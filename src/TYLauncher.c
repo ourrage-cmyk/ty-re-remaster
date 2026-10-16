@@ -60,6 +60,9 @@ static int PatchExe(const wchar_t* in, const wchar_t* out, wchar_t* err, int err
 }
 
 // ------------------------------------------------------------ starting the game
+#include "build_id.h"   // TY_BUILD_ID, written by build.ps1
+#define TY_VERSION L"v0.3.5-rc"
+#define TY_WINDOW_TITLE L"TY HD Renderer " TY_VERSION L"  build " TY_BUILD_ID
 static void Fail(const wchar_t* what) { wchar_t m[600]; swprintf(m, 600, L"%ls (error %lu)", what, GetLastError()); MessageBoxW(NULL, m, L"TYLauncher", MB_ICONERROR); }
 static int StartGame(int inject) {
     wchar_t exe[MAX_PATH], dll[MAX_PATH], cl[4400];
