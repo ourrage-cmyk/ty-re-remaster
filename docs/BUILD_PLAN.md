@@ -43,6 +43,13 @@ Nothing ships, and no release is cut, without the user's sign-off.
 | 5 | #15 research | A1, A4 | world-space AO/GI/fog alternatives | ideas only |
 | last | #17 release v0.3.5 | | G1 gate, release.ps1, zip verify | ask before shipping |
 
-## Status
+## Detail per item
 
-Updated per PR. Nothing is merged yet.
+Files, dependencies, what needs a game run, and acceptance per item: `docs/FIX_PLAN_20261016.md` (desktop, batches 1 to 3). This file is the sequence and the decisions; that file is the item-level plan.
+
+## Status (2026-10-16)
+
+- Issues #1 to #17: all open and current on GitHub (seeded 2026-10-16).
+- Fix branches: `fix/issue-1-ao`, `fix/issue-2-taa`, `fix/issue-11-shadows` are not pushed yet. PRs open when each branch exists.
+- Game runs: paused by the owner. Code edits and builds only until the owner says otherwise.
+- Nothing is merged. Nothing ships without the owner's sign-off.
