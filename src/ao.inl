@@ -600,7 +600,8 @@ static void RunAO(GLuint depthTex, int w, int h) {
     o_glUseProgram(ao.progAO); SetCommon(ao.progAO);
     U1f(ao.progAO, "u_radius", g_aoRadius); U1f(ao.progAO, "u_proj11", p11); U1i(ao.progAO, "u_slices", g_aoSlices); U1i(ao.progAO, "u_steps", g_aoSteps); U1i(ao.progAO, "u_debug", g_aoDebug);
     U1f(ao.progAO, "u_thin", g_aoThin);
-    U1f(ao.progAO, "u_frameNoise", g_aoTemporal ? fmodf(g_frame * 0.6180339f, 1.0f) : 0.0f);
+    // slow noise cycle: the rotation steps every 8 frames instead of every frame, so the temporal pass sees a stable pattern (less shimmer and grain)
+    U1f(ao.progAO, "u_frameNoise", g_aoTemporal ? fmodf(floorf(g_frame / 8.0f) * 0.6180339f, 1.0f) : 0.0f);
     o_glActiveTexture(0x84C0); o_glBindTexture(0x0DE1, depthTex);
     GProf(10); AODraw(); GProf(11);
     }
