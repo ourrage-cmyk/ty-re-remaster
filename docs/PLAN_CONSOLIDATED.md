@@ -11,7 +11,8 @@ One place for the work order. It joins the sources listed under "Where the detai
 - **Backup:** full OpenViking upload done at 2026-10-13 20:59 (`ovsync_all.ps1` plus `ovsync_extras.ps1`, 465 files). It has to be re-run after this document and the new issues land (see step 1 below).
 
 - **#11 closed (2026-10-16):** the owner playtested v0.3.4 (DLL sha1 3ee5da28a7) on Medium and confirmed the lines across the character shadows are fixed. High and Ultra were not yet playtested; reopen if they show the lines.
-- **Latest playtest (2026-10-17 000242, Medium only):** shadows no flicker; TAA looks good (no concerns, #2 open until the owner confirms); fog colour still changes with camera direction (#3/#4, now priority 1); AO under the character's feet grainy (#1, priority 2). High and Ultra still untested.
+- **Ultra/High playtest (2026-10-17, after Medium):** Ultra shows AO flicker and heavy TAA ghosting; High shows the same AO flicker with less ghosting. This confirms #6. AO flicker (#1) and TAA ghosting (#2) are back in batch 1 with the fog colour fix. If a setting cannot be made stable, change the Ultra preset, not the code.
+- **Latest playtest (2026-10-17 000242, Medium only):** shadows no flicker; TAA looks good on Medium (no concerns on Medium only); fog colour still changes with camera direction (#3/#4, now priority 1); AO under the character's feet grainy (#1, priority 2). High and Ultra still untested.
 
 ## Decisions accepted 2026-10-16
 
