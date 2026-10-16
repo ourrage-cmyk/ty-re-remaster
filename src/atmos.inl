@@ -211,7 +211,7 @@ void main() {
 }
 )";
 static struct { GLuint prog, tex[2]; int idx; bool failed, init; } skyE;
-static int g_atHazeFromSky = 1; static float g_atHazeSky = 0.6f, g_atBlurPx = 0.0f, g_atBlurStart = 4000.0f, g_atBlurRange = 12000.0f; static int g_atContactStable = 1;
+static int g_atHazeFromSky = 1; static float g_atHazeSky = 0.0f, g_atBlurPx = 0.0f, g_atBlurStart = 4000.0f, g_atBlurRange = 12000.0f; static int g_atContactStable = 1;
 
 typedef void(WINAPI* glDispatchCompute_t)(GLuint, GLuint, GLuint);
 typedef void(WINAPI* glBindImageTexture_t)(GLuint, GLuint, GLint, GLboolean, GLint, GLenum, GLenum);
@@ -266,7 +266,7 @@ static void LoadAtmosConfig() {
     F("Density", "0.000015", g_atDensity) F("HeightFalloff", "0.0015", g_atFalloff) F("MaxDist", "40000", g_atMaxDist)
     F("SunIntensity", "1.4", g_atSunInt) F("Anisotropy", "0.6", g_atG) F("AmbientScale", "1.0", g_atAmb)
     F("ContactShadows", "0.35", g_atContact) F("ContactLength", "25", g_atContactLen) F("ContactThickness", "6", g_atContactThick) F("FogAmount", "1.0", g_atFogMul)
-    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.5", g_atSkyHaze) F("SkyHazeHeight", "0.25", g_atSkyH) F("HazeHue", "0.25", g_atHazeHue) F("HazeSky", "0.6", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
+    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.5", g_atSkyHaze) F("SkyHazeHeight", "0.25", g_atSkyH) F("HazeHue", "0.25", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
 #undef F
