@@ -123,7 +123,7 @@ void main() {
   vec3 hRaw = YC(texture(u_hist, puv).rgb);
   vec3 h = clamp(hRaw, mn, mx);
   float motion = length((puv - uv) / u_rcp);
-  float blend = mix(u_blend, 0.5, clamp(motion / 12.0, 0.0, 1.0));   // trust history less under motion (ghosting)
+  float blend = mix(u_blend, 0.4, clamp(motion / 8.0, 0.0, 1.0));   // trust history less under motion (ghosting): full trust at 0 px, floor 0.4 by 8 px (was 0.5 by 12 px)   // trust history less under motion (ghosting)
   // history rejection (R5 grass ghosting): wind-animated grass and characters have no motion vectors, so their reprojected history is the
   // OLD geometry. When the raw history lies far outside the current neighbourhood box it is a disocclusion, not jitter noise -> blend less.
   float hd = abs(hRaw.x - h.x) / max(mx.x - mn.x, 0.02);
