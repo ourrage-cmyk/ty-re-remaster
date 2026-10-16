@@ -445,7 +445,7 @@ static struct {
     GLuint progPre0, progPreN, progAO2, texD; bool v2ok;
     int histIdx; bool histValid; unsigned lastFrame; float prevVP[16], prevCam[3];
 } ao;
-static float g_aoRadius2 = 400.0f, g_aoWide = 1.0f; static float g_aoRadius = 60.0f, g_aoStrength = 0.85f, g_aoPower = 1.0f, g_aoBlend = 0.85f, g_aoMB = 0.6f, g_aoThin = 0.5f;
+static float g_aoRadius2 = 400.0f, g_aoWide = 1.0f; static float g_aoRadius = 60.0f, g_aoStrength = 0.85f, g_aoPower = 1.0f, g_aoBlend = 0.92f, g_aoMB = 0.6f, g_aoThin = 0.5f;
 static int g_aoSlices = 3, g_aoSteps = 6, g_aoZMode = 0, g_aoEnable = 1, g_aoTemporal = 1;
 static int g_aoWSlices = 0, g_aoNoiseFrames = 64, g_aoBlurR = 2; static float g_aoBlurK = 0.15f; static int g_aoTMode = 1; static float g_aoFogFade = 1.0f; static bool g_aoOffFile; static int g_aoDebugIni; static float g_aoMipOff = 3.15f; static int g_aoLegacy = 0;
 
@@ -458,7 +458,7 @@ static void LoadAOConfig() {
     GetPrivateProfileStringA("ao", "WideStrength", "1.0", b, sizeof b, ini); g_aoWide = (float)atof(b);
     GetPrivateProfileStringA("ao", "Radius", "60", b, sizeof b, ini); g_aoRadius = (float)atof(b);
     GetPrivateProfileStringA("ao", "Thin", "0.5", b, sizeof b, ini); g_aoThin = (float)atof(b);
-    GetPrivateProfileStringA("ao", "TemporalBlend", "0.85", b, sizeof b, ini); g_aoBlend = (float)atof(b);
+    GetPrivateProfileStringA("ao", "TemporalBlend", "0.92", b, sizeof b, ini); g_aoBlend = (float)atof(b);
     GetPrivateProfileStringA("ao", "MultiBounce", "0.6", b, sizeof b, ini); g_aoMB = (float)atof(b);
     g_aoTemporal = GetPrivateProfileIntA("ao", "Temporal", 1, ini);
     GetPrivateProfileStringA("ao", "Strength", "0.85", b, sizeof b, ini); g_aoStrength = (float)atof(b);
