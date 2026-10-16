@@ -16,6 +16,7 @@ static std::unordered_map<GLuint, unsigned> g_pbrStamp;              // program 
 static void LoadPbrConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
     g_pbrEnable = GetPrivateProfileIntA("pbr", "Enable", 1, ini); g_pbrLitProps = GetPrivateProfileIntA("pbr", "LitProps", 1, ini);   // LitProps=0: dynamically lit (LIT=1) non-skinned props stay stock too g_pbrDebug = GetPrivateProfileIntA("pbr", "Debug", 0, ini);
+    g_texWaterNoFresnel = GetPrivateProfileIntA("pbr", "SkyFresnelSkipWater", 0, ini);   // 1: water-tagged draws (emissive/transparent) get no sky Fresnel term; 0 = unchanged
 #define PF(key, def, var) GetPrivateProfileStringA("pbr", key, def, b, sizeof b, ini); var = (float)atof(b);
     PF("NormalStrength", "1.0", g_pbrNormal) PF("Specular", "0.5", g_pbrSpec) PF("Roughness", "0.65", g_pbrRough) PF("HeightScale", "3.0", g_pbrHeight)
     PF("LowFreqBump", "0.6", g_pbrLowBump) PF("Cavity", "0.30", g_pbrCavity) PF("ValleyRough", "0.30", g_pbrValleyRough) PF("Sheen", "0.12", g_pbrSheen)
@@ -54,7 +55,7 @@ static bool PbrRewriteFS(std::string& s) {
     if (!lite && (s.find("diffuseColour *= light;") == std::string::npos || s.find("normalize(v_normal)") == std::string::npos)) return false;
     char hdr[1500];
     snprintf(hdr, sizeof hdr,
-        "in vec3 v_tyWorld;\nuniform vec3 tyCam; uniform vec3 tySunDir; uniform vec4 tyPbr; uniform vec4 tyPbr2; uniform vec4 tyPbr3; uniform vec4 tyRel; uniform vec4 tyRel2; uniform float tyTex;\n"
+        "in vec3 v_tyWorld;\nuniform vec3 tyCam; uniform vec3 tySunDir; uniform vec4 tyPbr; uniform vec4 tyPbr2; uniform vec4 tyPbr3; uniform vec4 tyRel; uniform vec4 tyRel2; uniform float tyTex; uniform float tyWater;\n"
         "// tyPbr: x normal strength, y specular, z roughness, w height scale; tyPbr2: x low-freq share kept in bump, y cavity, z valley roughness, w sheen;\n"
         "// tyPbr3.x relief strength; tyRel: x depth (world units) y ground mult z prop mult w 1=geometry already tessellated (parallax reduced); tyRel2: x fade0 y fade1 z max steps w mip bias\n"
         "float TyLum(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }\n"
@@ -144,7 +145,7 @@ static bool PbrRewriteFS(std::string& s) {
         "    float occl = clamp(dot(v_colour.rgb, vec3(0.3333)), 0.0, 1.0);        // baked vertex light/AO gates the highlight\n"
         "    float fade = TyDist(tyCamDist) * tyPbr.y * tyOn;\n"
         "    float spec = min(D * Vis * F * NoL, 4.0) * fade * occl;\n"
-        "    float Fr = 0.04 + 0.96 * pow(1.0 - NoV, 5.0);\n"
+        "    float Fr = (0.04 + 0.96 * pow(1.0 - NoV, 5.0)) * (1.0 - tyWater);     // tyWater=1 (ini SkyFresnelSkipWater, water draws): no sky Fresnel\n"
         "    vec3 env = vec3(0.55, 0.65, 0.85);\n"
         "    diffuseColour.rgb += spec * vec3(1.0, 0.94, 0.82) + Fr * (1.0 - rough) * 0.35 * fade * occl * env;\n"
         "    diffuseColour.rgb *= 1.0 + tyPbr2.w * pow(1.0 - NoV, 3.0) * rough * fade * occl * (1.0 - 0.5 * tyValley);   // soft dust / fibre sheen at grazing angles (albedo-coloured, not plastic)\n"
@@ -157,7 +158,7 @@ static bool PbrRewriteFS(std::string& s) {
 static void PbrOnLink(GLuint p) {
     GLint a = o_glGetUniformLocation(p, "tyCam"), b = o_glGetUniformLocation(p, "tySunDir"), c = o_glGetUniformLocation(p, "tyPbr"), d = o_glGetUniformLocation(p, "tyPbr2"), e = o_glGetUniformLocation(p, "tyPbr3");
     GLint f = o_glGetUniformLocation(p, "tyRel"), g = o_glGetUniformLocation(p, "tyRel2");
-    if (p < kTexProgs) { g_progTyTexLoc[p] = o_glGetUniformLocation(p, "tyTex"); g_progTyTexLast[p] = -1.0f; }
+    if (p < kTexProgs) { g_progTyTexLoc[p] = o_glGetUniformLocation(p, "tyTex"); g_progTyTexLast[p] = -1.0f; g_progTyWaterLoc[p] = o_glGetUniformLocation(p, "tyWater"); g_progTyWaterLast[p] = -1.0f; }
     if (a >= 0 || b >= 0 || c >= 0) { g_pbrLocs[p] = {a, b, c, d, e, f, g}; static int nlog; if (nlog++ < 6) logf("[pbr] prog %u locs cam%d sun%d pbr%d pbr2%d pbr3%d", p, a, b, c, d, e); }
 }
 static void TessApply(GLuint p) {

@@ -12,6 +12,7 @@ enum { TF_KNOWN = 1, TF_EMISSIVE = 2, TF_TRANSPARENT = 4, TF_CHARACTER = 8 };
 static int g_texEnable = 1, g_texDebug = 0, g_texSkinTags = 1;
 static const GLuint kTexProgs = 8192;
 static GLint g_progTyTexLoc[kTexProgs]; static float g_progTyTexLast[kTexProgs];   // per program: tyTex uniform location, last value (g_progDiffUnit = albedo sampler unit, in tyrender.cpp)
+static GLint g_progTyWaterLoc[kTexProgs]; static float g_progTyWaterLast[kTexProgs]; static int g_texWaterNoFresnel;   // ini [pbr] SkyFresnelSkipWater (default 0 = off): per-draw tyWater uniform, 1 = water-tagged draw
 static std::unordered_map<std::string, uint8_t> g_tagByName;      // lowercase file name -> flags
 static std::mutex g_texMu; static std::unordered_map<GLuint, std::string> g_texInfo;   // debug: id -> "name WxH"
 static unsigned g_texUploads, g_texNamed, g_texTagged, g_texReads;
@@ -33,7 +34,7 @@ static void LoadTexTags() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     g_texEnable = GetPrivateProfileIntA("tex", "Enable", 1, ini); g_texDebug = GetPrivateProfileIntA("tex", "Debug", 0, ini);
     g_texSkinTags = g_texEnable && GetPrivateProfileIntA("tex", "SkinnedByTag", 1, ini);   // skinned shaders get the detail code too; tags switch it per draw
-    for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = -1;
+    for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = g_progTyWaterLoc[i] = -1;
     if (!g_texFlagArr) g_texFlagArr = (uint8_t*)calloc(kTexArr, 1);
     g_tagByName.clear();
     for (auto& e : kTagNames) g_tagByName[e.n] = e.f;
@@ -156,6 +157,15 @@ HOOK(void, glCompressedTexImage2D, (GLenum t, GLint lvl, GLenum ifmt, GLsizei w,
 static unsigned g_texUntagCnt[1 << 18];   // debug: draws per untagged texture id
 static unsigned char g_progKind[kTexProgs];   // 0 = not evaluated, 1 = skinned, 2 = world
 static unsigned g_texDrawSet, g_texDrawChar, g_texDrawKnown, g_texDrawUnknown, g_texDraws;
+// Water = emissive or transparent tag (not character). Only used when [pbr] SkyFresnelSkipWater=1; the uniform stays 0 otherwise.
+static void TexSetWater(GLuint p, uint8_t fl) {
+    GLint loc = g_progTyWaterLoc[p]; if (!g_texWaterNoFresnel || loc < 0) return;
+    float v = ((fl & (TF_EMISSIVE | TF_TRANSPARENT)) && !(fl & TF_CHARACTER)) ? 1.0f : 0.0f;
+    if (g_progTyWaterLast[p] == v) return;
+    typedef void(WINAPI* pu1_t)(GLuint, GLint, GLfloat); static pu1_t pu1 = (pu1_t)o_wglGetProcAddress("glProgramUniform1f");
+    if (!pu1) return;
+    pu1(p, loc, v); g_progTyWaterLast[p] = v;
+}
 static void TexDrawPrep() {
     GLuint p = g_curProg; if (p >= kTexProgs) return;
     GLint loc = g_progTyTexLoc[p]; if (loc < 0) return;
@@ -165,6 +175,7 @@ static void TexDrawPrep() {
     if (fl & TF_CHARACTER) v = 1.0f; else if (g_progKind[p] == 1) v = (fl & TF_KNOWN) ? 0.0f : 1.0f; else v = 0.0f;
     if (g_texDebug && !(fl & TF_KNOWN) && tex < kTexArr) g_texUntagCnt[tex]++;
     g_texDraws++; if (fl & TF_CHARACTER) g_texDrawChar++; else if (fl & TF_KNOWN) g_texDrawKnown++; else g_texDrawUnknown++;
+    TexSetWater(p, fl);
     if (g_progTyTexLast[p] == v) return;
     typedef void(WINAPI* pu1_t)(GLuint, GLint, GLfloat); static pu1_t pu1 = (pu1_t)o_wglGetProcAddress("glProgramUniform1f");
     if (!pu1) return;
