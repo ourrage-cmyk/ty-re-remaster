@@ -99,7 +99,7 @@ void main() {
 static const char* kTAA = R"(#version 330
 in vec2 uv; out vec4 o;
 uniform sampler2D u_cur; uniform sampler2D u_hist; uniform sampler2D u_depth;
-uniform mat4 u_invVP; uniform mat4 u_prevVP; uniform vec2 u_rcp; uniform vec2 u_jitterUV; uniform float u_blend; uniform int u_valid; uniform float u_reject;
+uniform mat4 u_invVP; uniform mat4 u_prevVP; uniform mat4 u_VP; uniform vec2 u_rcp; uniform vec2 u_jitterUV; uniform float u_blend; uniform int u_valid; uniform float u_reject;
 vec3 YC(vec3 c) { return vec3(0.25 * c.r + 0.5 * c.g + 0.25 * c.b, 0.5 * c.r - 0.5 * c.b, -0.25 * c.r + 0.5 * c.g - 0.25 * c.b); }
 vec3 RGB(vec3 y) { return vec3(y.x + y.y - y.z, y.x + y.z, y.x - y.y - y.z); }
 void main() {
@@ -115,20 +115,27 @@ void main() {
   // variance clip box (tighter than min/max), intersected with min/max
   vec3 mu = m1 / 9.0, sig = sqrt(max(m2 / 9.0 - mu * mu, 0.0));
   mn = max(mn, mu - 1.0 * sig); mx = min(mx, mu + 1.0 * sig);
-  if (u_valid == 0) { o = vec4(cur, 1); return; }
+  // view depth of the closest surface in this frame; stored in the history alpha for the next frame's depth test
   vec4 w = u_invVP * vec4(dUV * 2.0 - 1.0, dMin * 2.0 - 1.0, 1.0); w /= w.w;
+  float zCur = (u_VP * vec4(w.xyz, 1.0)).w;
+  if (u_valid == 0) { o = vec4(cur, zCur); return; }
   vec4 pc = u_prevVP * vec4(w.xyz, 1.0);
   vec2 puv = uv + (pc.xy / pc.w * 0.5 + 0.5 - dUV);
-  if (pc.w <= 0.0 || any(lessThan(puv, vec2(0.0))) || any(greaterThan(puv, vec2(1.0)))) { o = vec4(cur, 1); return; }
-  vec3 hRaw = YC(texture(u_hist, puv).rgb);
+  if (pc.w <= 0.0 || any(lessThan(puv, vec2(0.0))) || any(greaterThan(puv, vec2(1.0)))) { o = vec4(cur, zCur); return; }
+  vec4 hs = texture(u_hist, puv);
+  vec3 hRaw = YC(hs.rgb);
   vec3 h = clamp(hRaw, mn, mx);
   float motion = length((puv - uv) / u_rcp);
-  float blend = mix(u_blend, 0.5, clamp(motion / 12.0, 0.0, 1.0));   // trust history less under motion (ghosting)
+  float blend = mix(u_blend, 0.4, clamp(motion / 8.0, 0.0, 1.0));   // trust history less under motion (ghosting): floor 0.4 by 8 px (was 0.5 by 12 px)
   // history rejection (R5 grass ghosting): wind-animated grass and characters have no motion vectors, so their reprojected history is the
   // OLD geometry. When the raw history lies far outside the current neighbourhood box it is a disocclusion, not jitter noise -> blend less.
   float hd = abs(hRaw.x - h.x) / max(mx.x - mn.x, 0.02);
   blend = mix(blend, min(blend, 0.35), u_reject * smoothstep(0.08, 0.5, hd));
-  o = vec4(mix(cur, RGB(h), blend), 1);
+  // depth-guided reject: the point's depth in the previous camera (pc.w) must match the depth stored with the history at puv.
+  // A mismatch is an occlusion or disocclusion edge, where history is the wrong surface -> drop it (blend 0).
+  float zRel = abs(pc.w - hs.a) / max(pc.w, 1e-3);
+  blend *= 1.0 - smoothstep(0.03, 0.10, zRel);
+  o = vec4(mix(cur, RGB(h), blend), zCur);
 }
 )";
 
@@ -212,6 +219,7 @@ static void RunFX(int w, int h) {
         GLuint p = fx.progTAA; o_glUseProgram(p);
         gx.Uniform1i(o_glGetUniformLocation(p, "u_cur"), 0); gx.Uniform1i(o_glGetUniformLocation(p, "u_hist"), 1); gx.Uniform1i(o_glGetUniformLocation(p, "u_depth"), 2);
         o_glUniformMatrix4fv(o_glGetUniformLocation(p, "u_invVP"), 1, 0, invVP); o_glUniformMatrix4fv(o_glGetUniformLocation(p, "u_prevVP"), 1, 0, fx.prevVP);
+        o_glUniformMatrix4fv(o_glGetUniformLocation(p, "u_VP"), 1, 0, g_sceneVP);
         gx.Uniform2f(o_glGetUniformLocation(p, "u_rcp"), 1.0f / w, 1.0f / h);
         gx.Uniform2f(o_glGetUniformLocation(p, "u_jitterUV"), g_jitterOn ? g_jitterX * 0.5f : 0.0f, g_jitterOn ? g_jitterY * 0.5f : 0.0f);
         gx.Uniform1f(o_glGetUniformLocation(p, "u_blend"), g_taaBlend); gx.Uniform1f(o_glGetUniformLocation(p, "u_reject"), g_taaReject);
