@@ -4,13 +4,34 @@ Subtle modern rendering for **TY the Tasmanian Tiger** on PC.
 
 **Status: preview / community beta, version 0.3.2.** Tested on one graphics card only: AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet. Reports are very welcome.
 
-## About this project
+## Why this exists
 
-This project adds a softer, modern look to TY while keeping the hand-painted feel of the original. Colours are tuned to stay close to the game. No game files are changed: the original `TY.exe` is never modified.
+TY the Tasmanian Tiger has bold, flat, colourful art, and that art deserves to be shown at its best. The renderer it shipped with is from the mid-2000s, though, and it holds the look back in a few specific ways:
 
-A launcher (`TYLauncher.exe`) gives you presets, sliders, saved settings and a Play button, so you can pick a look and press Play.
+- **Shadows are capped and hard.** Only the first shadow cascade is softened. The others are single hard taps. The shadow map is fixed at 2048, and a shadow can never be darker than 50%, so a bright day looks washed out instead of properly shaded.
+- **Fog is a flat colour blend.** Distant rocks and hills fade into a solid colour, with no light shafts through the haze.
+- **Surfaces are flat.** The game has no relief beyond what is painted on the textures, so sand, fences and rope look flat up close, especially at grazing angles.
+- **Light never bounces.** A coloured rock next to sand does not tint the sand.
+- **Few settings.** The game's own options are limited, with no way to tune shadow softness, haze or relief.
 
-It is a hobby side project, made with Claude for the community. It is for people who remember playing TY as kids, and for new players who are discovering it.
+This mod fixes those problems at the source, while keeping the game's look:
+
+- **Relief from the texture itself.** Cracks, grain, wood and rope get bumps and roughness from their own colour, so the ground has real profile. Feet stay on the ground, and characters are not changed.
+- **Contact shadows.** Ambient occlusion darkens crevices and corners where light cannot reach. It fades with distance and stays steady from frame to frame.
+- **Better shadows.** Adjustable shadow map size, a smooth filter with no grainy noise, and a cooler shade colour, so shadows read as shade instead of grey smudges.
+- **Atmosphere.** Volumetric haze with light shafts. Distant rocks and the horizon lose saturation, and the haze follows the real sky colour.
+- **Bounce light (High and Ultra).** Surfaces pick up a little colour from their neighbours.
+- **Smoother image.** Temporal anti-aliasing reduces shimmer on moving objects, and sharpening and grading keep it clean.
+- **A launcher with sliders.** Every effect has a slider, a short description and a rough cost tag, and your settings are saved.
+
+## Why you should try it
+
+- **Nothing in the game is changed.** The original `TY.exe` is never modified. To remove the mod, delete its files.
+- **You see the cost before you pay it.** The launcher shows what each option costs in frame time, so you can choose the look that suits your PC.
+- **Medium is the default.** It adds ambient occlusion, haze, relief, better shadows and anti-aliasing, and it runs at about 80 fps at 2560x1440 on the test card.
+- **It is subtle on purpose.** The aim is for TY to look like TY, only with shadows that behave, surfaces with texture and atmosphere that reads as atmosphere. Most effects are easiest to see up close. Haze and shadow shading are the most obvious changes from a distance.
+
+This is a hobby project, made with Claude for the community. It is for people who remember playing TY as kids, and for new players who are discovering it.
 
 ## What it does
 
