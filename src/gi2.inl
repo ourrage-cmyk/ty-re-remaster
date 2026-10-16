@@ -395,10 +395,18 @@ static bool GIHiz(GLuint depthTex, int w, int h, const float* invVP, const float
     };
     bool useMask = false;
     if (g_giMask && g_giMaskFrame == g_frame && g_giMaskFrameDraws > 0) {      // FB0 alpha = 0 where excluded sources were drawn -> own texture
+        // Half-res mask: the trace only samples it at half-res steps, and it is looked up by normalised UV, so no shader change.
+        // glCopyTexImage2D cannot downscale (it would grab a quarter of FB0), so FB0 is blitted into the half-res texture with GL_NEAREST.
         if (!g2.texMask) gx.GenTextures(1, &g2.texMask);
-        o_glActiveTexture(0x84C3); o_glBindTexture(0x0DE1, g2.texMask); o_glBindFramebuffer(0x8CA8, 0);
-        o_glCopyTexImage2D(0x0DE1, 0, 0x8058, 0, 0, w, h, 0);
+        o_glActiveTexture(0x84C3); o_glBindTexture(0x0DE1, g2.texMask);
+        if (g2.texMaskW != (GLuint)hw || g2.texMaskH != (GLuint)hh) { o_glTexImage2D(0x0DE1, 0, 0x8058, hw, hh, 0, 0x1908, 0x1401, nullptr); g2.texMaskW = hw; g2.texMaskH = hh; }
         gx.TexParameteri(0x0DE1, 0x2801, 0x2600); gx.TexParameteri(0x0DE1, 0x2800, 0x2600); gx.TexParameteri(0x0DE1, 0x2802, 0x812F); gx.TexParameteri(0x0DE1, 0x2803, 0x812F);
+        bool scissor = gx.IsEnabled(0x0C11);
+        if (scissor) o_glDisable(0x0C11);                                   // scissor clips blits
+        o_glBindFramebuffer(0x8CA8, 0); o_glBindFramebuffer(0x8CA9, g2.fbo);  // read FB0, draw into the GI fbo
+        GLenum blitBuf[1] = {0x8CE0}; o_glFramebufferTexture2D(0x8CA9, 0x8CE0, 0x0DE1, g2.texMask, 0); g2.DrawBuffers(1, blitBuf);
+        o_glBlitFramebuffer(0, 0, w, h, 0, 0, hw, hh, 0x4000 /*COLOR*/, 0x2600 /*NEAREST*/);
+        if (scissor) o_glEnable(0x0C11);
         useMask = true;
     }
     g_giMaskRan = g_frame;
