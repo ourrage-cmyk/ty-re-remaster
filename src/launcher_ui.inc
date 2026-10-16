@@ -366,6 +366,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
 int WINAPI wWinMain(HINSTANCE hi, HINSTANCE hp, LPWSTR cmd, int show) {
     GetModuleFileNameW(NULL, g_dir, MAX_PATH); wchar_t* s = wcsrchr(g_dir, L'\\'); if (s) s[1] = 0;
     swprintf(g_ini, MAX_PATH, L"%lstyrender.ini", g_dir);
+    EnsurePayload();
     int play = 0, inject = 1, argc; LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     for (int i = 1; i < argc; i++) {
         if (!wcscmp(argv[i], L"--wait")) { g_wait = 1; continue; }
