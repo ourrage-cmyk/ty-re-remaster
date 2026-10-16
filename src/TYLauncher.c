@@ -89,4 +89,13 @@ static int StartGame(int inject) {
 }
 
 
+// Build stamp shown in the window title so the exe is always identifiable. build.ps1 writes ty_version.h next to the output.
+#if defined(__has_include)
+#if __has_include("ty_version.h")
+#include "ty_version.h"
+#endif
+#endif
+#ifndef TY_VERSION
+#define TY_VERSION L"v0.3.5-rc"
+#endif
 #include "launcher_ui.inc"

@@ -1,13 +1,16 @@
 # Build tyrender.dll + TYLauncher.exe (32-bit, llvm-mingw i686, static runtime). Output: SRC\tyrender\out\
 # Usage: powershell -NoProfile -File C:\CLAUDE\SRC\tyrender\build.ps1 [-Install]   (-Install copies both into the working game folder)
-param([switch]$Install)
+param([switch]$Install, [string]$Version = 'v0.3.5-rc')
 $ErrorActionPreference = 'Stop'
 $bin = 'C:\CLAUDE\TOOLS\llvm-mingw\llvm-mingw-20261006-ucrt-x86_64\bin'
 $src = $PSScriptRoot; $out = Join-Path $src 'out'
 New-Item -ItemType Directory -Force $out | Out-Null
+# Version stamp for the launcher title bar: <Version> plus the short git sha of this source tree when available.
+$sha = (& git -C $src rev-parse --short HEAD 2>$null); $stamp = if ($sha) { "$Version ($sha)" } else { $Version }
+Set-Content -Path "$out\ty_version.h" -Value "#define TY_VERSION L`"$stamp`"" -Encoding ASCII
 & "$bin\i686-w64-mingw32-clang++.exe" -O2 -shared -static -std=c++17 -Wall -o "$out\tyrender.dll" "$src\tyrender.cpp" '-Wl,--kill-at'
 if ($LASTEXITCODE) { throw 'tyrender.dll build failed' }
-& "$bin\i686-w64-mingw32-clang.exe" -O2 -static -municode -mwindows -Wall -o "$out\TYLauncher.exe" "$src\TYLauncher.c" -lshell32 -lcomctl32
+& "$bin\i686-w64-mingw32-clang.exe" -O2 -static -municode -mwindows -Wall -I"$out" -o "$out\TYLauncher.exe" "$src\TYLauncher.c" -lshell32 -lcomctl32
 if ($LASTEXITCODE) { throw 'TYLauncher.exe build failed' }
 Get-ChildItem $out | Select-Object Name, Length
 if ($Install) {
