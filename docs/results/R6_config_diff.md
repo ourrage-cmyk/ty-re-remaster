@@ -1,0 +1,6 @@
+# R6-1: which harness runs were flicker-free? (2026-10-13, user watched while agents/gate ran)
+- 20:20 light_r5_perfbase: v0.3.3 DLL (agents\light\r5\base033.dll), MEDIUM preset (variant med), 11.78 ms.
+- 20:22 light_r5_perfnew: r5 DLL (textureLod fix), MEDIUM variants rej0/rej1 (TAAReject) and aa0 (AA off: user's "no TAA, aliasing but no shadow lines" run), 10.43 ms (aa0 9.93).
+- 20:23-20:24 light_r5_mo motion test (Medium; with TAA: "AA, distant shadows not flickering, AO noisy").
+- 20:27+ g1_gate soak (Medium preset_Balanced.ini): "best looking run"; 20:30 random walk fell in water -> water disco ball still there (GI is OFF in Medium => the blue pulsing on Ty is NOT GI: it is the engine's own water/envmap lighting or our light.inl hemisphere/specular on Ty).
+CONCLUSION: all flicker-free runs = MEDIUM (GI off, contact off, tess skin, AO 3x6, shadows 4096 Grid 3x3, fog 24). User earlier: High (= Medium + GI 1 ray + contact 0.35) and Ultra flicker. So the flicker source is in GI / contact shadows (High) and, additionally for Ultra, AO 4x8 + WideSlices, GI 2 rays, tess Scope=all L24, shadows 8192 Grid 4x4, fog 32 steps. Bisect order: High-GI, High-contact, then Ultra extras one by one, at low-fps emulation. NOTE water disco-ball happens on MEDIUM (GI off) -> separate cause: check [light] Hemisphere/specular + engine reflection on Ty near water.

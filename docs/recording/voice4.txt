@@ -1,0 +1,53 @@
+[0:00] Okay, I'm going to hit play. The video is not going to be perfectly synced with the audio
+[0:07] because I'm talking about it first, but I will tell you exactly which timestamps you need to be able to edit what you want to edit
+[0:15] or to find the screenshots of what I'm talking about. So I'm going to start the recording now.
+[0:23] So 3, 2, 1, recording started.
+[0:28] So we're going to load the game,
+[0:29] going to jump in straight here into the cliffs.
+[0:33] So now it is 33 seconds and we've just started.
+[0:36] There is a little bit of flickering, that's not ideal, of course.
+[0:39] And then when you look at the character,
+[0:43] let me try and see if I walk over here.
+[0:45] So we are now at 21 seconds in the recording,
+[0:50] recording, 50 seconds on the audio. You can see the character has a close up of his face
+[0:58] and in the shadows there on the close up of the face you can see the jagged bright lines
+[1:04] from the shadow edges that need to be fixed. Okay, then we're going to keep walking and
+[1:12] we cross the bridge, that's all looking good. When you go to the right hand side here, you
+[1:18] can see the fire this is at 52 seconds into the recording the video 52 seconds
+[1:23] in you can see the fire on the right hand side is not affected by the haze okay
+[1:30] then you go over to the Billy Billy sign that is in fact being tessellated
+[1:41] which is good but the bag I'm going to try and get you closer off the bag on the
+[1:55] bag as well at one minute 30 seconds you can see the lines on the shadows on the
+[2:00] bag but the bag itself is also not being tessellated so there's items that are
+[2:05] and there's items that are not tessellated which is really frustrating
+[2:08] I'm going to go through and run towards the back where the portal is.
+[2:19] Here where the portal is, it looks great. It's casting light onto the character,
+[2:25] but it is not casting light onto the ground.
+[2:27] That's why I went in and told you which textures are emissive and which ones aren't.
+[2:32] So you need to go in and make the emissive textures, emissive, the non-emissive textures, non-emissive.
+[2:38] Because if you're walking around you see his footprints here at two minutes, 15 seconds.
+[2:43] You'll see his footprints are almost glowing and
+[2:46] that's not good. They're not supposed to glow.
+[2:49] So you need to fix what's supposed to be emissive and what's not supposed to be emissive.
+[2:53] You need to make sure that the textures that are not characters are
+[2:56] tessellated and that the character marked
+[2:59] textures are not tessellated so that's what you need to fix. Everything else
+[3:05] looks great over here, the lighting looks amazing other than of course that it's
+[3:08] flickering and running in slow motion. The game kind of just yeah performance
+[3:15] isn't very good right now but it is much better than before so I think it can be
+[3:19] tweaked. I think I would honestly be playing it medium rather than ultra but
+[3:23] you know that's just here. I'm just gonna jump down quickly because I want to show
+[3:27] you something in the water. Perfect, so here we are. Let's go to maybe somewhere
+[3:37] where the water isn't quite as steep. Here we go. So three minutes, 18 seconds.
+[3:47] You can see the character barely moving but you see the flickering on the
+[3:51] character. That's because the water is two textures that are moving in different
+[3:56] directions and it's emitting light again. I've labeled what is emissive and what is not emissive.
+[4:02] The light, the water should not be reflecting the GI or at least it shouldn't be flickering blue
+[4:09] on the character like a disco ball so you can check that. Here at three minutes 48 again he's
+[4:18] barely moving you can check it. It's like every frame it changes. Yeah honestly it's not looking
+[4:26] very bad at all. I'm very happy with the progress we've made but I need you to go in and check
+[4:33] what I have actually provided you with, with regards to the textures and the labeling that you can
+[4:39] implement to make sure that all of this doesn't happen. And I've also said what if we were
+[4:46] making the distance rendering a little bit less of an issue. So let's say if the ambient occlusion fades from the character outward,
+[5:00] then the very faraway mountains like here at 4 minutes 40 would not be flickering because they wouldn't have ambient occlusion
+[5:12] that is fighting with the haze so that's something to look at.

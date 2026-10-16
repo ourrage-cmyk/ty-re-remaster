@@ -1,0 +1,9 @@
+# Task: AMBIENT OCCLUSION (agent folder C:\CLAUDE\SRC\agents\ao\, owns ao.inl; also touched gpuprof.inl sub-timers and tyrender.cpp hooks)
+Read `_common.md` first. State: depth-MIP XeGTAO-style path (v2: R32F depth mip chain, Hilbert + R2 noise, 3x6) measured at +1.41 ms over the stock frame vs legacy GTAO +5.82 ms (total frame deltas). Your finding: the "hidden 3.9 ms" was a timer attribution artifact (marks under-count; the GTAO shader itself is the cost) - use TOTAL FRAME ms as the metric. Legacy path kept via `[ao] Legacy=1`.
+Remaining work:
+1. Review `C:\CLAUDE\RESEARCH\results\v_ao\sheet.png` (off / legacy / v2 x 5 views) and full-size crops: v2 must match or beat legacy: contact shadows under props/fence/ropes, no halos at depth edges (ty silhouette, fence posts), thin occluders (grass/leaves) not turning black, stable under camera motion (no shimmer; check mid-motion snapshot), strength key behaves the same.
+2. Fix whatever v2 gets wrong; consider the FP16/half-res/denoise cost trade-offs; target total AO <= ~2 ms with equal or better look.
+3. List exactly which lines in tyrender.cpp you changed (diff text in REPORT.md) so the lead can three-way merge (other agents also edit that file at different places).
+4. Finalize REPORT.md.
+
+## UPDATE 2026-10-13 (lead review, results\VERDICTS.md): v2 has a DEFECT: at the close grazing view (sand_graze) the bottom of the frame gets a large dark smear (whole-image MAD vs off 26.0; legacy 1.4) and the vista view shifts (MAD 5.0); sand_wide and fence_mid are fine. Repro: results\v_ao\v2__sand_graze.png vs legacy__sand_graze.png. Likely near-field: radius or mip selection or depth-mip range at small view depth. Fix it first, re-verify with suite (views sand_graze, vista, default), then continue. Legacy AO changes the image by only about 1 of 255 on average, so also check v2 at default strength is not LOUDER than legacy anywhere.

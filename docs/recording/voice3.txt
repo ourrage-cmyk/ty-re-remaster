@@ -1,0 +1,25 @@
+[0:00] So I have gone through and I have labeled each of the textures where they
+[0:11] are transparent, whether it's a character, so it shouldn't have four
+[0:17] categories, not-emissive, transparent, emissive, and character. And the reason
+[0:23] for this is that I want to make sure the textures that are not emissive
+[0:29] are not emitting light. I want to make sure that the characters are not given
+[0:34] tassellation. I want to make sure that emissive textures glow and I want to
+[0:42] make sure that emissive textures can glow through transparent textures. That's
+[0:49] why. Now the classification isn't perfect. I will have missed a few so I
+[0:55] I need to make sure that it works even if the classification isn't perfect, which makes
+[1:01] it considerably harder, but the point is that I want to catch most of the outlowers.
+[1:07] Like for example, lava, I want it to glow.
+[1:09] That makes sense, right?
+[1:11] The boomerangs, I want them to glow, but the characters, I don't want them to glow.
+[1:15] The grass, I don't want them to glow.
+[1:17] The environment, I don't want them to glow, except for example, some of the collectibles
+[1:22] in the game. Those ones I want to glow. So it is a bit hard to know exactly what's what
+[1:28] from just the texture files because the names of the texture files are a little bit confusing.
+[1:35] And because the textures are
+[1:41] just flat, so I can't really see what they're supposed to be. So I've tried my best at classifying
+[1:46] it and I want you to go over it and understand it so that you can implement it as a filter
+[1:53] in all of the different shaders and go in and maybe through the game code you can find
+[2:02] what actually is considered a collectible and which ones should be glowing and which
+[2:07] ones shouldn't be glowing and all of those kind of things in case I misclassified some
+[2:11] of the items.
+[2:13] what I would like you to work on next.

@@ -1,0 +1,1 @@
+powershell -NoProfile -File C:\CLAUDE\TOOLS\suite.ps1 -Name grid_ultra_v034 -Dll C:\CLAUDE\SRC\tyrender\out\tyrender.dll -AB 'ultra=C:\CLAUDE\RESEARCH\results\inis\preset_Ultra.ini' -NoPerf -Views 'default=;vista=0 -60 300 -50 8;wide_left=0 -20 300 -70 6;sand_graze=-100 -60 700 -15 12;ty_feet=0 -60 150 0 15;fence_close=300 -40 350 35 12;rope_b=-60 0 400 25 6'
