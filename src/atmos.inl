@@ -205,7 +205,7 @@ void main() {
     acc += texture(u_color, q).rgb * w; ws += w;
   }
   vec4 prev = texelFetch(u_prev, ivec2(0), 0);
-  if (ws < 0.05) { o = prev; return; }                           // no sky in view: keep the last estimate
+  if (ws < 0.05) { o = vec4(prev.rgb, 0.0); return; }            // no sky in view: drop the estimate (alpha 0 -> haze falls back to the CPU hue), so a stale sky colour from the last view no longer tints the fog
   vec3 t = acc / ws;
   o = vec4(prev.a > 0.5 ? mix(prev.rgb, t, u_blend) : t, 1.0);
 }
