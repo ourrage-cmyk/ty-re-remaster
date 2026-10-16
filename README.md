@@ -1,66 +1,121 @@
-# TY HD Renderer (tyrender) - v0.3.2 preview / community beta
+# TY HD Renderer (tyrender)
 
-Modern rendering for **TY the Tasmanian Tiger** (PC, Steam build r4704_v1.44, 32-bit OpenGL). Drop-in: the game files are not modified.
+Subtle modern rendering for **TY the Tasmanian Tiger** on PC.
 
-**Status: preview / community beta.** Tested on one graphics card only (AMD Radeon RX 7600 XT, Windows 11). Other GPUs, NVIDIA, Intel and Linux/Proton are not tested yet. Reports with your `tyrender.log` are very welcome.
+**Status: preview / community beta, version 0.3.2.** Tested on one graphics card only: AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet. Reports are very welcome.
 
-## Test build v0.3.3 (not released yet)
-A test build is available for testers who want to check the open problems. It is not the recommended version: use v0.3.2 for normal play.
+## About this project
 
-What changed in v0.3.3:
-- **Textures are recognised by name.** A list of about 200 textures tells the renderer which ones are characters (no bumps, no relief, no shiny highlights on them), which ones glow (for example light sources) and which ones are see-through (water, glass, particles). Everything else gets the ground and prop relief.
-- **Bounce light ignores water, glow and see-through things.** Water no longer makes Ty flicker blue, and the portal glow no longer lights the ground. Setting `[gi] ExcludeSources=2` keeps the portal glow as a light source again.
-- **Bounce light is calmer.** It is blurred a little more and changes more slowly over time (`[gi] SourceBlur`, `NoiseCycle`, `TemporalBlend`).
-- **High costs about 2.5 ms more** than in v0.3.2 (about 19.8 ms at 2560x1440 on an RX 7600 XT, one run). Medium is unchanged at about 12 ms.
-- **Shadow edge tests:** a `[debug]` section of light settings (`ShadowView`, `PlaneBias`, `PlaneClamp`, `SlopeBias`, `SkinBias`) lets us look at shadow edges. They are all off by default.
+This project adds a softer, modern look to TY while keeping the hand-painted feel of the original. Colours are tuned to stay close to the game. No game files are changed: the original `TY.exe` is never modified.
 
-Please test High and Ultra and tell us whether they still flicker. Still open in this test build: the jagged bright lines on the edges of Ty's face and bag shadows, the water that still pulses Ty's brightness, footprints that may still glow, the dark halo behind Ty, fire that is not hazed, the portal light that does not reach the ground, and Ultra being slow.
+A launcher (`TYLauncher.exe`) gives you presets, sliders, saved settings and a Play button, so you can pick a look and press Play.
+
+It is a hobby side project, made with Claude for the community. It is for people who remember playing TY as kids, and for new players who are discovering it.
 
 ## What it does
+
 | Feature | What it does | Settings |
 |---|---|---|
-| Ambient occlusion (AO) | Darkens crevices, corners, the base of rocks and grass. Temporal, so it does not shimmer. | `[ao]` |
-| Better shadows | 4096 shadow maps (8192 in Ultra), a fixed filter grid with no per-pixel noise, cooler shadow colour. | `[shadows]` |
-| Volumetric haze | Dusty fog with sun shafts. Far rocks and the horizon turn hazier and less saturated; haze follows the real sky colour. | `[atmos]` |
-| Anti-aliasing | TAA or FXAA on top of the game's own MSAA. | `[post] AA` |
-| Sharpen and grade | Contrast-adaptive sharpening (clamped so it does not make dark or bright halos), gentle filmic curve, vibrance. HUD is not affected. | `[post]` |
-| Surface relief | Cracks, grain, wood and rope get relief and roughness from the texture's own colour. Ty's feet never sink into the ground. Characters are not changed. | `[pbr]`, `[tess]` |
-| Bounce light (High and Ultra) | Light bounces between surfaces. Ty's red trousers do not tint the ground. | `[gi]` |
-| Natural light | Cool sky-tinted shade, sky and ground bounce, translucent grass. | `[light]` |
+| Ambient occlusion (AO) | Soft shadows in corners and crevices. | `[ao]` |
+| Better shadows | Smoother shadow edges with no per-pixel noise. Shadow maps are 4096 (8192 in Ultra). Cooler shadow colour. | `[shadows]` |
+| Volumetric haze | Dusty haze with light shafts. Far rocks and the horizon look hazier and less saturated. The haze follows the real sky colour. | `[atmos]` |
+| Anti-aliasing | Smoother edges, using TAA or FXAA. | `[post] AA` |
+| Sharpen and grade | Gentle sharpening, a soft filmic curve and vibrance for colour. | `[post]` |
+| Surface relief | Cracks, grain, wood and rope get relief and roughness from their own texture colour. Feet do not sink into the ground. Characters are not changed. | `[pbr]`, `[tess]` |
+| Bounce light (High and Ultra) | Light bounces between nearby surfaces. | `[gi]` |
+| Natural light | Cool, sky-tinted shade, sky and ground bounce, and translucent grass. | `[light]` |
 
 ## What is new in v0.3.2
-- Flicker is reduced: the AO temporal filter uses history length and variance clamping, and the shadow filter no longer changes every frame.
-- Shadows: a fixed grid filter (`[shadows] Grid=1`) replaces the noisy filter. Shadow edges no longer strobe. Leaf rims from the sharpen pass are removed (`[post] SharpenHaloClamp=1`).
-- Haze: far trees and rocks take their colour from the real sky (`[atmos] HazeSky=0.6`). Optional distance blur (`DepthBlur`, off by default).
-- AO fades with fog (`[ao] FogFade=1`), so AO no longer fights the fog in the distance.
-- Characters: a capsule mask keeps Ty and NPCs from bouncing colour onto the ground (`[gi] Characters`, `CharacterColour`, `CharacterGI`, ...).
-- Relief scope defaults to `env-detail`: the texture-driven relief on the ground and props, characters excluded.
-- Launcher: a simple view with the four presets (Low, Medium, High, Ultra), an overall performance impact and the Play button; **More options >>** expands to every effect, the sliders and a description panel. Every option shows a performance tag (Free, Low, Medium, High).
+
+- Less flicker. The AO and shadow filters were steadied, and shadow edges no longer strobe.
+- Haze takes its colour from the real sky, so far trees and rocks follow it.
+- AO fades with fog, so it no longer fights the fog in the distance.
+- The launcher has a simple view with four presets (Low, Medium, High, Ultra), an overall performance impact and the Play button. **More options >>** shows every effect, the sliders and a description for each.
 
 ## Presets
-| Preset | Frame time at 2560x1440 (RX 7600 XT) | What it contains |
-|---|---|---|
-| Low | about 6.0 ms (about 166 fps) | No AO, no volumetric fog, FXAA, 2048 shadow maps |
-| **Medium** (recommended) | about 12 ms (about 80 fps) | AO, fog, relief, 4096 shadow maps, TAA. No bounce light |
-| High | about 18 ms (about 55 fps) | Medium + bounce light (1 ray) + contact shadows |
-| Ultra | about 31 ms (about 32 fps) | AO 4x8, bounce light (2 rays), fog 32 steps, environment relief, 8192 shadow maps |
 
-Stock game for comparison: about 5.7 ms. Full costs and the settings reference are in `PERFORMANCE.md`.
+Frame times are GPU milliseconds per frame. They are author-measured at 2560x1440, windowed, on one AMD Radeon RX 7600 XT. Other GPUs will be faster or slower. Lower is faster.
+
+| Preset | Frame time | About fps | What it adds |
+|---|---|---|---|
+| Stock game (no mod) | 5.7 ms | 175 | The original game, for comparison |
+| Low | about 6.0 ms | 166 | FXAA smoothing and 2048 shadow maps. No soft corner shadows, no haze |
+| **Medium** (recommended, default) | about 12 ms | 80 | Soft corner shadows, haze, surface relief, 4096 shadow maps, TAA smoothing. No bounce light |
+| High | about 18 ms | 55 | Medium plus bounce light (1 ray) and contact shadows |
+| Ultra | about 31 ms | 32 | More AO samples, bounce light (2 rays), higher-quality haze, environment relief, 8192 shadow maps |
+
+### Rough cost of each option vs Medium, one GPU, author-measured
+
+| Option | Change | Rough frame cost |
+|---|---|---|
+| Ambient occlusion (AO) | Off | saves about 1.15 ms |
+| Volumetric haze | Off | saves about 2.1 ms |
+| Contact shadows | On | about +1.7 ms |
+| Bounce light | On, 1 ray | about +4.4 ms |
+| Shadow maps | 8192, 32 taps | about +5.1 ms |
+| Environment relief | `[tess] Scope=env` | about +6.2 ms |
+
+These numbers are approximate. Effects interact, so the costs do not simply add up. They come from the v0.3 measurements in `docs/PERFORMANCE.md`. The v0.3.2 changes have not been timed one by one. Other GPUs will differ.
 
 ## Install
-1. Copy `tyrender.dll`, `TYLauncher.exe` and `tyrender.ini` into the game folder (next to `TY.exe`).
-2. Run `TYLauncher.exe`, pick a preset, press **Play with HD renderer**.
-   The first Play creates `TY_tyrender.exe`, a copy of TY.exe that loads tyrender.dll. TY.exe itself is never changed.
-3. Keep the launcher open and move the sliders. Most of them apply live.
-4. Optional: **Steam setup** copies a launch option. Paste it into Steam > TY > Properties > Launch options, and Steam's Play button starts the mod.
 
-`Play original (no mod)` starts the untouched game. `Advanced (ini)...` opens every setting in `tyrender.ini`.
+1. Download `TYLauncher.exe` from the release.
+2. Put it in the game folder, next to `TY.exe`.
+3. Run `TYLauncher.exe`, pick a preset (Medium is the recommended one) and press **Play with HD renderer**.
+   The first start installs the renderer files next to it. The first Play creates `TY_tyrender.exe`, a copy of `TY.exe` that loads `tyrender.dll`. `TY.exe` itself is never changed.
+4. Keep the launcher open to move the sliders. Most of them apply live.
+5. Optional: **Steam setup** copies a launch option. Paste it into Steam > TY the Tasmanian Tiger > Properties > General > Launch options. Steam's Play button then starts the mod.
 
-Memory: `TY_tyrender.exe` is marked Large Address Aware (4 GB instead of 2 GB). Without this the 32-bit game runs out of address space with the HD texture pack (log: `CMKHeap - Out of memory`).
+The single-file launcher applies from v0.3.5-rc.
 
-Uninstall: delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.ini`, `tyrender.log` and the `tyrender` folder.
+**Play original (no mod)** starts the untouched game. **Advanced (ini)...** opens `tyrender.ini`.
 
-## Settings file (`tyrender.ini`)
+**Memory:** `TY_tyrender.exe` is marked Large Address Aware (4 GB instead of 2 GB). Without this, the 32-bit game can run out of memory with the HD texture pack (log line: `CMKHeap - Out of memory`).
+
+## Uninstall
+
+Delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.ini`, `tyrender.log`, and the `tyrender` folder if it is there. If you added the Steam launch option, remove it in Steam. The original game keeps working without these files.
+
+## Known issues
+
+These are open issues from playtests. They are not fixed yet.
+
+- **Water:** when Ty is in water, his brightness pulses, because the water reflection reacts to him.
+- **Character shadows:** a thin bright line can run through the shadow edge on characters (face, bag), and the shadow looks slightly grid-like.
+- **Dark halo:** a dark halo can appear behind the character, on the side away from the camera.
+- **White rim:** fern shadows on the ground have a white rim.
+- **Glowing footprints:** some footprints can glow.
+- **Fire and light:** fire is not yet hazed by the fog, and the portal light does not reach the ground.
+- **Flicker on High and Ultra:** Medium is the stable preset in playtests. High and Ultra flickered in playtest 4. If you see flicker, use Medium.
+- **Ultra is slow:** about 31 ms per frame on the test card.
+- **Thin objects:** rope and grass get little benefit from relief, because their source textures are flat.
+- **Trails:** TAA can leave a faint trail on fast animation.
+- **Low-resolution textures:** relief comes from the texture's own colour, so it is subtle on low-resolution textures.
+- **Shimmer:** shimmer during fast camera moves has not been measured formally.
+- **Game version:** built against the 2020-04-04 `TY.exe`. Other builds are untested.
+
+## Reporting problems
+
+Send your `tyrender.log` and a screenshot, with your GPU model and driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
+
+## Compatibility and credits
+
+- Works with the base game.
+- Gets more from the ty2k mod. More texture detail means more precise relief.
+- The HD texture pack is separate from this project.
+- Made with Claude as a hobby project for the community. Thank you to everyone who tested and sent reports.
+
+## For modders
+
+Presets cover most needs, and the launcher writes the values it needs. To tune by hand, edit `tyrender.ini` in the game folder, or open it from **Advanced (ini)...** in the launcher. Costs per option are in `docs/PERFORMANCE.md`.
+
+### Fallback
+
+If your graphics card or driver cannot run an effect (for example no GL 4.3 compute for the fog, or a shader that does not compile), **that effect switches itself off** and the frame is drawn without it. The renderer does not fall back to a slower path. Check `tyrender.log` for the reason.
+
+<details>
+<summary>Settings reference (tyrender.ini)</summary>
+
 Live means the change applies while the game runs (through the launcher or the `tyrender\reload` file). Restart means the game must be restarted.
 
 | Section | Key | Default in code | Meaning |
@@ -82,9 +137,6 @@ Live means the change applies while the game runs (through the launcher or the `
 | `[gi]` | CharacterColour | 0.0 | How much of a character's colour is passed on (0 = none) |
 | `[gi]` | CharacterGI | 0.3 | How much light the character receives from the scene |
 | `[gi]` | CharacterHeight / CharacterRadius | 160 / 70 | Size of the mask around a character |
-| `[gi]` | ExcludeSources | 3 (test build v0.3.3) | Which textures do NOT send bounce light: 1 = glowing (emissive) textures, 2 = see-through (water, glass, particles) textures, 3 = both, 0 = none (old behaviour). `DebugView=3` shows the mask |
-| `[gi]` | SourceBlur / NoiseCycle / TemporalBlend | 0.15 / 8 / 0.85 (test build values) | Smoothness of the bounce light: blur of the sources, noise pattern length, how much of the previous frame is kept |
-| `[debug]` | ShadowView, PlaneBias, PlaneClamp, SlopeBias, SkinBias | off | Test aids for shadow edges (v0.3.3 test build) |
 | `[atmos]` | Enable / Froxel / Steps | 1 / 1 / 24 | Volumetric fog on or off, compute method, quality |
 | `[atmos]` | Intensity | 2.5 in code (presets write 2.2) | Overall haze amount (live) |
 | `[atmos]` | Desaturation / HazeLift | 0.7 / 0.35 | Far rocks lose colour and get lighter |
@@ -114,30 +166,6 @@ Live means the change applies while the game runs (through the launcher or the `
 | `[debug]` | ForceFallback | 0 | Test aid: bits 1 fog, 2 GI, 4 AO, 8 relief, 16 light shaders are forced to fail |
 | `[debug]` | StateGuard | 0 | Test aid: logs graphics-state changes |
 
-The shipped `tyrender.ini` is the Medium preset. Its header comment quotes an older figure ("about 90 fps"); Medium measures about 12 ms (about 80 fps) in v0.3.2. The launcher writes the values it needs, so you normally do not need to edit the file by hand.
+The shipped `tyrender.ini` is the Medium preset. The launcher writes the values it needs, so you normally do not need to edit the file by hand.
 
-## Fallback
-If your graphics card or driver cannot run an effect (for example no GL 4.3 compute for the fog, or a shader that does not compile), **that effect switches itself off** and the frame is drawn without it. The renderer does not fall back to a slower path. Check `tyrender.log` for the reason.
-
-## Known limitations and open issues
-Known issues from playtests 3 and 4 (v0.3.2, still in progress):
-- **Water pulsing on Ty:** when Ty drops into water his brightness pulses (the water reflection reacts to him). Water no longer adds bounce light in the test build, but the reflection pulse is not fixed yet.
-- **Character shadows:** a thin bright line runs through the shadow edge on characters (face, bag), and the shadow still looks slightly grid-like.
-- **AO halo behind the character:** a dark halo appears on the side away from the camera, whatever the light direction.
-- **White rim on fern shadows** on the ground.
-- **Footprints glow:** some footprint textures read as emissive (almost white). The texture list is in place, but the glow is not confirmed fixed.
-- **Fire and glowing lights:** the fire is not yet hazed by the fog, and the portal light does not light the ground.
-- **Flicker on High and Ultra:** Medium is stable in playtests. High and Ultra flickered in playtest 4 (v0.3.2). The v0.3.3 test build has changes for this; please report whether it is better. If you see flicker, use Medium.
-- **Ultra is slow** (about 31 ms per frame on the test card): use Medium or High on most computers.
-
-Requested and planned, not yet built: AO and relief distance-fade sliders, light spill from glowing objects (portal, crystal), per-level fog tuning (the Billabong level can look too hazy). A/B comparison screenshots (vanilla, Low, Medium, Ultra) for the community exist and will be published separately.
-
-Other limits:
-- Only tested on an AMD RX 7600 XT. NVIDIA, Intel and Linux/Proton are untested.
-- Motion shimmer and AO shimmer during fast camera moves have not been measured formally (playtest 3 on Medium/High reported no flicker; Ultra: see above).
-- Thin objects (rope, grass) get little or no relief benefit: the source textures are flat.
-- TAA can leave a faint trail on fast animation (no per-object motion vectors yet).
-- Relief is inward only and derived from the texture colour (the game has no height maps), so it is subtle on low-resolution textures. Shadows come from the untessellated mesh.
-- Built against the 2020-04-04 TY.exe. Other builds are untested.
-
-Feedback: send `tyrender.log` and a screenshot with your GPU model and driver version.
+</details>
