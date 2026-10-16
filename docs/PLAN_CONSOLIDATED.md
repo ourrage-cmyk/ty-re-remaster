@@ -10,7 +10,8 @@ One place for the work order. It joins the sources listed under "Where the detai
 - **Not yet verified by the user:** High and Ultra flicker, red on the ground, grass ghosting, checkerboard. The user has not played v0.3.4 yet.
 - **Backup:** full OpenViking upload done at 2026-10-13 20:59 (`ovsync_all.ps1` plus `ovsync_extras.ps1`, 465 files). It has to be re-run after this document and the new issues land (see step 1 below).
 
-- **#11 closed (2026-10-16):** the owner playtested v0.3.4 (DLL sha1 3ee5da28a7) and confirmed the lines across the character shadows are fixed. Evidence is the playtest, not a harness run. The earlier concern that the `textureLod` fix had been reverted is resolved by that playtest.
+- **#11 closed (2026-10-16):** the owner playtested v0.3.4 (DLL sha1 3ee5da28a7) on Medium and confirmed the lines across the character shadows are fixed. High and Ultra were not yet playtested; reopen if they show the lines.
+- **Latest playtest (2026-10-17 000242, Medium only):** shadows no flicker; TAA looks good (no concerns, #2 open until the owner confirms); fog colour still changes with camera direction (#3/#4, now priority 1); AO under the character's feet grainy (#1, priority 2). High and Ultra still untested.
 
 ## Decisions accepted 2026-10-16
 
@@ -36,7 +37,7 @@ Playtest Medium, High, and Ultra on v0.3.4. Check flicker, the red ground spot, 
 | #5 Water makes Ty flicker blue (C1, T74, W1) | Isolate hemisphere, specular, and engine reflection. Water GI side already handled by the v0.3.3 mask. | Ty stable in the slot-2 pond scene |
 | #1 AO: dark cloud behind Ty, shimmer (T73/T90) | Distance fade slider (FadeStart/FadeEnd), character not an AO occluder (capsule mask like GI), blue-noise plus history clamp, white rim on fern shadows (R3-F1). | No halo behind Ty; Medium +1 ms at most |
 | #2 TAA trails and grass ghosting (T91) | Depth-guided history reject, velocity-adaptive blend. Check `TAAReject` from v0.3.4 first. | No trails on fast Ty turns |
-| #11 Shadow checkerboard / dotted line | Closed 2026-10-16 on the owner's playtest of v0.3.4. | Done |
+| #11 Shadow checkerboard / dotted line | Closed 2026-10-16 on the owner's Medium playtest of v0.3.4. | Done |
 
 ### Step 3. Batch 2: speed and look
 | Issue | Work | Done when |
