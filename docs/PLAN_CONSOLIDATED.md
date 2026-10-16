@@ -10,7 +10,14 @@ One place for the work order. It joins the sources listed under "Where the detai
 - **Not yet verified by the user:** High and Ultra flicker, red on the ground, grass ghosting, checkerboard. The user has not played v0.3.4 yet.
 - **Backup:** full OpenViking upload done at 2026-10-13 20:59 (`ovsync_all.ps1` plus `ovsync_extras.ps1`, 465 files). It has to be re-run after this document and the new issues land (see step 1 below).
 
+- **Conflict to resolve before #11 closes:** the 2026-10-16 desktop check says the `textureLod` shadow fix may have been lost or reverted, and the owner still sees dotted lines on character shadows. Verify the fix is in the current source before counting #11 as done.
+
+## Decisions accepted 2026-10-16
+
+The owner said "agree to all of them" to the defaults below. A: yes, Ultra stays experimental in the ini. B: batch 1 first. C: footprints by texture clamp first. D: other-GPU reports welcome, not blocking. E: ship after batch 1 and 2 with one playtest. Nothing ships without the owner's sign-off.
+
 ## Work order
+
 
 Rules that apply to every item: one PR per fix, branch `fix/<id>-<slug>`, "Closes #<n>" in the body, evidence from a measured run (not a guess), max 3 agents at once, no game test while the user is playing.
 
@@ -71,6 +78,10 @@ E. **Release cadence:** ship after batch 1 and 2 with one playtest in between, o
 - `ovsync_all.ps1` skips `recording\`, `archive\`, and `agents\tasks\`; `ovsync_extras.ps1` covers them.
 
 ## Where the detail lives
+- `docs/PLAN_3DAY_20261016.md`: the 3-day pickup plan (sections 5 to 9 are the fix list).
+- `docs/FIX_PLAN_20261016.md`: item-level plan for batches 1 to 3 (files, dependencies, acceptance).
+- `docs/research/minecraft_shaderpack_port_ranking.md`: ranked ideas from the shader-pack study (ideas only, no code copied).
+- `docs/todo.json`: the task board (ids used above).
 - `docs/START_HERE.md`: entry point, commands, rules and traps.
 - `docs/RESUME.md`: current state and the dated save-point log (latest entry 2026-10-13 20:59).
 - `docs/PLAN_NEXT.md`: the batch order this document refines (last edited 2026-10-13 19:23; the RESUME log is newer).
