@@ -94,6 +94,55 @@ function Exit-GameLock([string]$Token) {
     if ($env:TY_LOCK_TOKEN -eq $Token) { Remove-Item Env:TY_LOCK_TOKEN -ErrorAction SilentlyContinue }
 }
 
+# Live monitoring. Stable files, so anyone can tail them while a run is going:
+#   C:\CLAUDE\RESEARCH\autoplaytest\progress.log   one timestamped line per event, plus a heartbeat every 20 s
+#   C:\CLAUDE\RESEARCH\autoplaytest\status.json    current variant, done/total, state, last update
+# Every line is also printed to the console.
+$ProgressDir = 'C:\CLAUDE\RESEARCH\autoplaytest'
+
+function Write-RunLog([string]$Msg) {
+    New-Item -ItemType Directory -Force $ProgressDir | Out-Null
+    $line = '{0} {1}' -f (Get-Date -Format 'HH:mm:ss'), $Msg
+    Add-Content -Path (Join-Path $ProgressDir 'progress.log') -Value $line -Encoding utf8
+    Write-Host $line
+}
+
+function Write-RunStatus([hashtable]$Status) {
+    New-Item -ItemType Directory -Force $ProgressDir | Out-Null
+    $Status['updated'] = (Get-Date -Format s)
+    $Status | ConvertTo-Json | Set-Content -Path (Join-Path $ProgressDir 'status.json') -Encoding utf8
+}
+
+# Background heartbeat: every $Interval seconds, log whether a game from $Game is alive (pid and CPU seconds), the newest screenshot and tyrender.log's last write.
+# It runs until the stop file exists. Start-Heartbeat returns the job; Stop-Heartbeat ends it.
+$HeartbeatScript = {
+    param([string]$Game, [string]$Dir, [int]$Interval)
+    $root = [IO.Path]::GetFullPath($Game).TrimEnd('\') + '\'
+    while (-not (Test-Path (Join-Path $Dir 'heartbeat.stop'))) {
+        $procs = @(Get-Process -Name 'TY_tyrender', 'TY' -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) })
+        $alive = if ($procs.Count -gt 0) { ($procs | ForEach-Object { '{0}:cpu{1:N0}s' -f $_.Id, $_.TotalProcessorTime.TotalSeconds }) -join ',' } else { 'none' }
+        $shot = Get-ChildItem (Join-Path $Game 'Screenshots') -Filter *.png -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+        $shotTxt = if ($shot) { $shot.LastWriteTime.ToString('HH:mm:ss') + ' ' + $shot.Name } else { 'none' }
+        $logFile = Join-Path $Game 'tyrender.log'
+        $logTxt = if (Test-Path $logFile) { (Get-Item $logFile).LastWriteTime.ToString('HH:mm:ss') } else { 'none' }
+        $line = '{0} heartbeat game=[{1}] newest_shot={2} tyrender.log={3}' -f (Get-Date -Format 'HH:mm:ss'), $alive, $shotTxt, $logTxt
+        Add-Content -Path (Join-Path $Dir 'progress.log') -Value $line -Encoding utf8
+        Start-Sleep -Seconds $Interval
+    }
+}
+
+function Start-Heartbeat([string]$Game, [int]$Interval = 20) {
+    New-Item -ItemType Directory -Force $ProgressDir | Out-Null
+    Remove-Item (Join-Path $ProgressDir 'heartbeat.stop') -ErrorAction SilentlyContinue
+    return Start-Job -ScriptBlock $HeartbeatScript -ArgumentList $Game, $ProgressDir, $Interval
+}
+
+function Stop-Heartbeat($Job) {
+    New-Item -ItemType File -Force (Join-Path $ProgressDir 'heartbeat.stop') | Out-Null
+    if ($Job) { Wait-Job $Job -Timeout 25 | Out-Null; Remove-Job $Job -Force -ErrorAction SilentlyContinue }
+    Remove-Item (Join-Path $ProgressDir 'heartbeat.stop') -ErrorAction SilentlyContinue
+}
+
 # Set one key in one ini section, creating the section or key when missing. Only touches the text lines; comments are kept.
 function Set-IniKey([string]$Path, [string]$Section, [string]$Key, [string]$Value) {
     $lines = New-Object System.Collections.Generic.List[string]

@@ -19,14 +19,17 @@ $tok = $null
 try {
     Assert-TestPhase
     $tok = Enter-GameLock 'boot_spot'
+    Write-RunLog "boot start: spot=$Spot exe=$Exe settle=${Settle}s"
     $play = Join-Path $PSScriptRoot '..\ty_play.ps1'
     # billabong = level 2 (save slot 2), per docs/RESUME.md: TY_SLOT=2 selects slot 2.
     if ($Spot -eq 'slot2' -or $Spot -eq 'billabong') { $env:TY_SLOT = '2' } else { Remove-Item Env:TY_SLOT -ErrorAction SilentlyContinue }
     & powershell -NoProfile -File $play -Extra $Extra -Settle $Settle -Exe $Exe -Game $Game
     if ($LASTEXITCODE -ne 0) { throw "ty_play exited $LASTEXITCODE" }
+    Write-RunLog 'boot OK (gameplay reached)'
     'BOOT OK'
     $code = 0
 } catch {
+    Write-RunLog "boot FAIL: $($_.Exception.Message)"
     "BOOT FAIL: $($_.Exception.Message)"
 } finally {
     if ($ownLock -and $tok) { Exit-GameLock $tok }

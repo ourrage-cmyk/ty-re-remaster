@@ -107,3 +107,19 @@ Procedure: the Fix plan thread sets `phase.txt` to `TEST` once all merges are do
 - `overlay` runs on slot 1 and `overlay_billabong` on slot 2 (after the 45 s cutscene settle). Each sets `[overlay] Key=F10`, then does: baseline frame, F10 open and frame, F10 close and frame. The closed frame must match the baseline.
 - `report.md` lists every `[overlay]` line from `tyrender.log` (the GL state dumps from #72) under its variant.
 - Not built: the chapter reload check. It needs the menu steps to reload a chapter, and those are not wired yet.
+
+## Watching a run live
+
+Every run writes to stable files that can be tailed while it is going:
+
+- `C:\CLAUDE\RESEARCH\autoplaytest\progress.log`: one timestamped line per event (run start, each variant start, boot OK or FAILED, variant done, run end), plus a heartbeat every 20 s. The heartbeat shows whether a game from the run's folder is alive (pid and CPU seconds), the newest screenshot and the last write time of `tyrender.log`.
+- `C:\CLAUDE\RESEARCH\autoplaytest\status.json`: state (`running` or `finished`), the current variant, how many variants are done, and the last update time.
+
+Every line is also printed to the console. To follow it in PowerShell:
+
+```
+Get-Content C:\CLAUDE\RESEARCH\autoplaytest\progress.log -Wait -Tail 20
+Get-Content C:\CLAUDE\RESEARCH\autoplaytest\status.json
+```
+
+The heartbeat runs as a background job and stops when the run ends. A stale heartbeat (no new lines for more than a minute) means the run has stopped or hung.

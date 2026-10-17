@@ -21,6 +21,8 @@ $lockToken = Enter-GameLock 'autoplaytest'
 
 if (-not $Out) { $Out = Join-Path 'C:\CLAUDE\RESEARCH\autoplaytest' (Get-Date -Format 'yyyyMMdd_HHmmss') }
 New-Item -ItemType Directory -Force $Out | Out-Null
+$hbJob = Start-Heartbeat $Game
+Write-RunLog "run start: variants=$($Variants -join ',') spot=$Spot game=$Game out=$Out"
 if ($Copy) {
     $copy = Join-Path $Out 'game'
     & robocopy $Game $copy /E /XD Screenshots /NFL /NDL /NJH /NJS /NP | Out-Null
@@ -78,6 +80,7 @@ function Save-GameLog($r) {
 
 function Run-Variant([string]$Name, [hashtable]$Def) {
     $dir = Join-Path $Out $Name; New-Item -ItemType Directory -Force $dir | Out-Null
+    Write-RunLog "variant $Name start (spot=$(if ($Def.ContainsKey('Spot')) { $Def.Spot } else { $Spot }))"
     $r = @{ Name = $Name; Dir = $dir; Boot = ''; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a'; OverlayLog = @() }
     if (Get-GameProcs $Game) { $r.Boot = 'FAIL a game process is already running from this folder (slot busy; announce in the Fix plan thread)'; return $r }
     $proc = [IO.Path]::GetFileNameWithoutExtension($Def.Exe)
@@ -95,8 +98,9 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
     else { Remove-Item $camFile -ErrorAction SilentlyContinue }
 
     $boot = & powershell -NoProfile -File (Join-Path $PSScriptRoot 'boot_spot.ps1') -Game $Game -Exe $Def.Exe -Extra $Def.Args -Spot $spot -Settle $settle 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) { $r.Boot = "FAIL $($boot.Trim())"; Stop-Game; Save-GameLog $r; return $r }
+    if ($LASTEXITCODE -ne 0) { $r.Boot = "FAIL $($boot.Trim())"; Write-RunLog "variant $Name boot FAILED: $($boot.Trim())"; Stop-Game; Save-GameLog $r; return $r }
     $r.Boot = 'OK'
+    Write-RunLog "variant $Name booted to gameplay, taking shots"
 
     # Two A/B pairs at the start spot (the first is the baseline for the overlay check).
     $r.Base = @(Take-Pair $Game $proc $dir 'base01') + @(Take-Pair $Game $proc $dir 'base02')
@@ -137,19 +141,26 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
     $r.Alive = if (Get-GameProcs $Game -Names @($proc)) { 'yes' } else { 'NO (exited before the end)' }
     Stop-Game
     Save-GameLog $r
+    Write-RunLog "variant $Name done: shots=$($r.ShotCount) flicker=[$($r.Flicker)] overlay=[$($r.Overlay)] alive=$($r.Alive)"
     return $r
 }
 
 $results = @()
 try {
+    $n = 0
     foreach ($name in $Variants) {
         if (-not $defs.ContainsKey($name)) { throw "unknown variant $name" }
+        Write-RunStatus @{ state = 'running'; current = $name; done = $n; total = $Variants.Count }
         $results += Run-Variant $name $defs[$name]
+        $n++
     }
+    Write-RunStatus @{ state = 'finished'; current = ''; done = $n; total = $Variants.Count }
 } finally {
     Stop-Game
     if ($hadIni) { Copy-Item $iniBackup $ini -Force }
     if ($hadCam) { Copy-Item $camBackup $camFileLive -Force } else { Remove-Item $camFileLive -ErrorAction SilentlyContinue }
+    Stop-Heartbeat $hbJob
+    Write-RunLog 'run end'
     Exit-GameLock $lockToken
 }
 
