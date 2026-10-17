@@ -78,7 +78,7 @@ The full key list with defaults is in `README.md` (section "Settings file"). Sum
 | `[tess] Scope=env` | about 6 ms more than Medium |
 | `[shadows] Grid` (1 = fixed grid, recommended) | about 0.7 ms more than the old filter |
 | `[ao] Legacy=1` (old AO) | about 5 ms more than the new AO; not recommended |
-| `[lod] Enable=1` (GI rays only, needs `[gi] Enable=1`) | saves GI trace time on far pixels; not yet measured (untested on hardware); default off |
+| `[lod] Enable=1` with `GI=1`, `AO=1` and/or `Fog=1` | saves GI rays, AO horizon steps and froxel fog samples on far pixels; not yet measured (untested on hardware); default off |
 | `[ao] TemporalMode`, `[atmos] HazeSky`, `[post] SharpenHaloClamp`, `[gi] Characters` | negligible |
 
 Live (applied while the game runs): `[ao] [gi] [atmos] [post] [fog] [light]`, `[pbr]` uniforms, `[shadows] Strength GrassStrength`.

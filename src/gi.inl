@@ -87,7 +87,6 @@ void main() {
 static struct { bool init, failed; int w, h; GLuint prog, progT, progC, texRaw, texH[2]; int histIdx; bool histValid; unsigned lastFrame; float prevVP[16]; } gi;
 static int g_giDebugIni;
 static void LoadGIConfig() {
-    LoadLodConfig();   // [lod] is read with [gi] so the config reload (tyrender.cpp) refreshes both
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
     g_giEnable = GetPrivateProfileIntA("gi", "Enable", 1, ini); g_giRays = GetPrivateProfileIntA("gi", "Rays", 4, ini); g_giSteps = GetPrivateProfileIntA("gi", "Steps", 8, ini);
 #define F(key, def, var) GetPrivateProfileStringA("gi", key, def, b, sizeof b, ini); var = (float)atof(b);
