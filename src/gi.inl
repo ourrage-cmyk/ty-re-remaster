@@ -92,7 +92,7 @@ static void LoadGIConfig() {
 #define F(key, def, var) GetPrivateProfileStringA("gi", key, def, b, sizeof b, ini); var = (float)atof(b);
     F("Strength", "0.7", g_giStrength) F("Radius", "400", g_giRadius) F("Thickness", "120", g_giThick) F("TemporalBlend", "0.85", g_giBlend) F("SigmaL", "4", g_giSigmaL) F("SourceBlur", "0.15", g_giBlur) g_giNoiseCycle = GetPrivateProfileIntA("gi", "NoiseCycle", 8, ini); g_giMask = GetPrivateProfileIntA("gi", "ExcludeSources", 7, ini);
     g_giCharOn = GetPrivateProfileIntA("gi", "Characters", 1, ini); F("CharacterColour", "0.0", g_giCharKeep) F("CharacterGI", "0.3", g_giCharGI) F("CharacterHeight", "160", g_giCharH) F("CharacterRadius", "70", g_giCharR)
-    g_giChecker = GetPrivateProfileIntA("gi", "Checker", 0, ini); g_giMode = GetPrivateProfileIntA("gi", "Mode", 1, ini); g_giAtrous = GetPrivateProfileIntA("gi", "Atrous", 3, ini); g_giHizIter = GetPrivateProfileIntA("gi", "HiZIter", 0, ini); g_giProf = GetPrivateProfileIntA("gi", "Prof", 0, ini); g_giSweep = GetPrivateProfileIntA("gi", "Sweep", 0, ini); g_giDebugIni = GetPrivateProfileIntA("gi", "DebugView", 0, ini);
+    g_giChecker = GetPrivateProfileIntA("gi", "Checker", 0, ini); g_giAtrousFar = GetPrivateProfileIntA("gi", "AtrousFar", 0, ini); g_giMode = GetPrivateProfileIntA("gi", "Mode", 1, ini); g_giAtrous = GetPrivateProfileIntA("gi", "Atrous", 3, ini); g_giHizIter = GetPrivateProfileIntA("gi", "HiZIter", 0, ini); g_giProf = GetPrivateProfileIntA("gi", "Prof", 0, ini); g_giSweep = GetPrivateProfileIntA("gi", "Sweep", 0, ini); g_giDebugIni = GetPrivateProfileIntA("gi", "DebugView", 0, ini);
 #undef F
 }
 static void PollGIFlags() {

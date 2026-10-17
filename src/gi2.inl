@@ -8,7 +8,7 @@
 //   4) composite onto FB0: depth-aware 2x2 upsample, shade-weighted desaturated albedo proxy (same look as the legacy path)
 // Config [gi]: Mode=1 (0 = legacy path) Atrous=3 HiZIter=0 (0 -> Steps*4 traversal iterations) Prof=0 (log per-pass GPU ms); the old keys keep their meaning.
 
-static int g_giMode = 1, g_giAtrous = 3, g_giHizIter = 0, g_giProf = 0, g_giChecker = 0;   // g_giChecker: [gi] Checker (default 0 = trace every pixel)
+static int g_giMode = 1, g_giAtrous = 3, g_giHizIter = 0, g_giProf = 0, g_giChecker = 0, g_giAtrousFar = 0;   // g_giChecker: [gi] Checker (default 0 = trace every pixel); g_giAtrousFar: [gi] AtrousFar (default 0 = 5x5 everywhere)
 static int g_giCharOn = 1; static float g_giCharKeep = 0.0f, g_giCharGI = 0.3f, g_giCharH = 160.0f, g_giCharR = 70.0f;   // [gi] Characters/CharacterColour/CharacterGI/CharacterHeight/CharacterRadius
 static float g_giSigmaL = 4.0f, g_giBlur = 0.0f; static int g_giNoiseCycle = 0;   // [gi] SourceBlur (cone footprint px per px of ray length, 0 = off), NoiseCycle (0 = noise changes every frame, N = repeats every N frames, 1 = static)
  static int g_giSweep = 0; static const char* g_giVarName = "";
@@ -264,7 +264,7 @@ void main() {
 
 static const char* kGIAtrous = R"(
 in vec2 uv; out vec4 o;
-uniform sampler2D u_src; uniform sampler2D u_hm; uniform sampler2D u_gb; uniform int u_step; uniform int u_first; uniform vec2 u_half; uniform float u_sigL;
+uniform sampler2D u_src; uniform sampler2D u_hm; uniform sampler2D u_gb; uniform int u_step; uniform int u_first; uniform vec2 u_half; uniform float u_sigL; uniform float u_farS;
 float Lum(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 float VarAt(ivec2 p) {
   p = clamp(p, ivec2(0), ivec2(u_half) - 1);
@@ -291,7 +291,8 @@ void main() {
   float kern[3] = float[3](0.375, 0.25, 0.0625);
   vec3 sum = cc; float wsum = 1.0, vsum = VarAt(ip), w2 = 1.0;
   sum = cc * 1.0; vsum = VarAt(ip) * 1.0;
-  for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) {
+  int R = gc.w > u_farS ? 1 : 2;                                      // [gi] AtrousFar: 3x3 ring instead of 5x5 beyond [lod] Start
+  for (int y = -R; y <= R; y++) for (int x = -R; x <= R; x++) {
     if (x == 0 && y == 0) continue;
     ivec2 q = ip + ivec2(x, y) * u_step;
     if (any(lessThan(q, ivec2(0))) || any(greaterThanEqual(q, ivec2(u_half)))) continue;
@@ -480,6 +481,7 @@ static bool GIHiz(GLuint depthTex, int w, int h, const float* invVP, const float
         o_glUseProgram(g2.progAT); Common(g2.progAT);
         gx.Uniform1i(UL(g2.progAT, "u_src"), 1); gx.Uniform1i(UL(g2.progAT, "u_hm"), 2); gx.Uniform1i(UL(g2.progAT, "u_gb"), 3);
         gx.Uniform2f(UL(g2.progAT, "u_half"), (float)hw, (float)hh); gx.Uniform1f(UL(g2.progAT, "u_sigL"), g_giSigmaL);
+        gx.Uniform1f(UL(g2.progAT, "u_farS"), g_giAtrousFar ? g_lodStart : 1e9f);
         o_glActiveTexture(0x84C2); o_glBindTexture(0x0DE1, g2.texHM[cur]);
         o_glActiveTexture(0x84C3); o_glBindTexture(0x0DE1, g2.texGB);
         GLuint src = g2.texHC[cur];
