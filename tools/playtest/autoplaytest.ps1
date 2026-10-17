@@ -38,6 +38,19 @@ $defs = @{
     overlay      = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'overlay.Key' = 'F10' };        Flicker = $false; Overlay = $true }
     fog_seethru1 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '1' };       Flicker = $false; Overlay = $false }
     emit1        = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1' };            Flicker = $false; Overlay = $false }
+    # Requested A/B variants, opt-in with -Variants. The water, trees and portal spots are not wired yet (see docs), so these run at the Rainbow Cliffs spot.
+    dbg_water_0  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '0' };         Flicker = $true;  Overlay = $false }
+    dbg_water_1  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '1' };         Flicker = $true;  Overlay = $false }
+    dbg_water_2  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '2' };         Flicker = $true;  Overlay = $false }
+    dbg_water_4  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '4' };         Flicker = $true;  Overlay = $false }
+    dbg_water_8  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '8' };         Flicker = $true;  Overlay = $false }
+    dbg_water_5  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '5' };         Flicker = $true;  Overlay = $false }
+    skyfog_012   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'atmos.SkyFogDist' = '0.12' };     Flicker = $false; Overlay = $false }   # needs #58 on main
+    skyfog_045   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'atmos.SkyFogDist' = '0.45' };     Flicker = $false; Overlay = $false }   # needs #58 on main
+    trees_see0   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '0' };        Flicker = $false; Overlay = $false }
+    trees_see1   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '1' };        Flicker = $false; Overlay = $false }
+    portal_comp0 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1'; 'emit.Compensate' = '0' }; Flicker = $false; Overlay = $false }
+    portal_comp1 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1'; 'emit.Compensate' = '1' }; Flicker = $false; Overlay = $false }
 }
 
 function Stop-Game { Get-GameProcs $Game | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800 }
