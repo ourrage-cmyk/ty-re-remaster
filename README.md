@@ -1,6 +1,12 @@
 # TY HD Renderer (tyrender)
 
-Subtle modern rendering for **TY the Tasmanian Tiger** on PC.
+> **G'day, mate!** Ty's Australian outback was painted by hand, and it deserves a light that does it justice. TY HD Renderer gives the outback a bit more depth: shadows that actually shade the ground, haze that rolls over the far rocks, and sand and fences with real texture when you get up close.
+>
+> Ty still looks like Ty, and the game plays exactly the same. You just see more of the bush around you.
+>
+> Nothing in the game files gets changed. Pick a preset, press Play, and go and find a dunny.
+
+A modern rendering layer for **TY the Tasmanian Tiger** on PC.
 
 **Status: preview / community beta, version 0.3.2.** Tested on one graphics card only: AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet. Reports are very welcome.
 
@@ -29,7 +35,7 @@ This mod fixes those problems at the source, while keeping the game's look:
 - **Nothing in the game is changed.** The original `TY.exe` is never modified. To remove the mod, delete its files.
 - **You see the cost before you pay it.** The launcher shows what each option costs in frame time, so you can choose the look that suits your PC.
 - **Medium is the default.** It adds ambient occlusion, haze, relief, better shadows and anti-aliasing, and it runs at about 80 fps at 2560x1440 on the test card.
-- **It is subtle on purpose.** The aim is for TY to look like TY, only with shadows that behave, surfaces with texture and atmosphere that reads as atmosphere. Most effects are easiest to see up close. Haze and shadow shading are the most obvious changes from a distance.
+- **Made to look like TY.** The aim is for TY to look like TY, only with shadows that behave, surfaces with texture and atmosphere that reads as atmosphere. Most effects are easiest to see up close. Haze and shadow shading are the most obvious changes from a distance.
 
 This is a hobby project, made with Claude for the community. It is for people who remember playing TY as kids, and for new players who are discovering it.
 
@@ -111,7 +117,7 @@ These are open issues from playtests. They are not fixed yet.
 - **Ultra is slow:** about 31 ms per frame on the test card.
 - **Thin objects:** rope and grass get little benefit from relief, because their source textures are flat.
 - **Trails:** TAA can leave a faint trail on fast animation.
-- **Low-resolution textures:** relief comes from the texture's own colour, so it is subtle on low-resolution textures.
+- **Low-resolution textures:** relief comes from the texture's own colour, so it is weaker on low-resolution textures.
 - **Shimmer:** shimmer during fast camera moves has not been measured formally.
 - **Game version:** built against the 2020-04-04 `TY.exe`. Other builds are untested.
 
