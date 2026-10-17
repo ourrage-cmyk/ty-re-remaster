@@ -59,6 +59,79 @@ This is a hobby project, made with Claude for the community. It is for people wh
 - AO fades with fog, so it no longer fights the fog in the distance.
 - The launcher has a simple view with four presets (Low, Medium, High, Ultra), an overall performance impact and the Play button. **More options >>** shows every effect, the sliders and a description for each.
 
+## Before and after
+
+These are F11 captures from one playtest on build `cda9364`, on the **Ultra** preset, shaders off (left) and on (right). They are the only comparison in this README, so read them as a sample of eight, not a full test. Ultra is the slowest preset, so Medium will show less of the difference.
+
+Scene names are our own guesses from the off frames. All images are in [`docs/ab/`](docs/ab/).
+
+**Honest read:** the change is clearest in shadows and ground shading. Ty's contact shadow is firmer, the cracked ground and rock walls have more relief, and shadows on the sand have more depth. Colour and sky are almost unchanged, and far-off haze is hard to see in these frames. The biggest change is in the archway shot (04). In most other pairs the difference is small enough that you would need the two side by side to see it. Whether it is worth the frame cost depends on how much you value those details.
+
+<table>
+<tr>
+<th align="left">Shaders off</th>
+<th align="left">Shaders on</th>
+</tr>
+<tr>
+<td><img src="docs/ab/01_beach_cliffs_fort_off.jpg" alt="Beach, red cliffs, palms and a ruined fort, shaders off" width="100%"></td>
+<td><img src="docs/ab/01_beach_cliffs_fort_on.jpg" alt="Beach, red cliffs, palms and a ruined fort, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>01: Beach, red cliffs, palms and the ruined fort. Palm shadows on the sand are a little darker on the right.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/02_palm_grove_water_off.jpg" alt="Ty in a palm grove by the water, shaders off" width="100%"></td>
+<td><img src="docs/ab/02_palm_grove_water_on.jpg" alt="Ty in a palm grove by the water, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>02: Ty in the palm grove by the water. Very little change. The water is not affected in this frame.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/03_portal_two_up_prompt_off.jpg" alt="Ty with the Two Up text and the Press R prompt beside the rainbow portal, shaders off" width="100%"></td>
+<td><img src="docs/ab/03_portal_two_up_prompt_on.jpg" alt="Ty with the Two Up text and the Press R prompt beside the rainbow portal, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>03: Ty next to the rainbow portal. The area around the portal is darker with shaders on, but the portal does not light the ground. This is a known issue.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/04_forest_arch_tunnel_off.jpg" alt="Ty walking under the wooden arch at the forest tunnel exit, shaders off" width="100%"></td>
+<td><img src="docs/ab/04_forest_arch_tunnel_on.jpg" alt="Ty walking under the wooden arch at the forest tunnel exit, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>04: Ty under the wooden arch at the forest tunnel exit. The largest change in the set: deeper shadow under Ty, stronger ground relief and a darker tunnel.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/05_canopy_path_dusk_off.jpg" alt="Ty on the canopy path at dusk, shaders off" width="100%"></td>
+<td><img src="docs/ab/05_canopy_path_dusk_on.jpg" alt="Ty on the canopy path at dusk, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>05: Ty on the canopy path at dusk. Small change, mostly in the shadows.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/06_canopy_path_closeup_off.jpg" alt="Close-up of Ty under the canopy, shaders off" width="100%"></td>
+<td><img src="docs/ab/06_canopy_path_closeup_on.jpg" alt="Close-up of Ty under the canopy, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>06: Close-up of Ty under the canopy. Slightly firmer shadow on the ground.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/07_tall_grass_off.jpg" alt="Ty in tall grass, shaders off" width="100%"></td>
+<td><img src="docs/ab/07_tall_grass_on.jpg" alt="Ty in tall grass, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>07: Ty in tall grass. Small change. The grass looks a little softer and darker at the base.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/08_fence_counter_17_off.jpg" alt="Fence, a counter showing 17, a sign and a machine, shaders off" width="100%"></td>
+<td><img src="docs/ab/08_fence_counter_17_on.jpg" alt="Fence, a counter showing 17, a sign and a machine, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub>08: The fence, the counter showing 17, a sign and a machine. Small change on the fence and posts.</sub></td>
+</tr>
+</table>
+
+Known issues that these frames do not show: the blue flicker in water, and fog over the water and lilies. See [Known issues](#known-issues).
+
 ## Presets
 
 Frame times are GPU milliseconds per frame. They are author-measured at 2560x1440, windowed, on one AMD Radeon RX 7600 XT. Other GPUs will be faster or slower. Lower is faster.
