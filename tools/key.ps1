@@ -34,7 +34,7 @@ foreach ($k in ($Keys -split ',' | ForEach-Object { $_.Trim().ToUpper() } | Wher
     # agents' subprocesses are not allowed to steal focus; the lead's TOOLS\focus_daemon.ps1 does it for them, so wait up to ~12 s for focus to arrive
     for ($try = 0; $try -lt 24 -and -not $fgOk; $try++) { $fgOk = [KW]::Force($h); if (-not $fgOk) { Start-Sleep -Milliseconds 500 } else { Start-Sleep -Milliseconds 120 } }
     if (-not $fgOk -or [KW]::GetForegroundWindow() -ne $h) { "FOCUS LOST - $k NOT sent (game not foreground after 12 s; is TOOLS\focus_daemon.ps1 running?)"; continue }
-    $vk = if ($vkMap.ContainsKey($k)) { $vkMap[$k] } else { [int][char]$k[0] }
+    $vk = if ($vkMap.ContainsKey($k)) { $vkMap[$k] } elseif ($k -match '^F(\d{1,2})$') { 0x6F + [int]$Matches[1] } else { [int][char]$k[0] }   # F1..F24
     $scan = [byte][KW]::MapVirtualKey([uint32]$vk, 0)
     $ext = if ($extended -contains $k) { 1 } else { 0 }
     [KW]::keybd_event([byte]$vk, $scan, $ext, [UIntPtr]::Zero)
