@@ -9,7 +9,7 @@
 #include <mutex>
 #include <algorithm>
 #include "tex_tags.inc"
-enum { TF_KNOWN = 1, TF_EMISSIVE = 2, TF_TRANSPARENT = 4, TF_CHARACTER = 8, TF_DECAL = 16 };   // TF_DECAL: named in ini [decal] Names (not a CSV tag)
+enum { TF_KNOWN = 1, TF_EMISSIVE = 2, TF_TRANSPARENT = 4, TF_CHARACTER = 8, TF_DECAL = 16, TF_WATER = 32 };   // TF_DECAL: named in ini [decal] Names (not a CSV tag). TF_WATER: file name contains "water" (ini [fog] WaterBoost)
 static int g_texEnable = 1, g_texDebug = 0, g_texSkinTags = 1, g_texLogUnknown = 0;   // g_texLogUnknown: ini [tex] LogUnknown (default 0): draws per untagged texture, by name, every 600 frames
 static const GLuint kTexProgs = 8192;
 static GLint g_progTyTexLoc[kTexProgs]; static float g_progTyTexLast[kTexProgs];   // per program: tyTex uniform location, last value (g_progDiffUnit = albedo sampler unit, in tyrender.cpp)
@@ -181,7 +181,9 @@ static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const voi
         logf("[tex] MISS id=%u px=%p nearest=%p+%u %s ringW=%u", id, px, best ? best->b : nullptr, best ? (unsigned)best->n : 0, best ? best->name : "-", g_texRingW);
     }
     if (nm) { g_texNamed++; auto it = g_tagByName.find(nm); if (it != g_tagByName.end()) { fl = it->second; if (fl & TF_KNOWN) g_texTagged++; }
-        if (g_decalClamp && std::find(g_decalNames.begin(), g_decalNames.end(), std::string(nm)) != g_decalNames.end()) fl |= TF_DECAL; }
+        if (g_decalClamp && std::find(g_decalNames.begin(), g_decalNames.end(), std::string(nm)) != g_decalNames.end()) fl |= TF_DECAL;
+        std::string low = nm; for (auto& c : low) c = (char)tolower((unsigned char)c);
+        if (low.find("water") != std::string::npos) fl |= TF_WATER; }
     g_texFlagArr[id] = fl; g_texClassArr[id] = MatClassOfFlags(fl);
     if ((g_spillLog || g_texLogUnknown) && nm) g_texNameById[id] = nm;
     if (g_texDebug) { char b[160]; snprintf(b, sizeof b, "%s %dx%d ifmt=%#x", nm ? nm : "?", w, h, ifmt); g_texInfo[id] = b; }
