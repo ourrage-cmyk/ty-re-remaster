@@ -41,6 +41,7 @@ $defs = @{
     stock        = @{ Exe = 'TY.exe';          Args = '-skipvideo'; Ini = @{};                              Flicker = $true;  Overlay = $false }
     mod          = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{};                              Flicker = $true;  Overlay = $false }
     overlay      = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'overlay.Key' = 'F10' };        Flicker = $false; Overlay = $true }
+    overlay_billabong = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'overlay.Key' = 'F10' }; Flicker = $false; Overlay = $true; Spot = 'billabong' }
     fog_seethru1 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '1' };       Flicker = $false; Overlay = $false }
     emit1        = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1' };            Flicker = $false; Overlay = $false }
     # Requested A/B variants, opt-in with -Variants. The water, trees and portal spots are not wired yet (see docs), so these run at the Rainbow Cliffs spot.
@@ -69,13 +70,15 @@ function Save-GameLog($r) {
     if (-not (Test-Path $src)) { $r.LogHits = 'no tyrender.log'; return }
     Copy-Item $src (Join-Path $r.Dir 'tyrender.log') -Force
     $hits = @(Select-String -Path $src -Pattern '(?i)\berror\b|\bfailed\b|assert' | Select-Object -First 5)
+    # [overlay] GL state lines (issue #12): the before/during/after dumps the overlay writes.
+    $r.OverlayLog = @(Select-String -Path $src -Pattern '\[overlay\]' | Select-Object -First 40 | ForEach-Object { $_.Line.Trim() })
     $r.LogHits = "$($hits.Count) (first: " + (($hits | ForEach-Object { $_.Line.Trim() }) -join ' | ') + ')'
     if ($hits.Count -eq 0) { $r.LogHits = '0' }
 }
 
 function Run-Variant([string]$Name, [hashtable]$Def) {
     $dir = Join-Path $Out $Name; New-Item -ItemType Directory -Force $dir | Out-Null
-    $r = @{ Name = $Name; Dir = $dir; Boot = ''; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a' }
+    $r = @{ Name = $Name; Dir = $dir; Boot = ''; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a'; OverlayLog = @() }
     if (Get-GameProcs $Game) { $r.Boot = 'FAIL a game process is already running from this folder (slot busy; announce in the Fix plan thread)'; return $r }
     $proc = [IO.Path]::GetFileNameWithoutExtension($Def.Exe)
 
@@ -159,6 +162,9 @@ $md = @(
     '|---|---|---|---|---|---|---|'
 )
 foreach ($r in $results) { $md += "| $($r.Name) | $($r.Boot) | $($r.Alive) | $($r.ShotCount) | $($r.Flicker) | $($r.Overlay) | $($r.LogHits) |" }
+$md += ''
+$ovr = @($results | Where-Object { $_.OverlayLog.Count -gt 0 })
+if ($ovr.Count -gt 0) { $md += '## [overlay] GL state lines from tyrender.log'; foreach ($r in $ovr) { $md += "### $($r.Name)"; $md += '```'; $md += $r.OverlayLog; $md += '```' } }
 $md += ''
 $md += '## Checklist'
 $md += ('- [{0}] boot to gameplay for every variant' -f $(if (@($results | Where-Object { $_.Boot -ne 'OK' }).Count -eq 0) { 'PASS' } else { 'FAIL' }))

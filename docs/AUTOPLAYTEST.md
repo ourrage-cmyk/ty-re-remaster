@@ -101,3 +101,9 @@ Only one game may run, and playtesting starts only after every session has finis
 - A run that holds the lock passes its token to child scripts in `TY_LOCK_TOKEN`, so `boot_spot.ps1` runs inside the parent's lock and does not take it twice.
 
 Procedure: the Fix plan thread sets `phase.txt` to `TEST` once all merges are done, then starts the run. It sets the phase back to `EDIT` or `FREEZE` after the run.
+
+## Overlay check (issue #12)
+
+- `overlay` runs on slot 1 and `overlay_billabong` on slot 2 (after the 45 s cutscene settle). Each sets `[overlay] Key=F10`, then does: baseline frame, F10 open and frame, F10 close and frame. The closed frame must match the baseline.
+- `report.md` lists every `[overlay]` line from `tyrender.log` (the GL state dumps from #72) under its variant.
+- Not built: the chapter reload check. It needs the menu steps to reload a chapter, and those are not wired yet.
