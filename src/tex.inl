@@ -8,13 +8,17 @@
 #include <mutex>
 #include <algorithm>
 #include "tex_tags.inc"
-enum { TF_KNOWN = 1, TF_EMISSIVE = 2, TF_TRANSPARENT = 4, TF_CHARACTER = 8 };
+enum { TF_KNOWN = 1, TF_EMISSIVE = 2, TF_TRANSPARENT = 4, TF_CHARACTER = 8, TF_DECAL = 16 };   // TF_DECAL: named in ini [decal] Names (not a CSV tag)
 static int g_texEnable = 1, g_texDebug = 0, g_texSkinTags = 1;
 static const GLuint kTexProgs = 8192;
 static GLint g_progTyTexLoc[kTexProgs]; static float g_progTyTexLast[kTexProgs];   // per program: tyTex uniform location, last value (g_progDiffUnit = albedo sampler unit, in tyrender.cpp)
 static GLint g_progTyWaterLoc[kTexProgs]; static float g_progTyWaterLast[kTexProgs]; static int g_texWaterNoFresnel;   // ini [pbr] SkyFresnelSkipWater (default 0 = off): per-draw tyWater uniform, 1 = water-tagged draw
 static std::unordered_map<std::string, uint8_t> g_tagByName;      // lowercase file name -> flags
 static int g_spillLog = 0; static std::unordered_map<GLuint, unsigned> g_spillCnt; static std::unordered_map<GLuint, std::string> g_texNameById;   // #9 step 1 (SpillLogDraw)
+// ini [decal] (#8 footprint glow): Clamp=0 (default off) caps the luminance of decal draws at Max; Names = file names that count as decals.
+// Per program: tyDecal uniform (1 = decal draw), set per draw from the bound albedo flags (TexDrawPrep).
+static int g_decalClamp = 0; static float g_decalMax = 0.9f; static std::vector<std::string> g_decalNames;
+static GLint g_progTyDecalLoc[kTexProgs]; static float g_progTyDecalLast[kTexProgs];
 static std::mutex g_texMu; static std::unordered_map<GLuint, std::string> g_texInfo;   // debug: id -> "name WxH"
 static unsigned g_texUploads, g_texNamed, g_texTagged, g_texReads;
 
@@ -36,7 +40,11 @@ static void LoadTexTags() {
     g_texEnable = GetPrivateProfileIntA("tex", "Enable", 1, ini); g_texDebug = GetPrivateProfileIntA("tex", "Debug", 0, ini);
     g_spillLog = g_texEnable && GetPrivateProfileIntA("spill", "LogEmitters", 0, ini);   // #9 step 1: log additive draws per texture (every 600 frames)
     g_texSkinTags = g_texEnable && GetPrivateProfileIntA("tex", "SkinnedByTag", 1, ini);   // skinned shaders get the detail code too; tags switch it per draw
-    for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = g_progTyWaterLoc[i] = -1;
+    for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = g_progTyWaterLoc[i] = g_progTyDecalLoc[i] = -1;
+    g_decalClamp = GetPrivateProfileIntA("decal", "Clamp", 0, ini);
+    char dv[32]; GetPrivateProfileStringA("decal", "Max", "0.9", dv, sizeof dv, ini); g_decalMax = (float)atof(dv);
+    char dn[512]; GetPrivateProfileStringA("decal", "Names", "ty_footprint.dds,ty_footprint2.dds", dn, sizeof dn, ini);
+    g_decalNames.clear(); for (char* t = strtok(dn, ","); t; t = strtok(nullptr, ",")) { std::string x = TexBase(t); while (!x.empty() && x.back() == ' ') x.pop_back(); if (!x.empty()) g_decalNames.push_back(x); }
     if (!g_texFlagArr) g_texFlagArr = (uint8_t*)calloc(kTexArr, 1);
     g_tagByName.clear();
     for (auto& e : kTagNames) g_tagByName[e.n] = e.f;
@@ -144,7 +152,8 @@ static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const voi
         for (unsigned i = 0; i < 8192; i++) { const TexRead& e = g_texRing[(g_texRingW - 1 - i) & 8191]; if (!e.name) break; if (e.b <= p && (!best || e.b > best->b)) best = &e; }
         logf("[tex] MISS id=%u px=%p nearest=%p+%u %s ringW=%u", id, px, best ? best->b : nullptr, best ? (unsigned)best->n : 0, best ? best->name : "-", g_texRingW);
     }
-    if (nm) { g_texNamed++; auto it = g_tagByName.find(nm); if (it != g_tagByName.end()) { fl = it->second; if (fl & TF_KNOWN) g_texTagged++; } }
+    if (nm) { g_texNamed++; auto it = g_tagByName.find(nm); if (it != g_tagByName.end()) { fl = it->second; if (fl & TF_KNOWN) g_texTagged++; }
+        if (g_decalClamp && std::find(g_decalNames.begin(), g_decalNames.end(), std::string(nm)) != g_decalNames.end()) fl |= TF_DECAL; }
     g_texFlagArr[id] = fl;
     if (g_spillLog && nm) g_texNameById[id] = nm;
     if (g_texDebug) { char b[160]; snprintf(b, sizeof b, "%s %dx%d ifmt=%#x", nm ? nm : "?", w, h, ifmt); g_texInfo[id] = b; }
@@ -169,8 +178,17 @@ static void TexSetWater(GLuint p, uint8_t fl) {
     if (!pu1) return;
     pu1(p, loc, v); g_progTyWaterLast[p] = v;
 }
+static void TexSetDecal(GLuint p, uint8_t fl) {
+    GLint loc = g_progTyDecalLoc[p]; if (loc < 0) return;
+    float v = (fl & TF_DECAL) ? 1.0f : 0.0f;
+    if (g_progTyDecalLast[p] == v) return;
+    typedef void(WINAPI* pu1_t)(GLuint, GLint, GLfloat); static pu1_t pu1 = (pu1_t)o_wglGetProcAddress("glProgramUniform1f");
+    if (!pu1) return;
+    pu1(p, loc, v); g_progTyDecalLast[p] = v;
+}
 static void TexDrawPrep() {
     GLuint p = g_curProg; if (p >= kTexProgs) return;
+    if (g_decalClamp) TexSetDecal(p, TexFlags(g_bound2D[g_progDiffUnit[p] & 31]));   // before the tyTex early-out: decal programs may have no PBR header
     GLint loc = g_progTyTexLoc[p]; if (loc < 0) return;
     if (!g_progKind[p]) g_progKind[p] = g_skinProgs.count(p) ? 1 : 2;
     GLuint tex = g_bound2D[g_progDiffUnit[p] & 31];
@@ -190,6 +208,21 @@ static void SpillLogDraw() {
     if (!g_spillLog || g_blendD != 1 || (g_blendS != 0x0302 && g_blendS != 1)) return;
     GLuint tex = g_bound2D[g_progDiffUnit[g_curProg < 8192 ? g_curProg : 0] & 31];
     g_spillCnt[tex]++;
+}
+// #8: decal luminance clamp (ini [decal] Clamp=1). Only shaders ending in the stock output line are rewritten; the uniform is set per draw (TexSetDecal).
+static bool DecalRewriteFS(std::string& s) {
+    if (!g_decalClamp) return false;
+    const char* kOut = "FINAL_COLOR = diffuseColour;";
+    if (s.find(kOut) == std::string::npos || s.find("void main") == std::string::npos || s.find("uniform float tyDecal;") != std::string::npos) return false;
+    char blk[400];
+    snprintf(blk, sizeof blk, "if (tyDecal > 0.5) { float tyDl = dot(diffuseColour.rgb, vec3(0.2126, 0.7152, 0.0722)); if (tyDl > %.4f) diffuseColour.rgb *= %.4f / tyDl; }\n  FINAL_COLOR = diffuseColour;", g_decalMax, g_decalMax);
+    ReplaceAll(s, kOut, blk);
+    s.insert(s.rfind("void main"), "uniform float tyDecal;\n");
+    return true;
+}
+static void TexOnLink(GLuint p) {
+    if (p >= kTexProgs) return;
+    g_progTyDecalLoc[p] = o_glGetUniformLocation(p, "tyDecal"); g_progTyDecalLast[p] = -1.0f;
 }
 static void TexReport() {
     static unsigned last; if (g_frame - last < 600) return; last = g_frame;

@@ -15,7 +15,7 @@ static std::unordered_map<GLuint, unsigned> g_pbrStamp;              // program 
 
 static void LoadPbrConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
-    g_pbrEnable = GetPrivateProfileIntA("pbr", "Enable", 1, ini); g_pbrLitProps = GetPrivateProfileIntA("pbr", "LitProps", 1, ini);   // LitProps=0: dynamically lit (LIT=1) non-skinned props stay stock too g_pbrDebug = GetPrivateProfileIntA("pbr", "Debug", 0, ini);
+    g_pbrEnable = GetPrivateProfileIntA("pbr", "Enable", 1, ini); g_pbrLitProps = GetPrivateProfileIntA("pbr", "LitProps", 1, ini); g_pbrDebug = GetPrivateProfileIntA("pbr", "Debug", 0, ini);   // LitProps=0: dynamically lit (LIT=1) non-skinned props stay stock too
     g_texWaterNoFresnel = GetPrivateProfileIntA("pbr", "SkyFresnelSkipWater", 0, ini);   // 1: water-tagged draws (emissive/transparent) get no sky Fresnel term; 0 = unchanged
 #define PF(key, def, var) GetPrivateProfileStringA("pbr", key, def, b, sizeof b, ini); var = (float)atof(b);
     PF("NormalStrength", "1.0", g_pbrNormal) PF("Specular", "0.5", g_pbrSpec) PF("Roughness", "0.65", g_pbrRough) PF("HeightScale", "3.0", g_pbrHeight)
