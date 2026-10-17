@@ -28,11 +28,11 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 Each pair is an F11 capture from one playtest, on build `cda9364` and the **Ultra** preset. Left is shaders off, right is shaders on.
 
-There are eight pairs, so treat them as a sample rather than a full test. Ultra is the slowest preset, so Medium will show less difference. The change is clearest in shadows and on the ground. Colour and sky barely move, and haze is hard to see in these frames.
+There are eight pairs, so treat them as a sample rather than a full test. Ultra is the slowest preset, so Medium will show less difference. **Read this first:** the F11 "shaders off" frame is not stock. The hotkey only switches off surface relief and the material extras (PBR). Ambient occlusion, bounce light, fog, shadows and anti-aliasing stay on in both frames. So these pairs show the relief and material part of the mod only. They are not a full before and after, and they should not be read as proof of shadow, AO, bounce light or fog differences. A true before and after set will replace them after the F11 fix and the next playtest.
 
 All images are in [`docs/ab/`](docs/ab/).
 
-### Shadows and relief
+### Ground and props
 
 <table>
 <tr>
@@ -44,18 +44,18 @@ All images are in [`docs/ab/`](docs/ab/).
 <td><img src="docs/ab/04_forest_arch_tunnel_on.jpg" alt="Ty under the wooden arch at the forest tunnel exit, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>04 Forest arch.</b> The biggest change in the set. Shadow under Ty is deeper, the ground has more relief, and the tunnel is darker.</sub></td>
+<td colspan="2"><sub><b>04 Forest arch.</b> Under the wooden arch at the forest tunnel exit.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/01_beach_cliffs_fort_off.jpg" alt="Beach, red cliffs, palms and a ruined fort, shaders off" width="100%"></td>
 <td><img src="docs/ab/01_beach_cliffs_fort_on.jpg" alt="Beach, red cliffs, palms and a ruined fort, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>01 Beach and fort.</b> Palm shadows on the sand are a little darker on the right.</sub></td>
+<td colspan="2"><sub><b>01 Beach and fort.</b> Beach, red cliffs, palms and the ruined fort.</sub></td>
 </tr>
 </table>
 
-### Contact shadows
+### Close-ups
 
 <table>
 <tr>
@@ -67,14 +67,14 @@ All images are in [`docs/ab/`](docs/ab/).
 <td><img src="docs/ab/06_canopy_path_closeup_on.jpg" alt="Close-up of Ty under the canopy, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>06 Canopy close-up.</b> The shadow on the ground is slightly firmer.</sub></td>
+<td colspan="2"><sub><b>06 Canopy close-up.</b> Close-up of Ty under the canopy.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/05_canopy_path_dusk_off.jpg" alt="Ty on the canopy path at dusk, shaders off" width="100%"></td>
 <td><img src="docs/ab/05_canopy_path_dusk_on.jpg" alt="Ty on the canopy path at dusk, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>05 Canopy path at dusk.</b> A small change, mostly in the shadows.</sub></td>
+<td colspan="2"><sub><b>05 Canopy path at dusk.</b> Ty on the canopy path at dusk.</sub></td>
 </tr>
 </table>
 
@@ -90,14 +90,14 @@ All images are in [`docs/ab/`](docs/ab/).
 <td><img src="docs/ab/07_tall_grass_on.jpg" alt="Ty in tall grass, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>07 Tall grass.</b> The grass is a little softer and darker at the base.</sub></td>
+<td colspan="2"><sub><b>07 Tall grass.</b> Ty in tall grass.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/08_fence_counter_17_off.jpg" alt="Fence, a counter showing 17, a sign and a machine, shaders off" width="100%"></td>
 <td><img src="docs/ab/08_fence_counter_17_on.jpg" alt="Fence, a counter showing 17, a sign and a machine, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>08 Fence and counter.</b> A small change on the fence and posts.</sub></td>
+<td colspan="2"><sub><b>08 Fence and counter.</b> The fence, the counter showing 17, a sign and a machine.</sub></td>
 </tr>
 </table>
 
@@ -113,18 +113,18 @@ All images are in [`docs/ab/`](docs/ab/).
 <td><img src="docs/ab/02_palm_grove_water_on.jpg" alt="Ty in a palm grove by the water, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>02 Palm grove by the water.</b> Very little change, and the water is not affected in this frame. The blue flicker on Ty in water is a known issue.</sub></td>
+<td colspan="2"><sub><b>02 Palm grove by the water.</b> The water is not changed by this comparison. The blue flicker on Ty in water is a known issue.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/03_portal_two_up_prompt_off.jpg" alt="Ty with the Two Up text and the Press R prompt beside the rainbow portal, shaders off" width="100%"></td>
 <td><img src="docs/ab/03_portal_two_up_prompt_on.jpg" alt="Ty with the Two Up text and the Press R prompt beside the rainbow portal, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>03 Rainbow portal.</b> The area around the portal is darker with shaders on, but the portal does not light the ground. Known issue.</sub></td>
+<td colspan="2"><sub><b>03 Rainbow portal.</b> Ty next to the rainbow portal. The portal does not light the ground yet (known issue).</sub></td>
 </tr>
 </table>
 
-**Haze has no clean pair yet.** Far trees and the sky on the second level are not fully fogged, which is a known issue. See [Known issues](#known-issues).
+**Fog and haze are not in these pairs.** F11 does not switch them off, so no pair shows them. Far trees and the sky on the second level are not fully fogged, which is a known issue. See [Known issues](#known-issues).
 
 ## Presets
 
