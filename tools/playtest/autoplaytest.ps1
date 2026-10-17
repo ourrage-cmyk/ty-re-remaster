@@ -74,6 +74,8 @@ $defs = @{
     sky_yaw090  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 90 0' }
     sky_yaw180  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 180 0' }
     sky_yaw270  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 270 0' }
+    # Static water camera: slot 1 (no cutscene), fixed yaw and pitch from the spawn. PLACEHOLDER yaw/pitch: set them from the sky_yaw sweep before the owner relies on this view.
+    water_static = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $true; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 270 -20' }
 }
 
 function Stop-Game { Get-GameProcs $Game | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800 }
