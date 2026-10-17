@@ -18,7 +18,10 @@ static int g_tsEnable = 1, g_tsScopeAll = 0, g_tsMaxLevel = 8, g_tsDebug = 0; st
 static float g_tsTargetEdge = 4.0f, g_tsReliefDepth = 3.0f, g_tsGroundRelief = 1.0f, g_tsPropRelief = 0.7f, g_tsReliefFade0 = 700.0f, g_tsReliefFade1 = 1600.0f, g_tsReliefLod = 0.0f, g_tsEdgeFade = 2.5f;
 static float g_tsReliefCurve = 1.0f, g_tsReliefKnee = 0.0f, g_tsReliefKneeSlope = 0.35f;   // relief shaping, see LoadTessConfig
 static int g_tsWorldMax = 48, g_tsCull = 1, g_tsAB = 0; static float g_tsLive = 1.0f;   // ABToggle=1 (test aid): relief+PBR extras flip on/off every time the debug-camera file changes static float g_tsPhongInward = 1.0f;
-struct TessLoc { GLint cam = -1, tp = -1, cull = -1, tr = -1, tr2 = -1; };
+struct TessLoc { GLint cam = -1, tp = -1, cull = -1, tr = -1, tr2 = -1, lod = -1; };
+// #10 distance LOD for tessellation: [lod] TessEnable=0 (default, unchanged). 1 = the edge level falls smoothly to TessMinScale of its value
+// between Start and End (view distance, world units). Shares Start/End/MinScale with the [lod] GI ramp; read in LoadTessConfig.
+static int g_tsLodOn = 0; static float g_tsLodS = 1500.0f, g_tsLodE = 6000.0f, g_tsLodMin = 0.35f;
 static std::unordered_map<GLuint, TessLoc> g_tessLoc; static std::unordered_map<GLuint, float> g_tessCullLast; static std::unordered_map<GLuint, unsigned> g_tessStamp;
 static std::unordered_map<GLuint, std::vector<TessVar>> g_tessVS;     // VS shader id -> its output varyings (tessellation-ready)
 static std::unordered_map<GLuint, std::vector<GLuint>> g_progShaders; // program -> attached shaders
@@ -55,6 +58,10 @@ static void LoadTessConfig() {
     GetPrivateProfileStringA("tess", "ReliefFadeEnd", "1600", b, sizeof b, ini); g_tsReliefFade1 = (float)atof(b);
     GetPrivateProfileStringA("tess", "ReliefLods", "0", b, sizeof b, ini); g_tsReliefLod = (float)atof(b);              // extra mip bias for the height sampling (+ = smoother/coarser relief)
     GetPrivateProfileStringA("tess", "EdgeFade", "2.5", b, sizeof b, ini); g_tsEdgeFade = (float)atof(b);                // >0: fade relief to 0 within N world units of patch borders (hides UV-seam cracks)
+    g_tsLodOn = GetPrivateProfileIntA("lod", "TessEnable", 0, ini);
+    GetPrivateProfileStringA("lod", "Start", "1500", b, sizeof b, ini); g_tsLodS = (float)atof(b);
+    GetPrivateProfileStringA("lod", "End", "6000", b, sizeof b, ini); g_tsLodE = (float)atof(b); if (g_tsLodE < g_tsLodS + 1.0f) g_tsLodE = g_tsLodS + 1.0f;
+    GetPrivateProfileStringA("lod", "MinScale", "0.35", b, sizeof b, ini); g_tsLodMin = (float)atof(b); if (g_tsLodMin < 0.0f) g_tsLodMin = 0.0f; if (g_tsLodMin > 1.0f) g_tsLodMin = 1.0f;
     g_tsReliefDepthFS = g_tsReliefDepth * 0.7f;   // fragment parallax uses 70% of ReliefDepth (stronger smears the paint at grazing angles)
     g_tsFsSteps = GetPrivateProfileIntA("tess", "ReliefSteps", 8, ini); if (g_tsFsSteps < 3) g_tsFsSteps = 3; if (g_tsFsSteps > 12) g_tsFsSteps = 12;   // parallax steps in the fragment shader
     GetPrivateProfileStringA("tess", "ReliefFeature", "1.0", b, sizeof b, ini); g_tsFsMipBias = (float)atof(b); if (g_tsFsMipBias < 0.5f) g_tsFsMipBias = 0.5f; // >1 = coarser features
@@ -255,13 +262,14 @@ static std::string MakeTCSWorld(const std::vector<TessVar>& vars) {
     s += "in vec3 tcIn_tyWorld[];\nout vec3 teIn_tyWorld[];\n";
     s += g_tsCull ? "#define TY_CULL 1\n" : "#define TY_CULL 0\n";
     s += R"GLSL(
-uniform vec3 tyTCam; uniform vec4 tyTP; uniform float tyTCull;   // tyTP: x px per world unit at distance 1, y target px, z target edge (world), w max level
+uniform vec3 tyTCam; uniform vec4 tyTP; uniform float tyTCull; uniform vec4 tyTL;   // tyTP: x px per world unit at distance 1, y target px, z target edge (world), w max level. tyTL: x Start y End z MinScale (x = 0: off)
 float EdgeLevel(vec3 a, vec3 b) {
   float len = distance(a, b);
   float d = max(distance(0.5 * (a + b), tyTCam), 1.0);
   float lw = len / tyTP.z;
   float ls = (tyTP.x > 0.0 && tyTP.y > 0.0) ? len * tyTP.x / (d * tyTP.y) : lw;
-  return clamp(min(lw, ls), 1.0, tyTP.w);
+  float lod = tyTL.x > 0.0 ? mix(1.0, tyTL.z, smoothstep(tyTL.x, tyTL.y, d)) : 1.0;   // #10 distance LOD: smooth, never a hard step
+  return clamp(min(lw, ls) * lod, 1.0, tyTP.w);
 }
 void main() {
 )GLSL";
@@ -408,7 +416,7 @@ static void TessAfterLink(GLuint prog) {
     GLint ok = 0; getiv(prog, 0x8B82, &ok);
     if (ok) { g_tessProgs.insert(prog);
         TessLoc tl; tl.cam = o_glGetUniformLocation(prog, "tyTCam"); tl.tp = o_glGetUniformLocation(prog, "tyTP"); tl.cull = o_glGetUniformLocation(prog, "tyTCull");
-        tl.tr = o_glGetUniformLocation(prog, "tyTR"); tl.tr2 = o_glGetUniformLocation(prog, "tyTR2"); g_tessLoc[prog] = tl; g_tessCullLast.erase(prog); g_tessStamp.erase(prog);
+        tl.tr = o_glGetUniformLocation(prog, "tyTR"); tl.tr2 = o_glGetUniformLocation(prog, "tyTR2"); tl.lod = o_glGetUniformLocation(prog, "tyTL"); g_tessLoc[prog] = tl; g_tessCullLast.erase(prog); g_tessStamp.erase(prog);
         logf("[tess] program %u linked WITH tessellation", prog); return; }
     char b[2048]; getlog(prog, sizeof b, nullptr, b); logf("[tess] program %u tessellated link FAILED -> restoring original:\n%s", prog, b);
     for (auto& kv : g_tessStages) { if (kv.second.first) detach(prog, kv.second.first); if (kv.second.second) detach(prog, kv.second.second); }

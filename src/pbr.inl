@@ -182,6 +182,7 @@ static void TessApply(GLuint p) {
     if (l.cam >= 0) pu3(p, l.cam, g_pbrCam[0], g_pbrCam[1], g_pbrCam[2]);
     float pxScale = g_pbrHaveCam && g_tsP11 > 0 && g_screenH > 0 ? 0.5f * (float)g_screenH * g_tsP11 : 0.0f;
     if (l.tp >= 0) pu4(p, l.tp, pxScale, g_tsTargetPx, g_tsTargetEdge, (float)g_tsWorldMax);
+    if (l.lod >= 0) pu4(p, l.lod, g_tsLodOn ? g_tsLodS : 0.0f, g_tsLodE, g_tsLodMin, 0.0f);   // #10: x = 0 turns the distance LOD off (identity)
     if (l.tr >= 0) pu4(p, l.tr, g_tsReliefFade0, g_tsReliefFade1, g_tsLive * g_tsReliefDepth * g_tsGroundRelief, g_tsLive * g_tsReliefDepth * g_tsPropRelief);
     if (l.tr2 >= 0) pu4(p, l.tr2, g_tsReliefLod, g_tsEdgeFade, 0.0f, 1.0f);
 }
