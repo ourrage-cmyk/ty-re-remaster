@@ -16,7 +16,8 @@ static std::unordered_map<GLuint, unsigned> g_pbrStamp;              // program 
 static void LoadPbrConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
     g_pbrEnable = GetPrivateProfileIntA("pbr", "Enable", 1, ini); g_pbrLitProps = GetPrivateProfileIntA("pbr", "LitProps", 1, ini); g_pbrDebug = GetPrivateProfileIntA("pbr", "Debug", 0, ini);   // LitProps=0: dynamically lit (LIT=1) non-skinned props stay stock too
-    g_texWaterNoFresnel = GetPrivateProfileIntA("pbr", "SkyFresnelSkipWater", 0, ini);   // 1: water-tagged draws (emissive/transparent) get no sky Fresnel term; 0 = unchanged
+    // water-tagged draws (emissive/transparent): WaterStable=1 (default, issue #5) drops their bump, relief, specular and sky Fresnel so the water colour does not change frame to frame; SkyFresnelSkipWater=1 is the older, Fresnel-only subset
+    g_texWaterNoFresnel = GetPrivateProfileIntA("pbr", "WaterStable", 1, ini) | GetPrivateProfileIntA("pbr", "SkyFresnelSkipWater", 0, ini);
 #define PF(key, def, var) GetPrivateProfileStringA("pbr", key, def, b, sizeof b, ini); var = (float)atof(b);
     PF("NormalStrength", "1.0", g_pbrNormal) PF("Specular", "0.5", g_pbrSpec) PF("Roughness", "0.65", g_pbrRough) PF("HeightScale", "3.0", g_pbrHeight)
     PF("LowFreqBump", "0.6", g_pbrLowBump) PF("Cavity", "0.30", g_pbrCavity) PF("ValleyRough", "0.30", g_pbrValleyRough) PF("Sheen", "0.12", g_pbrSheen)
@@ -67,7 +68,7 @@ static bool PbrRewriteFS(std::string& s) {
     const char* nblk = R"GLSL(
   vec3 tyN = normalize(v_normal);
   float tyCamDist = distance(v_tyWorld, tyCam);
-  float tyOn = 1.0 - tyTex;   // tyTex=1: character / unknown skinned texture -> no bump, relief or specular (set per draw from the texture tags)
+  float tyOn = (1.0 - tyTex) * (1.0 - tyWater);   // tyTex=1: character / unknown skinned texture -> no bump, relief or specular (set per draw from the texture tags). tyWater=1 (ini [pbr] WaterStable, water-tagged draws): same, so the water surface has a frame-stable colour (issue #5)
   float tyBumpW = TyDist(tyCamDist) * tyPbr.x * tyOn;
   float tyLumA = TyLum(diffuseColour.rgb); float tyChromaEdge = 0.0; float tyValley = 0.0;
   {
