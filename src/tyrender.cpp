@@ -89,7 +89,7 @@ static float g_fogDistance = 1.0f, g_fogAmount = 1.0f;   // [fog] Distance / Amo
 static bool GIMaskBegin(); static void GIMaskEnd(); static void RunGI(GLuint depthTex, int w, int h); static void LoadGIConfig(); static void PollGIFlags();
 static int g_pendingShadowUnit[2] = {-1, -1}; static GLuint g_shadowTex[2];   // engine cascade shadow maps (resolved at draw time)
 static void GProf(int m); static void GProfNextFrame();
-static void FogDiagDraw(); static bool LateFogBegin(); static void LateFogEnd();
+static void FogDiagDraw(); static bool LateFogBegin(); static void LateFogEnd(); static bool SeeThruDepthBegin(); static void SeeThruDepthEnd();
 static void RunAtmos(GLuint depthTex, int w, int h); static void LoadAtmosConfig(); static void PollAtmosFlags();
 static void OnNamedUniformMat(int id, const GLfloat* v, GLboolean t); static void OnNamedUniform4(int id, const GLfloat* v);
 static bool TessRewriteVS(GLuint shader, std::string& src); static void TessOnAttach(GLuint p, GLuint s); static void TessLink(GLuint p); static void LoadTessConfig();
@@ -254,7 +254,7 @@ HOOK(void, glDepthMask, (GLboolean f)) { CAP("glDepthMask %d", f); o_glDepthMask
 HOOK(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) { CAP("glColorMask %d%d%d%d", r, g, b, a); o_glColorMask(r, g, b, a); }
 HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); SpillLogDraw(); FogDiagDraw(); bool lateFog = LateFogBegin();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; }   // tessellated programs only accept GL_PATCHES
-    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } CAP("glDrawElements %#x n=%d", m, n); o_glDrawElements(m, n, t, idx); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } }
+    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } bool zFix = SeeThruDepthBegin(); CAP("glDrawElements %#x n=%d", m, n); o_glDrawElements(m, n, t, idx); if (zFix) SeeThruDepthEnd(); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } }
 HOOK(void, glDrawArrays, (GLenum m, GLint f, GLsizei n)) { g_draws++; TexDrawPrep();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; } CAP("glDrawArrays %#x first=%d n=%d", m, f, n); o_glDrawArrays(m, f, n); if (GIMaskBegin()) { o_glDrawArrays(m, f, n); GIMaskEnd(); } }
 HOOK(void, glTexImage2D, (GLenum t, GLint lvl, GLint ifmt, GLsizei w, GLsizei h, GLint b, GLenum fmt, GLenum ty, const GLvoid* px)) {

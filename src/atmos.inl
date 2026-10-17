@@ -221,6 +221,7 @@ void main() {
 )";
 static struct { GLuint prog, tex[2]; int idx; bool failed, init; } skyE;
 static int g_atHazeFromSky = 1; static float g_atHazeSky = 0.0f, g_atBlurPx = 0.0f, g_atBlurStart = 4000.0f, g_atBlurRange = 12000.0f; static int g_atContactStable = 1;
+static int g_fogSeeThruDepth = 0, g_fogLateEmit = 0;   // [fog] SeeThruDepth / LateEmitters (issue #4), read in LoadAtmosConfig; see LateFogBegin and SeeThruDepthBegin
 
 typedef void(WINAPI* glDispatchCompute_t)(GLuint, GLuint, GLuint);
 typedef void(WINAPI* glBindImageTexture_t)(GLuint, GLuint, GLint, GLboolean, GLint, GLenum, GLenum);
@@ -278,6 +279,7 @@ static void LoadAtmosConfig() {
     F("ContactShadows", "0.35", g_atContact) F("ContactLength", "25", g_atContactLen) F("ContactThickness", "6", g_atContactThick) F("FogAmount", "0.8", g_atFogMul)
     F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.8", g_atSkyHaze) F("SkyHazeHeight", "0.45", g_atSkyH) F("FogSaturation", "0.5", g_atFogSat) F("WaterFog", "1.0", g_atWaterFog) F("HueLock", "1.0", g_atHueLock) F("HazeHue", "0.15", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
+    g_fogSeeThruDepth = GetPrivateProfileIntA("fog", "SeeThruDepth", 0, ini); g_fogLateEmit = GetPrivateProfileIntA("fog", "LateEmitters", 0, ini);
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
 #undef F
     GetPrivateProfileStringA("atmos", "SunColor", "1.0,0.86,0.66", b, sizeof b, ini);
@@ -302,14 +304,28 @@ static void FogDiagDraw() {
 // Draws that come after the fog pass (transparent-tagged: water, glass, particles, distant foliage cards; ~15% of them in the fogdiag log) never see the
 // volumetric fog, only the engine's own per-vertex fog. [fog] LateBoost (default 1 = off; 2.0 was tried and fogged everything) multiplies that engine fog strength for just those draws.
 static GLfloat g_lateSaved[4]; static GLuint g_lateProg;
+// [fog] LateEmitters (issue #4, default 0): the same late boost also covers emissive draws after the fog pass (cave fire, particles), which were never hazed.
 static bool LateFogBegin() {
     if (g_lateFog <= 1.0f || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
-    if (!MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]).seeThru) return false;
+    const MatRow& row = MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]);
+    if (!row.seeThru && !(g_fogLateEmit && row.emissive)) return false;
     memcpy(g_lateSaved, g_progFog[g_curProg], sizeof g_lateSaved); g_lateProg = g_curProg;
     GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * g_lateFog, 1.0f - b[0]);
     o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, b); return true;
 }
 static void LateFogEnd() { if (g_lateProg == g_curProg) o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, g_lateSaved); }
+// [fog] SeeThruDepth (issue #4, default 0): see-through draws (foliage cards, water, glass) are drawn with depth write off, so the fog pass reads the
+// surface BEHIND them. A tree over sky then gets only the 0.12*MaxDist sky slab of fog and looks in front of the fog; water gets the rock depth under it.
+// 1 = write depth for those draws while they are drawn before the scene depth copy (the fog pass input). Emissive draws are excluded.
+static bool SeeThruDepthBegin() {
+    if (!g_fogSeeThruDepth || g_sceneDepthFrame == g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_texFlagArr) return false;
+    const MatRow& row = MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]);
+    if (!row.seeThru || row.emissive) return false;
+    GLboolean dm = 1; gx.GetBooleanv(0x0B72, &dm);
+    if (dm || !gx.IsEnabled(0x0B71)) return false;   // depth write already on, or no depth test: nothing to change
+    o_glDepthMask(1); return true;
+}
+static void SeeThruDepthEnd() { o_glDepthMask(0); }   // restores the state SeeThruDepthBegin saw (depth write off)
 static void RunAtmos(GLuint depthTex, int w, int h) {
     if (g_frame - g_fdLast >= 600) { g_fdLast = g_frame; logf("[fogdiag] transparent-tagged draws (sampled): before-fog depthW0/blend0=%u d0/b1=%u d1/b0=%u d1/b1=%u | after-fog d0/b0=%u d0/b1=%u d1/b0=%u d1/b1=%u",
         g_fdCnt[0][0][0], g_fdCnt[0][0][1], g_fdCnt[0][1][0], g_fdCnt[0][1][1], g_fdCnt[1][0][0], g_fdCnt[1][0][1], g_fdCnt[1][1][0], g_fdCnt[1][1][1]); memset(g_fdCnt, 0, sizeof g_fdCnt); }
