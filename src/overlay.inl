@@ -1,4 +1,4 @@
-// overlay.inl - in-game settings overlay (issue #12). Toggle with [overlay] Key= (default F10, F1..F24 or a virtual-key number, 0 = off).
+// overlay.inl - in-game settings overlay (issue #12). Toggle with [overlay] Key= (F1..F24 or a virtual-key number; default 0 = off, the panel is disabled until a key is set).
 // The panel lists a few tyrender.ini settings that already have live reload paths. Keys while it is open:
 //   Up / Down = select, Left / Right = change the value, Enter = keep and close, Esc or the toggle key = discard and close.
 // Every change is written to tyrender.ini at once and the owning Load*Config() runs again, so the effect is visible immediately.
@@ -7,7 +7,7 @@
 // Known v1 limits: arrow keys also reach the game while the panel is open; the panel is drawn with GDI into a DIB and uploaded with glDrawPixels.
 #include "build_id.h"
 
-static int g_ovVk = 0x79;                       // VK_F10
+static int g_ovVk = 0;                          // off until [overlay] Key= is set (see default_tyrender.ini)
 static bool g_ovOpen;
 static int g_ovSel;
 static bool g_ovKeyDown[8];                     // edge detect: 0 toggle, 1 up, 2 down, 3 left, 4 right, 5 enter, 6 esc
@@ -40,7 +40,7 @@ static int OvParseVk(const char* s) {
 }
 static void LoadOverlayConfig() {
     char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
-    GetPrivateProfileStringA("overlay", "Key", "F10", b, sizeof b, ini);
+    GetPrivateProfileStringA("overlay", "Key", "0", b, sizeof b, ini);
     g_ovVk = OvParseVk(b);
 }
 static std::string OvIniRaw(const OvItem& it) {
