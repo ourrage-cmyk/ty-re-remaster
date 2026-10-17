@@ -198,6 +198,9 @@ static bool EmitBegin() {
     gx.BindVertexArray(g_emitVao);
     o_glActiveTexture(0x84C0); o_glBindTexture(0x0DE1, g_emitDepthFull);
     o_glDrawArrays(4, 0, 3);
+    // 2b) the depth copy and depth pass above left the depth texture bound on unit 0 (raw o_ calls, so g_bound2D does not see it). Put the emitter's own
+    // binding back before the splat: otherwise an albedo sampled on unit 0 reads the scene depth (white far band, rings and stripes)
+    o_glActiveTexture(0x84C0); o_glBindTexture(0x0DE1, (GLuint)emS.tex0); o_glActiveTexture((GLenum)emS.unit);
     // 3) splat state: the emitter's own program and VAO, depth LEQUAL against the copied scene depth, additive albedo
     o_glUseProgram((GLuint)emS.prog); gx.BindVertexArray((GLuint)emS.vao);
     emDepthFunc(0x0203 /*LEQUAL*/); o_glDepthMask(0); o_glColorMask(1, 1, 1, 1);
