@@ -3,7 +3,8 @@
 //  * kernel32 IAT hooks (CreateFileW, CloseHandle, SetFilePointerEx, ReadFile) track those handles and record every read buffer range -> name in a ring.
 //  * glCompressedTexImage2D / glTexImage2D (level 0) look the data pointer up in the ring -> name -> flags (embedded table tex_tags.inc, built by
 //    gen_tex_tags.ps1 from texture_tags.csv + the rkv index; tyrender\texture_tags.csv, if present, overrides flags by name).
-// API: TexKnown(id) TexIsEmissive(id) TexIsCharacter(id) TexIsTransparent(id) TexFlags(id).  ini [tex] Enable=1 Debug=0
+// API: TexFlags(id) (raw tag bits), MatClass(id) (one class per texture), MatPolicy(id) (its row of kMatPolicy: every consumer asks the policy, not the bits).
+//      ini [tex] Enable=1 Debug=0.  Class model: docs/MATERIAL_CLASSIFICATION_PLAN.md section 3 (phase 1: behaviour unchanged).
 #include <vector>
 #include <mutex>
 #include <algorithm>
@@ -23,12 +24,37 @@ static std::mutex g_texMu; static std::unordered_map<GLuint, std::string> g_texI
 static unsigned g_texUploads, g_texNamed, g_texTagged, g_texReads;
 
 static uint8_t* g_texFlagArr = nullptr;                           // flags by GL texture id (ids are small ints)
+static uint8_t* g_texClassArr = nullptr;                          // MatClass by GL texture id, filled at upload from the flags (0 = unknown)
 static const GLuint kTexArr = 1 << 18;
 static inline uint8_t TexFlags(GLuint id) { return (g_texEnable && g_texFlagArr && id < kTexArr) ? g_texFlagArr[id] : 0; }
-static bool TexKnown(GLuint t) { return TexFlags(t) & TF_KNOWN; }
-static bool TexIsEmissive(GLuint t) { return TexFlags(t) & TF_EMISSIVE; }
-static bool TexIsCharacter(GLuint t) { return TexFlags(t) & TF_CHARACTER; }
-static bool TexIsTransparent(GLuint t) { return TexFlags(t) & TF_TRANSPARENT; }
+
+// ---- material classes (plan section 3). One class per texture; one policy row per class.
+// Precedence: emission follows the emissive flag alone; character only switches off relief/tessellation and GI colour bounce; transparent only
+// adds see-through (fog, water). An emissive character is EMIT_CHARACTER: it glows, and it is not a colour source.
+enum MatClass : uint8_t { MC_UNKNOWN = 0, MC_SOLID, MC_TRANSPARENT, MC_EMITTER, MC_TRANS_EMITTER, MC_CHARACTER, MC_EMIT_CHARACTER, MC_COUNT };
+// Columns used by phase 1 consumers. giBits: [gi] ExcludeSources bit that removes the draw as a colour source (1 emissive, 2 transparent, 4 character).
+// Columns for emission, AO, shadows and TAA (plan section 3) are added with their phases.
+struct MatRow { uint8_t giBits; bool noRelief; bool character; bool emissive; bool waterTag; bool seeThru; };
+static const MatRow kMatPolicy[MC_COUNT] = {
+    //            giBits  noRelief character emissive waterTag seeThru
+    /* UNKNOWN   */ {0,    0,       0,        0,       0,       0},
+    /* SOLID     */ {0,    0,       0,        0,       0,       0},
+    /* TRANSP    */ {2,    0,       0,        0,       1,       1},
+    /* EMITTER   */ {1,    0,       0,        1,       1,       0},
+    /* TRANS_EM  */ {3,    0,       0,        1,       1,       1},
+    /* CHARACTER */ {4,    1,       1,        0,       0,       0},
+    /* EMIT_CHAR */ {4,    1,       1,        1,       0,       0},
+};
+static uint8_t MatClassOfFlags(uint8_t fl) {
+    if (!(fl & TF_KNOWN)) return MC_UNKNOWN;
+    if (fl & TF_CHARACTER) return (fl & TF_EMISSIVE) ? MC_EMIT_CHARACTER : MC_CHARACTER;
+    if (fl & TF_EMISSIVE) return (fl & TF_TRANSPARENT) ? MC_TRANS_EMITTER : MC_EMITTER;
+    return (fl & TF_TRANSPARENT) ? MC_TRANSPARENT : MC_SOLID;
+}
+static inline uint8_t MatClass(GLuint id) { return (g_texEnable && g_texClassArr && id < kTexArr) ? g_texClassArr[id] : MC_UNKNOWN; }
+static inline const MatRow& MatPolicy(GLuint id) { return kMatPolicy[MatClass(id)]; }
+// Decal overlay (ini [decal] Names): a separate bit, not a class. Footprints (#8) read it through this helper.
+static inline bool MatDecal(GLuint id) { return TexFlags(id) & TF_DECAL; }
 
 static std::string TexBase(const std::string& p) {
     size_t s = p.find_last_of("\\/"); std::string b = s == std::string::npos ? p : p.substr(s + 1);
@@ -46,6 +72,7 @@ static void LoadTexTags() {
     char dn[512]; GetPrivateProfileStringA("decal", "Names", "ty_footprint.dds,ty_footprint2.dds", dn, sizeof dn, ini);
     g_decalNames.clear(); for (char* t = strtok(dn, ","); t; t = strtok(nullptr, ",")) { std::string x = TexBase(t); while (!x.empty() && x.back() == ' ') x.pop_back(); if (!x.empty()) g_decalNames.push_back(x); }
     if (!g_texFlagArr) g_texFlagArr = (uint8_t*)calloc(kTexArr, 1);
+    if (!g_texClassArr) g_texClassArr = (uint8_t*)calloc(kTexArr, 1);
     g_tagByName.clear();
     for (auto& e : kTagNames) g_tagByName[e.n] = e.f;
     std::string csv; char pth[MAX_PATH]; snprintf(pth, sizeof pth, "%styrender\\texture_tags.csv", g_dir);
@@ -154,7 +181,7 @@ static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const voi
     }
     if (nm) { g_texNamed++; auto it = g_tagByName.find(nm); if (it != g_tagByName.end()) { fl = it->second; if (fl & TF_KNOWN) g_texTagged++; }
         if (g_decalClamp && std::find(g_decalNames.begin(), g_decalNames.end(), std::string(nm)) != g_decalNames.end()) fl |= TF_DECAL; }
-    g_texFlagArr[id] = fl;
+    g_texFlagArr[id] = fl; g_texClassArr[id] = MatClassOfFlags(fl);
     if (g_spillLog && nm) g_texNameById[id] = nm;
     if (g_texDebug) { char b[160]; snprintf(b, sizeof b, "%s %dx%d ifmt=%#x", nm ? nm : "?", w, h, ifmt); g_texInfo[id] = b; }
     if (g_texDebug && g_texUploads < 500) logf("[tex] upload id=%u %dx%d ifmt=%#x bytes=%d px=%p name=%s flags=%u", id, w, h, ifmt, bytes, px, nm ? nm : "?", fl);
@@ -164,23 +191,23 @@ HOOK(void, glCompressedTexImage2D, (GLenum t, GLint lvl, GLenum ifmt, GLsizei w,
     o_glCompressedTexImage2D(t, lvl, ifmt, w, h, b, sz, px);
 }
 // ---- per draw: albedo texture of the bound program -> tyTex uniform (1 = no relief / bump / specular for this draw)
-// Rules: texture tagged character=yes -> 1.  Skinned program (boneMats): relief only if the texture is in the list and not a character (unknown = stock).
+// Rules (policy column noRelief): character class -> 1.  Skinned program (boneMats): relief only if the texture is classed and not a character (unknown = stock).
 // Non-skinned program: 0 unless character.  Without tags (Enable=0) skinned programs are not rewritten at all.
 static unsigned g_texUntagCnt[1 << 18];   // debug: draws per untagged texture id
 static unsigned char g_progKind[kTexProgs];   // 0 = not evaluated, 1 = skinned, 2 = world
 static unsigned g_texDrawSet, g_texDrawChar, g_texDrawKnown, g_texDrawUnknown, g_texDraws;
-// Water = emissive or transparent tag (not character). Only used when [pbr] SkyFresnelSkipWater=1; the uniform stays 0 otherwise.
-static void TexSetWater(GLuint p, uint8_t fl) {
+// Water = policy column waterTag (emissive or transparent, not character). Only used when [pbr] SkyFresnelSkipWater=1; the uniform stays 0 otherwise.
+static void TexSetWater(GLuint p, GLuint tex) {
     GLint loc = g_progTyWaterLoc[p]; if (!g_texWaterNoFresnel || loc < 0) return;
-    float v = ((fl & (TF_EMISSIVE | TF_TRANSPARENT)) && !(fl & TF_CHARACTER)) ? 1.0f : 0.0f;
+    float v = MatPolicy(tex).waterTag ? 1.0f : 0.0f;
     if (g_progTyWaterLast[p] == v) return;
     typedef void(WINAPI* pu1_t)(GLuint, GLint, GLfloat); static pu1_t pu1 = (pu1_t)o_wglGetProcAddress("glProgramUniform1f");
     if (!pu1) return;
     pu1(p, loc, v); g_progTyWaterLast[p] = v;
 }
-static void TexSetDecal(GLuint p, uint8_t fl) {
+static void TexSetDecal(GLuint p, GLuint tex) {
     GLint loc = g_progTyDecalLoc[p]; if (loc < 0) return;
-    float v = (fl & TF_DECAL) ? 1.0f : 0.0f;
+    float v = MatDecal(tex) ? 1.0f : 0.0f;
     if (g_progTyDecalLast[p] == v) return;
     typedef void(WINAPI* pu1_t)(GLuint, GLint, GLfloat); static pu1_t pu1 = (pu1_t)o_wglGetProcAddress("glProgramUniform1f");
     if (!pu1) return;
@@ -188,15 +215,15 @@ static void TexSetDecal(GLuint p, uint8_t fl) {
 }
 static void TexDrawPrep() {
     GLuint p = g_curProg; if (p >= kTexProgs) return;
-    if (g_decalClamp) TexSetDecal(p, TexFlags(g_bound2D[g_progDiffUnit[p] & 31]));   // before the tyTex early-out: decal programs may have no PBR header
+    GLuint tex = g_bound2D[g_progDiffUnit[p] & 31];
+    if (g_decalClamp) TexSetDecal(p, tex);   // before the tyTex early-out: decal programs may have no PBR header
     GLint loc = g_progTyTexLoc[p]; if (loc < 0) return;
     if (!g_progKind[p]) g_progKind[p] = g_skinProgs.count(p) ? 1 : 2;
-    GLuint tex = g_bound2D[g_progDiffUnit[p] & 31];
-    uint8_t fl = TexFlags(tex); float v;
-    if (fl & TF_CHARACTER) v = 1.0f; else if (g_progKind[p] == 1) v = (fl & TF_KNOWN) ? 0.0f : 1.0f; else v = 0.0f;
-    if (g_texDebug && !(fl & TF_KNOWN) && tex < kTexArr) g_texUntagCnt[tex]++;
-    g_texDraws++; if (fl & TF_CHARACTER) g_texDrawChar++; else if (fl & TF_KNOWN) g_texDrawKnown++; else g_texDrawUnknown++;
-    TexSetWater(p, fl);
+    uint8_t cls = MatClass(tex); const MatRow& row = kMatPolicy[cls]; float v;
+    if (row.noRelief) v = 1.0f; else if (g_progKind[p] == 1) v = (cls == MC_UNKNOWN) ? 1.0f : 0.0f; else v = 0.0f;
+    if (g_texDebug && cls == MC_UNKNOWN && tex < kTexArr) g_texUntagCnt[tex]++;
+    g_texDraws++; if (row.character) g_texDrawChar++; else if (cls != MC_UNKNOWN) g_texDrawKnown++; else g_texDrawUnknown++;
+    TexSetWater(p, tex);
     if (g_progTyTexLast[p] == v) return;
     typedef void(WINAPI* pu1_t)(GLuint, GLint, GLfloat); static pu1_t pu1 = (pu1_t)o_wglGetProcAddress("glProgramUniform1f");
     if (!pu1) return;
@@ -228,7 +255,7 @@ static void TexReport() {
     static unsigned last; if (g_frame - last < 600) return; last = g_frame;
     for (auto& kv : g_spillCnt) {
         auto it = g_texNameById.find(kv.first);
-        logf("[spill] additive draws=%u tex=%u name=%s emissive=%d (last 600 frames)", kv.second, kv.first, it == g_texNameById.end() ? "?" : it->second.c_str(), TexIsEmissive(kv.first) ? 1 : 0);
+        logf("[spill] additive draws=%u tex=%u name=%s emissive=%d (last 600 frames)", kv.second, kv.first, it == g_texNameById.end() ? "?" : it->second.c_str(), MatPolicy(kv.first).emissive ? 1 : 0);
     }
     g_spillCnt.clear();
     logf("[tex] stats frame=%u reads=%u uploads(with data)=%u named=%u tagged=%u | relief-program draws since last: %u (character %u, tagged non-character %u, untagged %u) uniform sets %u", g_frame, g_texReads, g_texUploads, g_texNamed, g_texTagged, g_texDraws, g_texDrawChar, g_texDrawKnown, g_texDrawUnknown, g_texDrawSet);

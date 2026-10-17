@@ -290,8 +290,7 @@ static void PollAtmosFlags() {
 static unsigned g_atRanFrame, g_fdCnt[2][2][2], g_fdLast;
 static void FogDiagDraw() {
     if (g_frame % 60 != 0 || !g_curProg || !gx.GetBooleanv || !gx.IsEnabled || !g_texFlagArr) return;
-    uint8_t f = TexFlags(g_bound2D[g_progDiffUnit[g_curProg < 8192 ? g_curProg : 0] & 31]);
-    if (!(f & TF_KNOWN) || !(f & TF_TRANSPARENT) || (f & TF_CHARACTER)) return;
+    if (!MatPolicy(g_bound2D[g_progDiffUnit[g_curProg < 8192 ? g_curProg : 0] & 31]).seeThru) return;
     GLboolean dm = 0; gx.GetBooleanv(0x0B72, &dm);
     g_fdCnt[g_atRanFrame == g_frame ? 1 : 0][dm ? 1 : 0][gx.IsEnabled(0x0BE2) ? 1 : 0]++;
 }
@@ -300,8 +299,7 @@ static void FogDiagDraw() {
 static GLfloat g_lateSaved[4]; static GLuint g_lateProg;
 static bool LateFogBegin() {
     if (g_lateFog <= 1.0f || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
-    uint8_t f = TexFlags(g_bound2D[g_progDiffUnit[g_curProg] & 31]);
-    if (!(f & TF_KNOWN) || !(f & TF_TRANSPARENT) || (f & TF_CHARACTER)) return false;
+    if (!MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]).seeThru) return false;
     memcpy(g_lateSaved, g_progFog[g_curProg], sizeof g_lateSaved); g_lateProg = g_curProg;
     GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * g_lateFog, 1.0f - b[0]);
     o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, b); return true;
