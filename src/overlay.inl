@@ -153,13 +153,24 @@ static void OvDraw(HDC dc) {
     static fb_t bindFb = o_glBindFramebuffer;
     static en_t enable = (en_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glEnable");
     static en_t disable = (en_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glDisable");
-    if (!wp || !pd || !pushA || !popA || !pushC || !popC || !getI || !enable || !disable) return;
+    typedef void(WINAPI* cm_t)(GLboolean, GLboolean, GLboolean, GLboolean); typedef void(WINAPI* db_t)(GLenum);
+    typedef void(WINAPI* pz_t)(GLfloat, GLfloat);
+    static cm_t colorMask = (cm_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glColorMask");
+    static db_t drawBuffer = (db_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glDrawBuffer");
+    static pz_t pixelZoom = (pz_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glPixelZoom");
+    if (!wp || !pd || !pushA || !popA || !pushC || !popC || !getI || !enable || !disable) {
+        static bool logged; if (!logged) { logged = true; logf("[overlay] draw skipped: missing GL entry point (wp=%p pd=%p)", (void*)wp, (void*)pd); }
+        return;
+    }
     GLint prog = 0, drawFb = 0; getI(0x8B8D /*CURRENT_PROGRAM*/, &prog); getI(0x8CA6 /*DRAW_FRAMEBUFFER_BINDING*/, &drawFb);
     pushA(0x00000004 /*GL_ENABLE_BIT*/ | 0x00000400 /*GL_COLOR_BUFFER_BIT*/ | 0x00000020 /*GL_PIXEL_MODE_BIT*/ | 0x00000001 /*GL_CURRENT_BIT*/);
     pushC(0x00000001 /*GL_CLIENT_PIXEL_STORE_BIT*/);
     if (up) up(0);
     if (bindFb) bindFb(0x8CA9 /*GL_DRAW_FRAMEBUFFER*/, 0);
-    disable(0x0B71 /*DEPTH_TEST*/); disable(0x0B90 /*STENCIL_TEST*/); enable(0x0BE2 /*BLEND*/);
+    disable(0x0B71 /*DEPTH_TEST*/); disable(0x0B90 /*STENCIL_TEST*/); disable(0x0C11 /*SCISSOR_TEST*/); disable(0x0BC0 /*ALPHA_TEST*/); enable(0x0BE2 /*BLEND*/);
+    if (colorMask) colorMask(1, 1, 1, 1);     // a leftover colour mask would hide the panel
+    if (drawBuffer) drawBuffer(0x0405 /*GL_BACK*/);
+    if (pixelZoom) pixelZoom(1.0f, 1.0f);
     typedef void(WINAPI* bf_t)(GLenum, GLenum); static bf_t blendFunc = (bf_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glBlendFunc");
     if (blendFunc) blendFunc(0x0302 /*SRC_ALPHA*/, 0x0303 /*ONE_MINUS_SRC_ALPHA*/);
     typedef void(WINAPI* ps_t)(GLenum, GLint); static ps_t ps = (ps_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glPixelStorei");
@@ -177,7 +188,9 @@ static void OverlayFrame(HDC dc) {
     HWND wnd = WindowFromDC(dc);
     bool front = wnd && GetForegroundWindow() == wnd;
     auto edge = [&](int idx, int vk) { bool d = front && (GetAsyncKeyState(vk) & 0x8000) != 0; bool f = d && !g_ovKeyDown[idx]; g_ovKeyDown[idx] = d; return f; };
-    bool tog = edge(0, g_ovVk), up = edge(1, VK_UP), dn = edge(2, VK_DOWN), lf = edge(3, VK_LEFT), rt = edge(4, VK_RIGHT), en = edge(5, VK_RETURN), es = edge(6, VK_ESCAPE);
+    bool tog = false;
+    { bool d = (GetAsyncKeyState(g_ovVk) & 0x8000) != 0; tog = d && !g_ovKeyDown[0]; g_ovKeyDown[0] = d; }
+    bool up = edge(1, VK_UP), dn = edge(2, VK_DOWN), lf = edge(3, VK_LEFT), rt = edge(4, VK_RIGHT), en = edge(5, VK_RETURN), es = edge(6, VK_ESCAPE);
     if (!g_ovOpen) { if (tog) OvOpen(); }
     else {
         if (tog || es) OvRevertAndClose();
@@ -190,5 +203,8 @@ static void OverlayFrame(HDC dc) {
             if (rt) OvSetVal(g_ovSel, g_ovVal[g_ovSel] + it.step);
         }
     }
-    if (g_ovOpen) OvDraw(dc);
+    if (g_ovOpen) {
+        OvDraw(dc);
+        static int frames; if (++frames == 1 || frames == 120) logf("[overlay] drawn frame %d (front=%d)", frames, (int)front);
+    }
 }
