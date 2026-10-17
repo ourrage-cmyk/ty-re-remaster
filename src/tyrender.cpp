@@ -78,7 +78,7 @@ static void AddChar(const GLfloat* v, GLboolean t) {
     for (int i = 0; i < g_nChars; i++) if (fabsf(g_chars[i][0] - p[0]) + fabsf(g_chars[i][1] - p[1]) + fabsf(g_chars[i][2] - p[2]) < 20.0f) return;
     if (g_nChars < 8) { memcpy(g_chars[g_nChars], p, sizeof p); g_nChars++; }
 }
-static float g_fogC[4] = {0, 0, 1e9f, 0}; static bool g_haveFogC; static float g_progFog[8192][4]; static GLint g_progFogLoc1[8192]; static float g_lateFog = 2.0f;   // per program: last engine fogCoords (after override) + location+1; [fog] LateBoost   // last engine fogCoords (after override): AO fades with the same fog fraction
+static float g_fogC[4] = {0, 0, 1e9f, 0}; static bool g_haveFogC; static float g_progFog[8192][4]; static GLint g_progFogLoc1[8192]; static float g_lateFog = 1.0f;   // per program: last engine fogCoords (after override) + location+1; [fog] LateBoost   // last engine fogCoords (after override): AO fades with the same fog fraction
 static float g_fogDistance = 1.0f, g_fogAmount = 1.0f;   // [fog] Distance / Amount: scale the engine fog (fogCoords) and the volumetric fog
 static bool GIMaskBegin(); static void GIMaskEnd(); static void RunGI(GLuint depthTex, int w, int h); static void LoadGIConfig(); static void PollGIFlags();
 static int g_pendingShadowUnit[2] = {-1, -1}; static GLuint g_shadowTex[2];   // engine cascade shadow maps (resolved at draw time)
@@ -572,7 +572,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
             for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);
             { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
               GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
-              GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "2.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
+              GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "1.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
             logf("[cfg] reloaded all"); }
     }   // poll the trigger file every 8 frames
     TexReport();
@@ -658,7 +658,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
     LoadGIConfig();
     { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
       GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
-      GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "2.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
+      GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "1.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
     LoadTessConfig();
     LoadPbrConfig(); LoadLightConfig(); LoadTexTags();
     logf("tyrender stage1 loaded. game dir %s  capture=%d,%d dump=%d override=%d", g_dir, g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
