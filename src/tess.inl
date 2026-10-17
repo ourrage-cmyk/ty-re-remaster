@@ -16,6 +16,7 @@ static float g_tsReliefDepthFS = 3.0f, g_tsFsMipBias = 1.0f; static int g_tsFsSt
 static int g_tsEnable = 1, g_tsScopeAll = 0, g_tsMaxLevel = 8, g_tsDebug = 0; static float g_tsAlpha = 0.7f, g_tsAlphaWorld = 0.45f, g_tsTargetPx = 12.0f, g_tsEdgeWorld = 25.0f, g_tsFadeStart = 1500.0f, g_tsFadeEnd = 4000.0f, g_tsMaxSmooth = 3.0f, g_tsDisp = 2.5f, g_tsDispLod = 1.5f;
 // --- world relief (session 5): texture-driven INWARD-only displacement, adaptive fractional tessellation, TCS frustum/back-face culling ---
 static float g_tsTargetEdge = 4.0f, g_tsReliefDepth = 3.0f, g_tsGroundRelief = 1.0f, g_tsPropRelief = 0.7f, g_tsReliefFade0 = 700.0f, g_tsReliefFade1 = 1600.0f, g_tsReliefLod = 0.0f, g_tsEdgeFade = 2.5f;
+static float g_tsReliefCurve = 1.0f, g_tsReliefKnee = 0.0f, g_tsReliefKneeSlope = 0.35f;   // relief shaping, see LoadTessConfig
 static int g_tsWorldMax = 48, g_tsCull = 1, g_tsAB = 0; static float g_tsLive = 1.0f;   // ABToggle=1 (test aid): relief+PBR extras flip on/off every time the debug-camera file changes static float g_tsPhongInward = 1.0f;
 struct TessLoc { GLint cam = -1, tp = -1, cull = -1, tr = -1, tr2 = -1; };
 static std::unordered_map<GLuint, TessLoc> g_tessLoc; static std::unordered_map<GLuint, float> g_tessCullLast; static std::unordered_map<GLuint, unsigned> g_tessStamp;
@@ -41,6 +42,12 @@ static void LoadTessConfig() {
     // world relief keys
     GetPrivateProfileStringA("tess", "TargetEdge", "4", b, sizeof b, ini); g_tsTargetEdge = (float)atof(b); if (g_tsTargetEdge < 0.5f) g_tsTargetEdge = 0.5f;   // world units per sub-triangle edge on near surfaces
     GetPrivateProfileStringA("tess", "ReliefDepth", "3", b, sizeof b, ini); g_tsReliefDepth = (float)atof(b);          // max inward depth (world units) of cracks/valleys; 0 = old +-Displacement path
+    // Shaping of the relief amount (texture darkness -> depth). Defaults reproduce the old curve exactly.
+    //   ReliefCurve < 1 lifts weak relief (textures that were barely carved get deeper: the floor rises); > 1 pushes weak relief down.
+    //   ReliefKnee > 0 (world units): depth above the knee grows only at ReliefKneeSlope of its rate, so strongly carved textures stop growing when ReliefDepth is raised.
+    GetPrivateProfileStringA("tess", "ReliefCurve", "1.0", b, sizeof b, ini); g_tsReliefCurve = (float)atof(b); if (g_tsReliefCurve < 0.2f) g_tsReliefCurve = 0.2f; if (g_tsReliefCurve > 4.0f) g_tsReliefCurve = 4.0f;
+    GetPrivateProfileStringA("tess", "ReliefKnee", "0", b, sizeof b, ini); g_tsReliefKnee = (float)atof(b); if (g_tsReliefKnee < 0.0f) g_tsReliefKnee = 0.0f;
+    GetPrivateProfileStringA("tess", "ReliefKneeSlope", "0.35", b, sizeof b, ini); g_tsReliefKneeSlope = (float)atof(b); if (g_tsReliefKneeSlope < 0.0f) g_tsReliefKneeSlope = 0.0f; if (g_tsReliefKneeSlope > 1.0f) g_tsReliefKneeSlope = 1.0f;
     GetPrivateProfileStringA("tess", "GroundRelief", "1.0", b, sizeof b, ini); g_tsGroundRelief = (float)atof(b);      // multiplier on up-facing surfaces (sand, paths)
     GetPrivateProfileStringA("tess", "PropRelief", "0.7", b, sizeof b, ini); g_tsPropRelief = (float)atof(b);          // multiplier on walls/fence/rope/rock
     GetPrivateProfileStringA("tess", "ReliefFadeStart", "700", b, sizeof b, ini); g_tsReliefFade0 = (float)atof(b);
@@ -275,8 +282,8 @@ static std::string MakeTESWorld(const std::vector<TessVar>& vars) {
     for (auto& v : vars) if (!v.name.empty()) s += "in " + v.type + " teIn_" + v.name + "[];\nout " + v.type + " " + v.name + ";\n";
     s += "in vec3 teIn_tyWorld[];\n";
     char buf[400];
-    snprintf(buf, sizeof buf, "const float kAlpha = %.3f, kFade0 = %.1f, kFade1 = %.1f, kMaxSm = %.2f, kDisp = %.2f, kDispLod = %.2f;\n", g_tsAlphaWorld, g_tsFadeStart, g_tsFadeEnd, g_tsMaxSmooth,
-             g_tsReliefDepth > 0.0f ? 0.0f : g_tsDisp, g_tsDispLod);
+    snprintf(buf, sizeof buf, "const float kAlpha = %.3f, kFade0 = %.1f, kFade1 = %.1f, kMaxSm = %.2f, kDisp = %.2f, kDispLod = %.2f, kCurve = %.3f, kKnee = %.2f, kKneeSlope = %.3f;\n", g_tsAlphaWorld, g_tsFadeStart, g_tsFadeEnd, g_tsMaxSmooth,
+             g_tsReliefDepth > 0.0f ? 0.0f : g_tsDisp, g_tsDispLod, g_tsReliefCurve, g_tsReliefKnee, g_tsReliefKneeSlope);
     s += buf;
     s += R"GLSL(
 vec3 PhongProj(vec3 p, vec3 q, vec3 n) { return q - dot(q - p, n) * n; }
@@ -312,9 +319,11 @@ void main() {
       float fp = max(tyTP.z, sqrt(aW) / L);                           // world size of one sub-triangle (never finer than TargetEdge: stable near, filtered far)
       float lod = clamp(log2(max(fp * tpu, 1.0)) + tyTR2.x, 0.0, 9.0);
       vec2 gx = vec2(exp2(lod) / ts.x, 0.0), gy = vec2(0.0, exp2(lod) / ts.y);
-      float depthN = clamp(-TyH3(tuv, gx, gy), 0.0, 1.0);             // inward only: cracks/dark lines go down, nothing rises (feet never sink)
+      float depthN = pow(clamp(-TyH3(tuv, gx, gy), 0.0, 1.0), kCurve);   // inward only: cracks/dark lines go down, nothing rises (feet never sink)
+      float amp = mix(tyTR.w, tyTR.z, ground) * depthN;                 // world units
+      if (kKnee > 0.0 && amp > kKnee) amp = kKnee + (amp - kKnee) * kKneeSlope;   // soft knee: strong relief stops growing past the knee
       float edgeF = tyTR2.y > 0.0 ? smoothstep(0.0, tyTR2.y, min(b.x, min(b.y, b.z)) * sqrt(aW)) : 1.0;   // world-unit fade width at patch borders
-      w -= nI * (mix(tyTR.w, tyTR.z, ground) * depthN * rf * edgeF);
+      w -= nI * (amp * rf * edgeF);
     }
   }
 )GLSL";
