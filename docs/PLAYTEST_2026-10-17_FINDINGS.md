@@ -94,9 +94,61 @@ Cause hypotheses point at source names found by search. Nothing here is confirme
 ### 9. Footprints moment
 - **Not located.** No timestamp was given and I did not search.
 
+## Round 2 measurements
+
+Method: frames at 0.5 s steps (2 fps), extracted from `Recording 2026-10-17 094656.mp4` at 320 px for scans and 960 px for the committed copies. Metrics:
+- **MAD** = mean absolute per-channel difference against the previous step (0–255).
+- **Blue ratio** = B/(R+G+B), over the character box (x 40–60%, y 45–95%) and the whole frame.
+- **Changed pixels** = share of sampled pixels with a summed channel difference > 45 against the pre-water frame.
+
+Data: `docs/playtest_frames/data/` (CSV).
+
+### 1. Frame-diff scan, 1:40–2:30
+- Median MAD 3.37, sd 12.28, threshold (median + 3 sd) 40.2.
+- **Exact-zero frames (duplicates):** 1:58.5–2:02.5 (`q_038`–`q_046`), 2:04.5–2:05.0 (`q_050`–`q_051`), 2:07.5–2:15.0 (`q_056`–`q_071`). **Near-zero (MAD < 0.05):** 2:03.5–2:04.0 (`q_048`–`q_049`), 2:06.5 (`q_054`, 0.10). Small but non-zero: 2:05.5 (0.93), 2:07.0 (0.87). Non-zero jump at 2:06.0 (`q_053`, 4.10). 2:16.0 onward mostly non-zero. 2:10 (`q_061`) has MAD 0.87, near-duplicate. 2:15 (`q_071`) is exact zero.
+- **Jumps above threshold:** 1:57.0 (`q_035`, MAD 73.4, the cliff-to-water cut); 2:18.0 (`q_077`, MAD 42.9); 2:18.5 (`q_078`, MAD 42.6). The 1:46.5 step (`q_014`, MAD 48.5) is also above threshold but is outside the 2:10 focus and was not checked.
+
+### 2. Is the stall at 2:10 and 2:15 in the recording or the game?
+- Both steps are duplicate frames in the recording file itself. Blue ratio and luminance are constant across the stall (`lumAll` 385.6–385.7).
+- **Clock test could not be run.** The "separate game capture" starting at 57 s is not on disk. The only 17 October recording in `C:\CLAUDE` and `C:\Users\yanni\Videos` is `094656.mp4`. Without the capture file there is nothing to compare hypothesis (a), capture = rec − 57 s (2:10 → 1:13), with hypothesis (b), capture = rec + 57 s (2:10 → 3:07).
+- **Answer:** the stall is present in the recording file. Whether the game froze or the capture duplicated frames cannot be told apart from this file. Not confirmed.
+
+### 3. Water entry
+- **Entry into water: 1:57.0** (`water_entry_0157.jpg`, frame `q_035`). Blue ratio on the character box jumps from 0.15 (1:56.5) to 0.26 (1:57.0) and holds at 0.26 through 2:10. Whole-frame luminance roughly doubles at the same step (171 → 386). The jump is a full-frame change, so it is the scene transition, not only Ty.
+
+### 4. Overlay breaking
+- Against the pre-water frame (1:56.5, `q_034`), **~78% of sampled pixels change from 1:57.0 onward**, across all cells of the 3×3 grid (the change is whole-frame, not localised).
+- The change is constant from 1:57.0 to 2:15.0 (77.8–78.0%).
+- **A second step at 2:15.5–2:16.0:** 80.6% at 2:15.5 (`q_072`), 84.4% at 2:16.0 (`q_073`, shown as `overlay_step_0216.jpg`), rising to 93.7% at 2:18.0 (`q_077`). This is the break point. It is after the 2:05 reference, not at 2:05.
+- The Windows system menu at top-left (2:05) was excluded from the count.
+
+### 5. Trees near 5:40
+- Scan 4:40–6:40 at 0.5 s: 240 frames, **55 cutscene frames** (letterbox bars or subtitle text) and 185 non-cutscene frames. Non-cutscene runs (outdoor gameplay, after the subtitle check):
+  - 4:40.0–4:44.5 (10 frames)
+  - 4:53.0–4:53.5 (2)
+  - 5:04.0–5:24.5 (42)
+  - 5:25.5–5:30.0 (10)
+  - 5:32.5–5:39.0 (14)
+  - 5:44.5–6:07.0 (46)
+  - 6:08.5–6:12.0 (8)
+  - 6:14.0–6:39.5 (52)
+- **5:40.0 is a cutscene** (subtitled dialogue, `t_121`), not outdoor gameplay. The nearest outdoor scene is 5:32.5–5:39.0. The outdoor 5:35 frame is `outdoor_trees_0535.jpg`.
+- Fog on trees, rough (green-vs-red colour split, not a real segmentation, so treat as indicative):
+  - 5:04–5:24 scene: crown lum 148, terrain lum 63, fog colour ~(139, 174, 210).
+  - 5:32.5–5:39 scene: crown lum 85, terrain lum 116, fog ~(104, 102, 111).
+  - 5:44.5–6:07 scene: crown lum 106, terrain lum 97, fog ~(89, 100, 78).
+- **Not confirmed:** whether the tree crowns are fogged more than the terrain. The segmentation does not isolate crowns cleanly, so these numbers do not settle the claim.
+
+### 6. Named moments
+- **7:42 portal** (`portal_0742.jpg`): glow area 6.2% of frame with luminance > 200. Peak luminance 253.8. Mean glow luminance 220.4.
+- **9:30 rock** (`skybox_rock_0930.jpg`): mesa top RGB (135, 84, 78), lum 98.6. Fog at mesa base RGB (112, 72, 58), lum 82.0. **Colour delta 33.4** (RGB Euclidean). Sampling boxes were placed by eye, so the delta is indicative.
+- **0:15 lilies** (`fog_water_0015.jpg`): not separable. Luminance thresholds either pick the whole water (lum > 150 covers 67% of the band) or nothing (lum > 170 covers 0%). Far-water mean lum 151.0, sat 0.377. Background rock lum 70.8, sat 0.383. **Lily-pad luminance and saturation not measured.**
+
 ## Open items
 
-- Finer scan (2–4 fps) of 1:50–2:10 to find the water entry.
-- Find the footprints timestamp.
-- Short clips (not stills) for: the 2:05 overlay, the 4:20 reload, the 5:40 tree claim. Stills cannot settle these.
+- Lily-pad segmentation at 0:15 needs a colour-based mask (the pads are light green-white on blue-grey), not a luminance threshold.
+- The 2:16 break needs a clip, not stills, to tell a real geometry break from a scene change.
+- Whether the 2:10–2:15 stall is in the game or the capture needs the separate 57 s capture file. It is not on disk.
+- Tree crown fog needs a proper segmentation (or a clip), not the green-vs-red split used here.
+- Footprints moment: still not located.
 - Run the `DebugWater` bisect on the 2:05 spot, one bit per playtest.
