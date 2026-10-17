@@ -5,7 +5,9 @@
 // Output (game dir): tyrender.log, tyrender\dump\<hash>.<vs|fs>.glsl ; overrides read from tyrender\override\<hash>.glsl
 // Config (game dir): tyrender.ini  [debug] CaptureFrame=N (0=off)  CaptureFrame2=N  DumpShaders=1  OverrideShaders=1
 #include <windows.h>
+#include <shlobj.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <math.h>
@@ -600,6 +602,25 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
     return r;
 }
 
+// ---------------------------------------------------------------- launcher clash guard (issue #13)
+// Reads the game's own settings.ini and logs a warning when it asks for something the DLL already provides (SSAO).
+// Warn only: settings.ini is never rewritten. Config tyrender.ini [clash] Check=1 (0 = off).
+static void CheckGameSettingsClash() {
+    char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
+    if (!GetPrivateProfileIntA("clash", "Check", 1, ini)) return;
+    char docs[MAX_PATH] = "";
+    if (FAILED(SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs))) return;
+    char path[MAX_PATH]; snprintf(path, sizeof path, "%s\\TY the Tasmanian Tiger\\settings.ini", docs);
+    FILE* f = fopen(path, "rb"); if (!f) { logf("[clash] no game settings.ini at %s", path); return; }
+    static char buf[16384]; size_t n = fread(buf, 1, sizeof buf - 1, f); fclose(f); buf[n] = 0;
+    for (char* line = strtok(buf, "\r\n"); line; line = strtok(nullptr, "\r\n")) {
+        char key[64] = "", val[64] = "";
+        if (sscanf(line, " %63[^= ] = %63s", key, val) != 2) continue;
+        if (!_stricmp(key, "SSAO") && !_stricmp(val, "true"))
+            logf("[clash] settings.ini has SSAO=true; the DLL's own AO runs too and the menu can stall. Set SSAO=false in settings.ini.");
+    }
+}
+
 // ---------------------------------------------------------------- init
 static void Install() {
     HMODULE exe = GetModuleHandleA(nullptr);
@@ -652,6 +673,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
     QueryPerformanceFrequency(&g_qpf);
     AddVectoredExceptionHandler(1, CrashVEH);
     LoadConfig();
+    CheckGameSettingsClash();
     LoadAOConfig();
     LoadFXConfig();
     LoadShadowConfig();
