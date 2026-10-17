@@ -204,6 +204,7 @@ static void RefreshCosts(void) {
     SetWindowTextW(h_total, m);
     int mp = MatchPreset();
     g_presetSel = mp; for (int i = 0; i < NPRESET; i++) InvalidateRect(h_preset[i], NULL, TRUE);
+    if (GetFileAttributesW(g_ini) != INVALID_FILE_ATTRIBUTES) WritePrivateProfileStringW(L"shots", L"Preset", mp >= 0 ? kPresets[mp] : L"Custom", g_ini);   // names the A/B screenshots (abshot.inl)
     SetWindowTextW(h_presetNote, mp >= 0 ? kPresetNote[mp] : L"Custom mix: you changed something. Click a preset to snap back.");
     if (g_descCur >= 0) ShowDescIdx(g_descCur);
 }

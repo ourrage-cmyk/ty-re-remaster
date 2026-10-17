@@ -12,6 +12,10 @@
 #include <stdarg.h>
 #include <math.h>
 #include <string>
+#include <vector>
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unordered_map>
 #include <set>
 
@@ -529,6 +533,7 @@ static void Snapshot(HDC dc) {
 #include "light.inl"
 #include "debugcam.inl"
 #include "gpuprof.inl"
+#include "abshot.inl"
 static void ApplyShadowStrength(GLuint p) {
     typedef void(WINAPI* pu1f_t)(GLuint, GLint, GLfloat); static pu1f_t pu = (pu1f_t)o_wglGetProcAddress("glProgramUniform1f");
     auto it = g_shadowStrengthLoc.find(p); if (it == g_shadowStrengthLoc.end() || it->second < 0 || !pu) return;
@@ -572,7 +577,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
         Snapshot(dc); PollDebugCam(); MotionPoll(); PollAOFlags(); PollAtmosFlags(); PollGIFlags();
         char p[MAX_PATH]; snprintf(p, sizeof p, "%styrender\\post_off", g_dir); g_fxOffFile = GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES;
         snprintf(p, sizeof p, "%styrender\\reload", g_dir);
-        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
+        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); LoadShotConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
             for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);
             { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
               GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
@@ -581,6 +586,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
     }   // poll the trigger file every 8 frames
     TexReport();
     GProf(9);                                      // GPU timestamp: end of this frame's commands (before present, so vsync waits are not counted)
+    ABShotFrame(dc);                               // A/B hotkey (abshot.inl): reads the frame just drawn, F11 by default
     BOOL r = o_SwapBuffers(dc);
     GProfNextFrame();
     g_frame++;
@@ -684,7 +690,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
       GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
       GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "1.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
     LoadTessConfig();
-    LoadPbrConfig(); LoadLightConfig(); LoadTexTags();
+    LoadPbrConfig(); LoadLightConfig(); LoadShotConfig(); LoadTexTags();
     logf("tyrender stage1 loaded. game dir %s  capture=%d,%d dump=%d override=%d", g_dir, g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
     Install();
     CheckOrig("SwapBuffers", (void*)o_SwapBuffers);
