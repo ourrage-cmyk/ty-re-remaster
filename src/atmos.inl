@@ -229,7 +229,7 @@ void main() {
 )";
 static struct { GLuint prog, tex[2]; int idx; bool failed, init; } skyE;
 static int g_atHazeFromSky = 1; static float g_atHazeSky = 0.0f, g_atBlurPx = 0.0f, g_atBlurStart = 4000.0f, g_atBlurRange = 12000.0f; static int g_atContactStable = 1;
-static int g_fogSeeThruDepth = 0, g_fogLateEmit = 0;   // [fog] SeeThruDepth / LateEmitters (issue #4), read in LoadAtmosConfig; see LateFogBegin and SeeThruDepthBegin
+static int g_fogSeeThruDepth = 0, g_fogLateEmit = 0; static float g_fogWaterBoost = 1.0f;   // [fog] SeeThruDepth / LateEmitters / WaterBoost (issue #4), read in LoadAtmosConfig; see LateFogBegin and SeeThruDepthBegin
 
 typedef void(WINAPI* glDispatchCompute_t)(GLuint, GLuint, GLuint);
 typedef void(WINAPI* glBindImageTexture_t)(GLuint, GLuint, GLint, GLboolean, GLint, GLenum, GLenum);
@@ -288,6 +288,7 @@ static void LoadAtmosConfig() {
     F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.8", g_atSkyHaze) F("SkyHazeHeight", "0.45", g_atSkyH) F("FogSaturation", "0.5", g_atFogSat) F("WaterFog", "1.0", g_atWaterFog) F("HueLock", "1.0", g_atHueLock) F("HazeHue", "0.15", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
     g_fogSeeThruDepth = GetPrivateProfileIntA("fog", "SeeThruDepth", 0, ini); g_fogLateEmit = GetPrivateProfileIntA("fog", "LateEmitters", 0, ini);
+    { char wb[32]; GetPrivateProfileStringA("fog", "WaterBoost", "1.0", wb, sizeof wb, ini); g_fogWaterBoost = (float)atof(wb); }   // 1 = off (water keeps LateBoost)
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
 #undef F
     GetPrivateProfileStringA("atmos", "SunColor", "1.0,0.86,0.66", b, sizeof b, ini);
@@ -314,11 +315,15 @@ static void FogDiagDraw() {
 static GLfloat g_lateSaved[4]; static GLuint g_lateProg;
 // [fog] LateEmitters (issue #4, default 0): the same late boost also covers emissive draws after the fog pass (cave fire, particles), which were never hazed.
 static bool LateFogBegin() {
-    if (g_lateFog <= 1.0f || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
-    const MatRow& row = MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]);
+    if ((g_lateFog <= 1.0f && g_fogWaterBoost <= 1.0f) || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
+    GLuint tex = g_bound2D[g_progDiffUnit[g_curProg] & 31];
+    const MatRow& row = MatPolicy(tex);
     if (!row.seeThru && !(g_fogLateEmit && row.emissive)) return false;
+    // [fog] WaterBoost (issue #3/#4 water): water-named see-through draws use their own multiplier; their vertex fog is already at the water's own distance
+    float mult = (g_fogWaterBoost > 1.0f && row.seeThru && (TexFlags(tex) & TF_WATER)) ? g_fogWaterBoost : g_lateFog;
+    if (mult <= 1.0f) return false;
     memcpy(g_lateSaved, g_progFog[g_curProg], sizeof g_lateSaved); g_lateProg = g_curProg;
-    GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * g_lateFog, 1.0f - b[0]);
+    GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * mult, 1.0f - b[0]);
     o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, b); return true;
 }
 static void LateFogEnd() { if (g_lateProg == g_curProg) o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, g_lateSaved); }
