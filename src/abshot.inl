@@ -6,6 +6,7 @@
 // It replaces the ABToggle debug-camera file trigger for users; that trigger stays as a harness aid when [tess] ABToggle=1.
 #include "build_id.h"                   // TY_BUILD_ID_A, written by build.ps1
 static int g_shotVk = 0x7A;             // VK_F11
+static int g_shotPair = 0;              // [shots] Pair=1 opt-in: capture a pair with the relief + PBR state flipped. Default 0 = one frame, no render state touched (the pair mode broke the scene geometry in the 2026-10-17 playtest, issue #14 / F11 regression)
 static float g_shotOrigLive = 1.0f;     // g_tsLive before the press, restored after the pair
 static char g_shotStamp[24];
 static bool g_shotDown;                 // key state at the previous frame (edge detect)
@@ -21,6 +22,7 @@ static void LoadShotConfig() {
     char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     GetPrivateProfileStringA("shots", "Key", "F11", b, sizeof b, ini);
     g_shotVk = ShotParseVk(b);
+    g_shotPair = GetPrivateProfileIntA("shots", "Pair", 0, ini) != 0;
 }
 static bool ShotReadFrame(HDC dc, int& w, int& h, std::string& px) {
     HWND wnd = WindowFromDC(dc); RECT rc;
@@ -107,6 +109,7 @@ static void ABShotFrame(HDC dc) {
         SYSTEMTIME st; GetLocalTime(&st);
         snprintf(g_shotStamp, sizeof g_shotStamp, "%04d%02d%02d-%02d%02d%02d", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
         if (!g_shotTitleUntil) { g_shotWnd = wnd; GetWindowTextA(wnd, g_shotTitle, sizeof g_shotTitle); }
+        if (!g_shotPair) { ShotCapture(dc, g_tsLive > 0.5f ? "shaders-on" : "shaders-off"); return; }   // default: one frame, render state untouched
         g_shotOrigLive = g_tsLive;
         ShotCapture(dc, g_tsLive > 0.5f ? "shaders-on" : "shaders-off");
         g_tsLive = g_shotOrigLive > 0.5f ? 0.0f : 1.0f;             // the next frame renders the other state
