@@ -58,6 +58,13 @@ Playtest Medium, High, and Ultra on v0.3.4. Check flicker, the red ground spot, 
 5. New A/B shots for the community post (`abshots.ps1` plus `match_ab.ps1`).
 6. Tag `v0.3.5` on main; zip attached to the release, never committed.
 
+### Release rule (owner, 2026-10-16)
+- The release artifact is always **TYLauncher.exe**. It is the primary asset, with its sha1 in the release notes. The launcher embeds the matching `tyrender.dll` and `default_tyrender.ini` (built by `build.ps1`) and installs them next to itself on start, so users only run the exe. An existing `tyrender.ini` is never overwritten.
+- The zip is a secondary asset. Zips, DLLs and exes are never committed.
+- The launcher title bar shows the version and build id (`TY HD Renderer v0.3.5-rc  build <sha>`, with `-dirty` on a modified tree), so a tester can tell the exe is current.
+- Pre-releases (untested in game) are marked as pre-release on GitHub.
+
+
 ### Parallel tracks (do not block the batches)
 - #12 In-game overlay menu on an unused hotkey (D1) and #13 launcher vs in-game settings clash guard (D2): tooling, can start any time.
 - #14 A/B screenshot hotkey: last.

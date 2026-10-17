@@ -7,11 +7,16 @@ $src = $PSScriptRoot; $out = Join-Path $src 'out'
 New-Item -ItemType Directory -Force $out | Out-Null
 & "$bin\i686-w64-mingw32-clang++.exe" -O2 -shared -static -std=c++17 -Wall -o "$out\tyrender.dll" "$src\tyrender.cpp" '-Wl,--kill-at'
 if ($LASTEXITCODE) { throw 'tyrender.dll build failed' }
+# Embed the matching tyrender.dll and default ini in the launcher (resources 1 and 2): TYLauncher.exe alone is the release.
+$rc = Join-Path $out 'payload.rc'
+Set-Content -Path $rc -Value @(('1 RCDATA "' + ("$out\tyrender.dll" -replace '\\', '/') + '"'), ('2 RCDATA "' + ("$src\default_tyrender.ini" -replace '\\', '/') + '"')) -Encoding ascii
+& "$bin\i686-w64-mingw32-windres.exe" -O coff -o "$out\payload.res.o" $rc
+if ($LASTEXITCODE) { throw 'payload resource build failed' }
 # build id = short git sha (+ -dirty when the tree has local edits), shown in the launcher title bar
 $sha = (git -C $src rev-parse --short HEAD 2>$null); if (-not $sha) { $sha = 'nogit' }
 if (git -C $src status --porcelain 2>$null) { $sha += '-dirty' }
 Set-Content -Path (Join-Path $out 'build_id.h') -Value ('#define TY_BUILD_ID L"' + $sha + '"') -Encoding ascii
-& "$bin\i686-w64-mingw32-clang.exe" -O2 -static -municode -mwindows -Wall "-I$out" -o "$out\TYLauncher.exe" "$src\TYLauncher.c" -lshell32 -lcomctl32
+& "$bin\i686-w64-mingw32-clang.exe" -O2 -static -municode -mwindows -Wall "-I$out" -o "$out\TYLauncher.exe" "$src\TYLauncher.c" "$out\payload.res.o" -lshell32 -lcomctl32
 if ($LASTEXITCODE) { throw 'TYLauncher.exe build failed' }
 Get-ChildItem $out | Select-Object Name, Length
 if ($Install) {
