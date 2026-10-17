@@ -131,10 +131,11 @@ The heartbeat runs as a background job and stops when the run ends. A stale hear
 - a variant in the run is not used by any check in the plan.
 
 A plan is JSON (`tools\playtest\plans\<name>.json`) with `name`, `purpose`, and `checks`. Each check has:
-- `id`, `kind` (`boot`, `overlay`, `flicker`, `log` or `manual`), and `variants`
+- `id`, `kind` (`boot`, `overlay`, `flicker`, `tyflicker`, `log` or `manual`), and `variants`
 - `issue` and `decides`: what the check settles, and which issue it feeds
 - `pass`: the criterion in words, and `next`: what to try when it fails
-- for `flicker`: `baseline` and `limit` (lower-half temporal std ratio)
+- for `flicker`: `baseline` and `limit` (lower-half temporal std ratio). The whole-frame metric is mostly background (grass, clouds, sky), so it does not separate the DebugWater variants (about 40 to 41 for 0, 1 and 2).
+- for `tyflicker`: `baseline` and `limit`. Same idea, but measured over Ty's rectangle only (x 0.41 to 0.605, y 0.39 to 0.90): the temporal std of the blue excess inside it, divided by the baseline's. Use this for water and Ty-flicker questions (#5, #80).
 - for `log`: `pattern` (regex) and `mustMatch` (true = the line must appear, false = it must not)
 
 Each check is decided and logged as it runs (`[PASS]`, `[FAIL]`, `[INCONCLUSIVE]`). A missing variant or log gives INCONCLUSIVE, never a guess. `manual` checks are INCONCLUSIVE until a person looks at `contact_sheet.png`.
@@ -142,6 +143,10 @@ Each check is decided and logged as it runs (`[PASS]`, `[FAIL]`, `[INCONCLUSIVE]
 `report.md` in the run folder starts with the purpose, then a table of check results with evidence, then an Issues section: PASS means "supported by this run, issue closes only after the owner's playtest", FAIL gives the `next` step.
 
 Plans: `current_run.json` (the first full run, written after the fact) and `next_monitor.json` (issues #79 to #84 and #86).
+
+Rerun list for the next plan:
+- `trees_see1` (billabong) failed at boot on the coordinator's run. The likely cause was an empty `-TargetPid` in the ENTER presses of `ty_play.ps1`. `KeyEnter` now throws a clear error when no game window exists, so rerun it to confirm the boot works.
+- The `tyflicker` checks in `next_monitor.json` and `req-80-debugwater` replace the whole-frame flicker check, because that check did not discriminate between the DebugWater variants.
 
 ## Request queue (other threads and agents)
 

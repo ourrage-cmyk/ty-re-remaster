@@ -92,7 +92,7 @@ function Save-GameLog($r) {
 function Run-Variant([string]$Name, [hashtable]$Def) {
     $dir = Join-Path $Out $Name; New-Item -ItemType Directory -Force $dir | Out-Null
     Write-RunLog "variant $Name start (spot=$(if ($Def.ContainsKey('Spot')) { $Def.Spot } else { $Spot }))"
-    $r = @{ Name = $Name; Dir = $dir; Boot = ''; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a'; OverlayLog = @() }
+    $r = @{ Name = $Name; Dir = $dir; Boot = ''; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a'; OverlayLog = @(); TyBlue = -1 }
     if (Get-GameProcs $Game) { $r.Boot = 'FAIL a game process is already running from this folder (slot busy; announce in the Fix plan thread)'; return $r }
     $proc = [IO.Path]::GetFileNameWithoutExtension($Def.Exe)
 
@@ -124,6 +124,7 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
         if ($frames.Count -ge 3) {
             $s = [PlaytestImg]::TemporalStd([string[]]$frames, $TyX0, $TyY0, $TyX1, $TyY1)
             $r.FlickerLower = $s[2]
+            $r.TyBlue = ([PlaytestImg]::RegionBlueStd([string[]]$frames, $TyX0, $TyY0, $TyX1, $TyY1))[0]
             $r.Flicker = 'whole {0:N2} / upper {1:N2} / lower {2:N2} (n={3})' -f $s[0], $s[1], $s[2], $frames.Count
         } else { $r.Flicker = "FAIL only $($frames.Count) frames" }
     }
@@ -205,6 +206,12 @@ function Get-CheckResult($c, $results) {
             $ok = if ($c.mustMatch) { $hits.Count -gt 0 } else { $hits.Count -eq 0 }
             $first = (@($hits | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() })) -join ' | '
             return @{ Status = $(if ($ok) { 'PASS' } else { 'FAIL' }); Evidence = "$($hits.Count) matching line(s) in $($vs[0])$(if ($first) { ': ' + $first })" }
+        }
+        'tyflicker' {
+            $v = $rs[$vs[0]]; $b = $rs[$c.baseline]
+            if (-not $b -or $v.TyBlue -lt 0 -or $b.TyBlue -lt 0) { return @{ Status = 'INCONCLUSIVE'; Evidence = "no Ty-region values for $($vs[0]) or baseline $($c.baseline)" } }
+            $ratio = $v.TyBlue / [Math]::Max(0.0001, $b.TyBlue)
+            return @{ Status = $(if ($ratio -le $c.limit) { 'PASS' } else { 'FAIL' }); Evidence = ('Ty blue-excess std {0:N3} vs {1} {2:N3}: ratio {3:N2} (limit {4})' -f $v.TyBlue, $c.baseline, $b.TyBlue, $ratio, $c.limit) }
         }
         'manual' { return @{ Status = 'INCONCLUSIVE'; Evidence = "needs a person to look: $(Join-Path $Out 'contact_sheet.png') (variants: $($vs -join ', '))" } }
         default { return @{ Status = 'INCONCLUSIVE'; Evidence = "unknown check kind $($c.kind)" } }

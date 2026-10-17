@@ -56,6 +56,34 @@ public static class PlaytestImg {
     }
     return new double[] { all / Math.Max(1, na), up / Math.Max(1, nu), lo / Math.Max(1, nl) };
   }
+  // Ty's own region only: temporal std-dev of the mean blue excess (B - (R+G)/2) and of luma over the region, per frame. Returns {blue, luma}.
+  public static double[] RegionBlueStd(string[] files, double x0, double y0, double x1, double y1) {
+    int n = files.Length; var blue = new double[n]; var luma = new double[n];
+    for (int f = 0; f < n; f++) {
+      using (var A = new Bitmap(files[f])) {
+        int w = A.Width, h = A.Height;
+        int px0 = (int)(x0 * w), px1 = (int)(x1 * w), py0 = (int)(y0 * h), py1 = (int)(y1 * h);
+        var d = A.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+        var buf = new byte[d.Stride * h];
+        System.Runtime.InteropServices.Marshal.Copy(d.Scan0, buf, 0, buf.Length);
+        A.UnlockBits(d);
+        double sb = 0, sl = 0; long c = 0;
+        for (int y = py0; y < py1; y += 2) for (int x = px0; x < px1; x += 2) {
+          int k = y * d.Stride + x * 3;
+          double b = buf[k], g = buf[k + 1], r = buf[k + 2];
+          sb += b - (r + g) / 2.0; sl += 0.2126 * r + 0.7152 * g + 0.0722 * b; c++;
+        }
+        blue[f] = c > 0 ? sb / c : 0; luma[f] = c > 0 ? sl / c : 0;
+      }
+    }
+    return new double[] { Sd(blue), Sd(luma) };
+  }
+  static double Sd(double[] v) {
+    int n = v.Length; if (n < 2) return 0;
+    double m = 0; foreach (var x in v) m += x; m /= n;
+    double q = 0; foreach (var x in v) q += (x - m) * (x - m);
+    return Math.Sqrt(q / (n - 1));
+  }
 }
 '@
 

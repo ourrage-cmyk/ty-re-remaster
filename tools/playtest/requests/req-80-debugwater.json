@@ -36,7 +36,7 @@
   "checks": [
     {
       "id": "bisect-bit1",
-      "kind": "flicker",
+      "kind": "tyflicker",
       "variants": [
         "dbg_water_1"
       ],
@@ -48,7 +48,7 @@
     },
     {
       "id": "bisect-bit2",
-      "kind": "flicker",
+      "kind": "tyflicker",
       "variants": [
         "dbg_water_2"
       ],
@@ -60,7 +60,7 @@
     },
     {
       "id": "bisect-bit4",
-      "kind": "flicker",
+      "kind": "tyflicker",
       "variants": [
         "dbg_water_4"
       ],
@@ -72,7 +72,7 @@
     },
     {
       "id": "bisect-bit8",
-      "kind": "flicker",
+      "kind": "tyflicker",
       "variants": [
         "dbg_water_8"
       ],
@@ -84,7 +84,7 @@
     },
     {
       "id": "bisect-bit5",
-      "kind": "flicker",
+      "kind": "tyflicker",
       "variants": [
         "dbg_water_5"
       ],
