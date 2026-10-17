@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $bin = 'C:\CLAUDE\TOOLS\llvm-mingw\llvm-mingw-20261006-ucrt-x86_64\bin'
 $src = $PSScriptRoot; $out = Join-Path $src 'out'
 New-Item -ItemType Directory -Force $out | Out-Null
-& "$bin\i686-w64-mingw32-clang++.exe" -O2 -shared -static -std=c++17 -Wall -o "$out\tyrender.dll" "$src\tyrender.cpp" '-Wl,--kill-at'
+& "$bin\i686-w64-mingw32-clang++.exe" -O2 -shared -static -std=c++17 -Wall -o "$out\tyrender.dll" "$src\tyrender.cpp" '-Wl,--kill-at' -lshell32
 if ($LASTEXITCODE) { throw 'tyrender.dll build failed' }
 # Embed the matching tyrender.dll and default ini in the launcher (resources 1 and 2): TYLauncher.exe alone is the release.
 $rc = Join-Path $out 'payload.rc'
