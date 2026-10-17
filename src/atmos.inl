@@ -353,7 +353,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
     if (g_frame - g_fdLast >= 600) { g_fdLast = g_frame; logf("[fogdiag] transparent-tagged draws (sampled): before-fog depthW0/blend0=%u d0/b1=%u d1/b0=%u d1/b1=%u | after-fog d0/b0=%u d0/b1=%u d1/b0=%u d1/b1=%u",
         g_fdCnt[0][0][0], g_fdCnt[0][0][1], g_fdCnt[0][1][0], g_fdCnt[0][1][1], g_fdCnt[1][0][0], g_fdCnt[1][0][1], g_fdCnt[1][1][0], g_fdCnt[1][1][1]); memset(g_fdCnt, 0, sizeof g_fdCnt); }
     g_atRanFrame = g_frame;
-    if ((!g_atEnable && g_atContact <= 0) || g_atOffFile || atm.failed || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
+    if ((!g_atEnable && g_atContact <= 0) || g_atOffFile || g_abOff || atm.failed || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
     if (!LoadGX()) { atm.failed = true; return; }
     if (!atm.init) {
         atm.prog = CompileProg("atmos", kVS, "#version 330\n", kCommon, kAtmos);

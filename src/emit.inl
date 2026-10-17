@@ -136,7 +136,7 @@ static void EmitSyncFrame() {
 // Around the normal draw of every emitter-class draw: an occlusion query (visible samples = screen area). Sets g_emitDrawOrd for EmitBegin.
 static void EmitQBegin() {
     g_emitDrawOrd = -1;
-    if (!g_emitEnable || g_emitActive || !g_emitW || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_texEnable) return;
+    if (!g_emitEnable || g_abOff || g_emitActive || !g_emitW || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_texEnable) return;
     if (!MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]).emissive || g_progTyEmitLoc[g_curProg] < 0) return;
     EmitSyncFrame();
     if (g_emitOrd >= kEmitOrdMax) return;
@@ -221,7 +221,7 @@ static void EmitEnd() {
 
 // Once per frame, from the end-of-3D-pass block (after GI, before atmos): blur the emission buffer and add it to FB0.
 static void RunEmit(int w, int h) {
-    if (!g_emitEnable || !EmitInit(w, h)) return;
+    if (!g_emitEnable || g_abOff || !EmitInit(w, h)) return;
     EmitRankPoll();
     if (g_emitFrame != g_frame || !g_emitCount || g_emitComposed == g_frame) return;
     g_emitComposed = g_frame;

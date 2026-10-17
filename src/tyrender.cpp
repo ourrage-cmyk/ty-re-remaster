@@ -71,7 +71,7 @@ static void PollAOFlags();
 static void LoadAOConfig();
 static void LoadFXConfig();
 static void RunFX(int w, int h);
-static unsigned g_sceneDepthFrame = ~0u, g_fxDoneFrame = ~0u; static bool g_fxOffFile;
+static unsigned g_sceneDepthFrame = ~0u, g_fxDoneFrame = ~0u; static bool g_fxOffFile; static bool g_abOff;   // A/B hotkey: this frame is the vanilla "off" frame of a pair (abshot.inl); AO, GI, atmos, fx and TAA skip while set
 static int g_screenW, g_screenH; static GLuint g_sceneDepthTex; static bool g_sceneModified;
 static std::unordered_map<uint64_t, int> g_namedLocs;   // (prog<<32|loc) -> 1 shadowVPMatrix1, 2 shadowVPMatrix2, 3 shadowDir, 4 fogColour, 5 shadowTexture1, 6 shadowTexture2
 static int g_aoDebug, g_giDebug;   // debug view selectors (set by flag files, see ao.inl / gi.inl)
@@ -545,11 +545,12 @@ static void Snapshot(HDC dc) {
 #include "gpuprof.inl"
 #include "abshot.inl"
 #include "overlay.inl"
+static const float kShStockStrength = 0.5f;   // the stock shader multiplies shadowAmount by this literal
 static void ApplyShadowStrength(GLuint p) {
     typedef void(WINAPI* pu1f_t)(GLuint, GLint, GLfloat); static pu1f_t pu = (pu1f_t)o_wglGetProcAddress("glProgramUniform1f");
     auto it = g_shadowStrengthLoc.find(p); if (it == g_shadowStrengthLoc.end() || it->second < 0 || !pu) return;
     bool grass = false; for (GLuint s : g_progShaders[p]) if (g_grassVS.count(s)) grass = true;
-    pu(p, it->second, grass ? g_shGrassStrength : g_shStrength);
+    pu(p, it->second, g_abOff ? kShStockStrength : grass ? g_shGrassStrength : g_shStrength);   // A/B off frame: the stock literal (shadowAmount * 0.5), no per-program tuning
     auto lt = g_shadowLodLoc.find(p); if (lt != g_shadowLodLoc.end() && lt->second >= 0) pu(p, lt->second, (float)g_shLod);
 }
 static void AfterLink(GLuint p) {
