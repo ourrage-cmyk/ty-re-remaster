@@ -284,7 +284,21 @@ static void PollAtmosFlags() {
     snprintf(p, sizeof p, "%styrender\\atmos_debug", g_dir); g_atDebug = ReadFileStr(p, s) ? atoi(s.c_str()) : 0;
 }
 
+// Diagnostic for trees poking through the fog (log only, no visual change): once in 60 frames, count transparent-tagged non-character draws
+// by (before/after this frame's fog pass) x (depth write on/off) x (blend on/off); the totals are logged every 600 frames.
+// If foliage draws come AFTER the fog pass the fog cannot see them; if they come before with depth write off it fogs the surface behind them.
+static unsigned g_atRanFrame, g_fdCnt[2][2][2], g_fdLast;
+static void FogDiagDraw() {
+    if (g_frame % 60 != 0 || !g_curProg || !gx.GetBooleanv || !gx.IsEnabled || !g_texFlagArr) return;
+    uint8_t f = TexFlags(g_bound2D[g_progDiffUnit[g_curProg < 8192 ? g_curProg : 0] & 31]);
+    if (!(f & TF_KNOWN) || !(f & TF_TRANSPARENT) || (f & TF_CHARACTER)) return;
+    GLboolean dm = 0; gx.GetBooleanv(0x0B72, &dm);
+    g_fdCnt[g_atRanFrame == g_frame ? 1 : 0][dm ? 1 : 0][gx.IsEnabled(0x0BE2) ? 1 : 0]++;
+}
 static void RunAtmos(GLuint depthTex, int w, int h) {
+    if (g_frame - g_fdLast >= 600) { g_fdLast = g_frame; logf("[fogdiag] transparent-tagged draws (sampled): before-fog depthW0/blend0=%u d0/b1=%u d1/b0=%u d1/b1=%u | after-fog d0/b0=%u d0/b1=%u d1/b0=%u d1/b1=%u",
+        g_fdCnt[0][0][0], g_fdCnt[0][0][1], g_fdCnt[0][1][0], g_fdCnt[0][1][1], g_fdCnt[1][0][0], g_fdCnt[1][0][1], g_fdCnt[1][1][0], g_fdCnt[1][1][1]); memset(g_fdCnt, 0, sizeof g_fdCnt); }
+    g_atRanFrame = g_frame;
     if ((!g_atEnable && g_atContact <= 0) || g_atOffFile || atm.failed || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
     if (!LoadGX()) { atm.failed = true; return; }
     if (!atm.init) {
