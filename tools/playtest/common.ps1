@@ -56,6 +56,34 @@ public static class PlaytestImg {
     }
     return new double[] { all / Math.Max(1, na), up / Math.Max(1, nu), lo / Math.Max(1, nl) };
   }
+  // Ty's own region only: temporal std-dev of the mean blue excess (B - (R+G)/2) and of luma over the region, per frame. Returns {blue, luma}.
+  public static double[] RegionBlueStd(string[] files, double x0, double y0, double x1, double y1) {
+    int n = files.Length; var blue = new double[n]; var luma = new double[n];
+    for (int f = 0; f < n; f++) {
+      using (var A = new Bitmap(files[f])) {
+        int w = A.Width, h = A.Height;
+        int px0 = (int)(x0 * w), px1 = (int)(x1 * w), py0 = (int)(y0 * h), py1 = (int)(y1 * h);
+        var d = A.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+        var buf = new byte[d.Stride * h];
+        System.Runtime.InteropServices.Marshal.Copy(d.Scan0, buf, 0, buf.Length);
+        A.UnlockBits(d);
+        double sb = 0, sl = 0; long c = 0;
+        for (int y = py0; y < py1; y += 2) for (int x = px0; x < px1; x += 2) {
+          int k = y * d.Stride + x * 3;
+          double b = buf[k], g = buf[k + 1], r = buf[k + 2];
+          sb += b - (r + g) / 2.0; sl += 0.2126 * r + 0.7152 * g + 0.0722 * b; c++;
+        }
+        blue[f] = c > 0 ? sb / c : 0; luma[f] = c > 0 ? sl / c : 0;
+      }
+    }
+    return new double[] { Sd(blue), Sd(luma) };
+  }
+  static double Sd(double[] v) {
+    int n = v.Length; if (n < 2) return 0;
+    double m = 0; foreach (var x in v) m += x; m /= n;
+    double q = 0; foreach (var x in v) q += (x - m) * (x - m);
+    return Math.Sqrt(q / (n - 1));
+  }
 }
 '@
 
@@ -94,6 +122,55 @@ function Exit-GameLock([string]$Token) {
     if ($env:TY_LOCK_TOKEN -eq $Token) { Remove-Item Env:TY_LOCK_TOKEN -ErrorAction SilentlyContinue }
 }
 
+# Live monitoring. Stable files, so anyone can tail them while a run is going:
+#   C:\CLAUDE\RESEARCH\autoplaytest\progress.log   one timestamped line per event, plus a heartbeat every 20 s
+#   C:\CLAUDE\RESEARCH\autoplaytest\status.json    current variant, done/total, state, last update
+# Every line is also printed to the console.
+$ProgressDir = 'C:\CLAUDE\RESEARCH\autoplaytest'
+
+function Write-RunLog([string]$Msg) {
+    New-Item -ItemType Directory -Force $ProgressDir | Out-Null
+    $line = '{0} {1}' -f (Get-Date -Format 'HH:mm:ss'), $Msg
+    Add-Content -Path (Join-Path $ProgressDir 'progress.log') -Value $line -Encoding utf8
+    Write-Host $line
+}
+
+function Write-RunStatus([hashtable]$Status) {
+    New-Item -ItemType Directory -Force $ProgressDir | Out-Null
+    $Status['updated'] = (Get-Date -Format s)
+    $Status | ConvertTo-Json | Set-Content -Path (Join-Path $ProgressDir 'status.json') -Encoding utf8
+}
+
+# Background heartbeat: every $Interval seconds, log whether a game from $Game is alive (pid and CPU seconds), the newest screenshot and tyrender.log's last write.
+# It runs until the stop file exists. Start-Heartbeat returns the job; Stop-Heartbeat ends it.
+$HeartbeatScript = {
+    param([string]$Game, [string]$Dir, [int]$Interval)
+    $root = [IO.Path]::GetFullPath($Game).TrimEnd('\') + '\'
+    while (-not (Test-Path (Join-Path $Dir 'heartbeat.stop'))) {
+        $procs = @(Get-Process -Name 'TY_tyrender', 'TY' -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) })
+        $alive = if ($procs.Count -gt 0) { ($procs | ForEach-Object { '{0}:cpu{1:N0}s' -f $_.Id, $_.TotalProcessorTime.TotalSeconds }) -join ',' } else { 'none' }
+        $shot = Get-ChildItem (Join-Path $Game 'Screenshots') -Filter *.png -ErrorAction SilentlyContinue | Sort-Object LastWriteTime | Select-Object -Last 1
+        $shotTxt = if ($shot) { $shot.LastWriteTime.ToString('HH:mm:ss') + ' ' + $shot.Name } else { 'none' }
+        $logFile = Join-Path $Game 'tyrender.log'
+        $logTxt = if (Test-Path $logFile) { (Get-Item $logFile).LastWriteTime.ToString('HH:mm:ss') } else { 'none' }
+        $line = '{0} heartbeat game=[{1}] newest_shot={2} tyrender.log={3}' -f (Get-Date -Format 'HH:mm:ss'), $alive, $shotTxt, $logTxt
+        Add-Content -Path (Join-Path $Dir 'progress.log') -Value $line -Encoding utf8
+        Start-Sleep -Seconds $Interval
+    }
+}
+
+function Start-Heartbeat([string]$Game, [int]$Interval = 20) {
+    New-Item -ItemType Directory -Force $ProgressDir | Out-Null
+    Remove-Item (Join-Path $ProgressDir 'heartbeat.stop') -ErrorAction SilentlyContinue
+    return Start-Job -ScriptBlock $HeartbeatScript -ArgumentList $Game, $ProgressDir, $Interval
+}
+
+function Stop-Heartbeat($Job) {
+    New-Item -ItemType File -Force (Join-Path $ProgressDir 'heartbeat.stop') | Out-Null
+    if ($Job) { Wait-Job $Job -Timeout 25 | Out-Null; Remove-Job $Job -Force -ErrorAction SilentlyContinue }
+    Remove-Item (Join-Path $ProgressDir 'heartbeat.stop') -ErrorAction SilentlyContinue
+}
+
 # Set one key in one ini section, creating the section or key when missing. Only touches the text lines; comments are kept.
 function Set-IniKey([string]$Path, [string]$Section, [string]$Key, [string]$Value) {
     $lines = New-Object System.Collections.Generic.List[string]
@@ -122,6 +199,15 @@ function Get-GameProcs([string]$Game, [string[]]$Names = @('TY_tyrender', 'TY'))
     return @(Get-Process -Name $Names -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) })
 }
 
+# Foreground check before a shot. focus_game.ps1 raises the game window; returns $false when it cannot, and the run marks those shots invalid.
+if ($null -eq $script:FgMiss) { $script:FgMiss = 0 }
+function Ensure-GameFg([string]$Game, [string]$Proc) {
+    $p = Get-GameProcs $Game -Names @($Proc) | Select-Object -First 1
+    if (-not $p) { return $false }
+    & powershell -NoProfile -File (Join-Path $ToolsDir 'focus_game.ps1') -TargetPid $p.Id | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
 # Press one key in the game window. Targets the game process under $Game by PID, and key.ps1 fails visibly if focus is lost.
 function Send-GameKey([string]$Game, [string]$Proc, [string]$Key, [int]$DelayMs = 800) {
     $p = Get-GameProcs $Game -Names @($Proc) | Select-Object -First 1
@@ -132,6 +218,7 @@ function Send-GameKey([string]$Game, [string]$Proc, [string]$Key, [int]$DelayMs 
 # Press the A/B screenshot key once (F11 by default, which writes 2 PNGs into <game>\Screenshots) and copy the new pair to $Dest as <Prefix>_a.png / <Prefix>_b.png.
 # Returns the copied paths (empty when the game wrote nothing).
 function Take-Pair([string]$Game, [string]$Proc, [string]$Dest, [string]$Prefix, [string]$ShotKey = 'F11') {
+    if (-not (Ensure-GameFg $Game $Proc)) { $script:FgMiss++; Write-RunLog "shot $Prefix: game NOT foreground, shot marked invalid" }
     $before = @(Get-GameShots $Game)
     Send-GameKey $Game $Proc $ShotKey 300
     $new = @()

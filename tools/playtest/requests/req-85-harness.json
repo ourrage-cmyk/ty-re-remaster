@@ -1,0 +1,14 @@
+{
+  "id": "req-85-harness",
+  "status": "backlog",
+  "priority": 2,
+  "requester": {
+    "issue": 85,
+    "thread": ""
+  },
+  "question": "Harness self-check: Take-Pair bug and the portal view. Tracked as harness work, not a playtest result.",
+  "reason": "The Take-Pair fix is not on main (it is on a PC branch). The portal view is not found. Missing capability: a portal view or a save for slot 1.",
+  "variants": [],
+  "checks": [],
+  "report": ""
+}

@@ -1,0 +1,14 @@
+{
+  "id": "req-86-recording-ambiguity",
+  "status": "backlog",
+  "priority": 3,
+  "requester": {
+    "issue": 86,
+    "thread": ""
+  },
+  "question": "Classify 1:57-2:18 of the 2026-10-17 recording: scene cut or geometry break.",
+  "reason": "Needs a clip of gameplay that a person records. The harness cannot classify a recording it did not make.",
+  "variants": [],
+  "checks": [],
+  "report": ""
+}

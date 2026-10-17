@@ -1,0 +1,58 @@
+{
+  "id": "req-84-portal-emit",
+  "status": "pending",
+  "priority": 2,
+  "requester": {
+    "issue": 84,
+    "thread": ""
+  },
+  "question": "Does [emit] Enable=1 light the ground at the portal, and are the lights within the forward-render cap?",
+  "variants": [
+    {
+      "name": "portal_comp0",
+      "note": "[emit] Enable=1, Compensate=0"
+    },
+    {
+      "name": "portal_comp1",
+      "note": "[emit] Enable=1, Compensate=1"
+    }
+  ],
+  "checks": [
+    {
+      "id": "emit-active-0",
+      "kind": "log",
+      "variants": [
+        "portal_comp0"
+      ],
+      "pattern": "\\[emit\\]",
+      "mustMatch": true,
+      "pass": "[emit] lines logged",
+      "decides": "emitter active (Compensate 0)",
+      "next": "check [emit] Enable"
+    },
+    {
+      "id": "emit-active-1",
+      "kind": "log",
+      "variants": [
+        "portal_comp1"
+      ],
+      "pattern": "\\[emit\\]",
+      "mustMatch": true,
+      "pass": "[emit] lines logged",
+      "decides": "emitter active (Compensate 1)",
+      "next": "check [emit] Enable"
+    },
+    {
+      "id": "portal-look",
+      "kind": "manual",
+      "variants": [
+        "portal_comp0",
+        "portal_comp1"
+      ],
+      "pass": "a person sees the ground lit at the portal",
+      "decides": "portal light on the ground",
+      "next": "needs the portal view, not yet found (#85)"
+    }
+  ],
+  "report": ""
+}

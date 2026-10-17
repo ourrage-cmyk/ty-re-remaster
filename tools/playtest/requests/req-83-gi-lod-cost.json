@@ -1,0 +1,63 @@
+{
+  "id": "req-83-gi-lod-cost",
+  "status": "pending",
+  "priority": 2,
+  "requester": {
+    "issue": 83,
+    "thread": ""
+  },
+  "question": "What do [gi] Checker and [lod] Enable cost in GPU ms at the same spot, and does flicker come back with Checker=1?",
+  "variants": [
+    {
+      "name": "gi_checker1",
+      "note": "[gi] Checker=1"
+    },
+    {
+      "name": "lod_enable1",
+      "note": "[lod] Enable=1"
+    },
+    {
+      "name": "mod",
+      "note": "baseline"
+    }
+  ],
+  "checks": [
+    {
+      "id": "gi-checker-timings",
+      "kind": "log",
+      "variants": [
+        "gi_checker1"
+      ],
+      "pattern": "\\[gpusub\\]",
+      "mustMatch": true,
+      "pass": "[gpusub] lines logged; compare to the mod baseline by hand",
+      "decides": "GI Checker timing is available",
+      "next": "measure the baseline and this variant at the same spot"
+    },
+    {
+      "id": "lod-enable-timings",
+      "kind": "log",
+      "variants": [
+        "lod_enable1"
+      ],
+      "pattern": "\\[gpusub\\]",
+      "mustMatch": true,
+      "pass": "[gpusub] lines logged; compare to the mod baseline by hand",
+      "decides": "LOD timing is available",
+      "next": "measure the baseline and this variant"
+    },
+    {
+      "id": "gi-checker-flicker",
+      "kind": "flicker",
+      "variants": [
+        "gi_checker1"
+      ],
+      "baseline": "mod",
+      "limit": 1.5,
+      "pass": "lower-half ratio vs mod <= 1.5",
+      "decides": "Checker=1 does not bring flicker back",
+      "next": "keep Checker=0"
+    }
+  ],
+  "report": ""
+}
