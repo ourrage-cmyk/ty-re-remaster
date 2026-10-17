@@ -28,7 +28,7 @@ static Slider g_sl[] = {
     { L"atmos",   L"Intensity",     L"Distance haze",       0.00f, 4.00f, 1.20f, L"Dusty air that washes out far-away rocks and the painted mountains on the horizon. Lower = crisp postcard, higher = hot dusty afternoon (needs Volumetric fog on)." },
     { L"atmos",   L"SunIntensity",  L"Light shafts",        0.00f, 8.00f, 2.00f, L"Brightness of the sun beams cutting through the haze (needs Volumetric fog on)." },
     { L"atmos",   L"ContactShadows",L"Contact shadows",     0.00f, 1.00f, 0.00f, L"Tiny sharp shadows where things touch the ground (Ty's feet, fence posts). It is the one slider here that costs performance: zero is free, anything above that is not." },
-    { L"tess",    L"Displacement",  L"Surface relief",      0.00f, 6.00f, 2.50f, L"How deep cracks, grain and rope strands are carved. High values look rugged, very high values look like cardboard." },
+    { L"tess",    L"ReliefDepth",   L"Surface relief",      0.00f, 10.00f, 3.00f, L"How deep cracks, grain and rope strands are carved. High values look rugged, very high values look like cardboard." },
     { L"post",    L"Sharpen",       L"Sharpening",          0.00f, 1.00f, 0.35f, L"Edge crispness. Too much and you can count the pixels, too little and it looks like a watercolour." },
 };
 #define NSL (int)(sizeof g_sl / sizeof g_sl[0])

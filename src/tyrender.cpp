@@ -5,7 +5,9 @@
 // Output (game dir): tyrender.log, tyrender\dump\<hash>.<vs|fs>.glsl ; overrides read from tyrender\override\<hash>.glsl
 // Config (game dir): tyrender.ini  [debug] CaptureFrame=N (0=off)  CaptureFrame2=N  DumpShaders=1  OverrideShaders=1
 #include <windows.h>
+#include <shlobj.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <math.h>
@@ -94,6 +96,7 @@ static bool TessRewriteVS(GLuint shader, std::string& src); static void TessOnAt
 static void LoadLightConfig(); static bool LightRewriteFS(std::string& s); static void LightOnLink(GLuint p); static void LightApply(GLuint p); static void EnsureLtDecl(std::string& s); static bool DebugCamApply(float* m); static void PollDebugCam(); static void MotionPoll(); static void MotionFrame(HDC dc);
 static void LoadPbrConfig(); static bool PbrRewriteVS(std::string& s); static bool PbrRewriteFS(std::string& s); static void PbrOnLink(GLuint p); static void PbrApply(GLuint p); static void PbrUpdate();
 static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const void* px, int bytes); static void LoadTexTags(); static void TexReport(); static void TexDrawPrep(); static int g_progDiffUnit[8192];
+static bool DecalRewriteFS(std::string& s); static void TexOnLink(GLuint p);
 static bool g_curProgTess; static unsigned g_tessBadDrawsExt; static bool IsTessProg(GLuint p); static void TessPatchMode();
 
 // ---------------------------------------------------------------- IAT patching
@@ -368,9 +371,9 @@ HOOK(void, glShaderSource, (GLuint s, GLsizei count, const GLchar* const* str, c
     }
     if (!useOv && type == GL_FRAGMENT_SHADER) {   // order: PBR (normals/spec) -> shadow patch (PCF, strength) -> light model; each stage is optional
         std::string p = src;
-        bool pb = PbrRewriteFS(p), sh = g_shPatch && PatchShadowShader(p), lt = LightRewriteFS(p);
-        if (pb || sh || lt) {
-            if (TestCompile(type, p)) { ov = p; useOv = true; logf("glShaderSource shader=%u hash=%08x [FS:%s%s%s]", s, h, pb ? " PBR" : "", sh ? " SHADOW" : "", lt ? " LIGHT" : ""); }
+        bool pb = PbrRewriteFS(p), sh = g_shPatch && PatchShadowShader(p), lt = LightRewriteFS(p), dc = DecalRewriteFS(p);   // decal last: it rewrites the stock output line
+        if (pb || sh || lt || dc) {
+            if (TestCompile(type, p)) { ov = p; useOv = true; logf("glShaderSource shader=%u hash=%08x [FS:%s%s%s%s]", s, h, pb ? " PBR" : "", sh ? " SHADOW" : "", lt ? " LIGHT" : "", dc ? " DECAL" : ""); }
             else {
                 logf("[fs] %08x combined rewrite failed to compile (pbr=%d shadow=%d light=%d) -> trying shadow patch alone", h, pb, sh, lt);
                 std::string q = src; if (g_shPatch && PatchShadowShader(q) && TestCompile(type, q)) { ov = q; useOv = true; }
@@ -539,7 +542,7 @@ static void ApplyShadowStrength(GLuint p) {
 static void AfterLink(GLuint p) {
     GLint loc = o_glGetUniformLocation ? o_glGetUniformLocation(p, "tyShadowStrength") : -1;
     if (loc >= 0) { g_shadowStrengthLoc[p] = loc; ApplyShadowStrength(p); }
-    PbrOnLink(p); LightOnLink(p);
+    PbrOnLink(p); LightOnLink(p); TexOnLink(p);
 }
 static bool TessRewriteVS(GLuint shader, std::string& src) {
     std::vector<TessVar> vars; std::string orig = src;
@@ -605,6 +608,25 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
     return r;
 }
 
+// ---------------------------------------------------------------- launcher clash guard (issue #13)
+// Reads the game's own settings.ini and logs a warning when it asks for something the DLL already provides (SSAO).
+// Warn only: settings.ini is never rewritten. Config tyrender.ini [clash] Check=1 (0 = off).
+static void CheckGameSettingsClash() {
+    char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
+    if (!GetPrivateProfileIntA("clash", "Check", 1, ini)) return;
+    char docs[MAX_PATH] = "";
+    if (FAILED(SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs))) return;
+    char path[MAX_PATH]; snprintf(path, sizeof path, "%s\\TY the Tasmanian Tiger\\settings.ini", docs);
+    FILE* f = fopen(path, "rb"); if (!f) { logf("[clash] no game settings.ini at %s", path); return; }
+    static char buf[16384]; size_t n = fread(buf, 1, sizeof buf - 1, f); fclose(f); buf[n] = 0;
+    for (char* line = strtok(buf, "\r\n"); line; line = strtok(nullptr, "\r\n")) {
+        char key[64] = "", val[64] = "";
+        if (sscanf(line, " %63[^= ] = %63s", key, val) != 2) continue;
+        if (!_stricmp(key, "SSAO") && !_stricmp(val, "true"))
+            logf("[clash] settings.ini has SSAO=true; the DLL's own AO runs too and the menu can stall. Set SSAO=false in settings.ini.");
+    }
+}
+
 // ---------------------------------------------------------------- init
 static void Install() {
     HMODULE exe = GetModuleHandleA(nullptr);
@@ -657,6 +679,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
     QueryPerformanceFrequency(&g_qpf);
     AddVectoredExceptionHandler(1, CrashVEH);
     LoadConfig();
+    CheckGameSettingsClash();
     LoadAOConfig();
     LoadFXConfig();
     LoadShadowConfig();

@@ -10,7 +10,7 @@ $sha = (git -C $src rev-parse --short HEAD 2>$null); if (-not $sha) { $sha = 'no
 if (git -C $src status --porcelain 2>$null) { $sha += '-dirty' }
 # build_id.h: the wide id for the launcher title and the narrow id for tyrender.dll (A/B screenshot names, abshot.inl)
 Set-Content -Path (Join-Path $out 'build_id.h') -Value @(('#define TY_BUILD_ID L"' + $sha + '"'), ('#define TY_BUILD_ID_A "' + $sha + '"')) -Encoding ascii
-& "$bin\i686-w64-mingw32-clang++.exe" -O2 -shared -static -std=c++17 -Wall "-I$out" -o "$out\tyrender.dll" "$src\tyrender.cpp" '-Wl,--kill-at'
+& "$bin\i686-w64-mingw32-clang++.exe" -O2 -shared -static -std=c++17 -Wall "-I$out" -o "$out\tyrender.dll" "$src\tyrender.cpp" '-Wl,--kill-at' -lshell32
 if ($LASTEXITCODE) { throw 'tyrender.dll build failed' }
 # Embed the matching tyrender.dll and default ini in the launcher (resources 1 and 2): TYLauncher.exe alone is the release.
 $rc = Join-Path $out 'payload.rc'
