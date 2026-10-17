@@ -6,7 +6,8 @@
 param(
     [string]$Game = 'C:\CLAUDE\TY the Tasmanian Tiger',
     [string[]]$Variants = @('stock', 'mod', 'overlay', 'fog_seethru1', 'emit1'),
-    [ValidateSet('rainbow', 'slot2')][string]$Spot = 'rainbow',
+    [ValidateSet('rainbow', 'billabong', 'slot2')][string]$Spot = 'rainbow',
+    [string]$Cam = '',         # optional view offset "dx dy dz yawDeg pitchDeg" written to tyrender\cam.txt (debugcam.inl), relative to the spot's start camera. Empty = none.
     [int]$FlickerFrames = 10,
     [double]$FlickerRatioMax = 1.5,
     [double]$OverlayClosedMax = 3.0,
@@ -30,6 +31,10 @@ $ini = Join-Path $Game 'tyrender.ini'
 $iniBackup = Join-Path $Out 'tyrender.ini.orig'
 $hadIni = Test-Path $ini
 if ($hadIni) { Copy-Item $ini $iniBackup -Force }
+$camFileLive = Join-Path $Game 'tyrender\cam.txt'
+$camBackup = Join-Path $Out 'cam.txt.orig'
+$hadCam = Test-Path $camFileLive
+if ($hadCam) { Copy-Item $camFileLive $camBackup -Force }
 
 # Each variant: the exe to start, the launch args, ini keys to set on top of the installed ini, and which checks to run.
 $defs = @{
@@ -73,6 +78,10 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
     # Every variant starts from the backed-up ini, so overrides never stack.
     if ($hadIni) { Copy-Item $iniBackup $ini -Force }
     foreach ($k in $Def.Ini.Keys) { $sec, $key = $k.Split('.', 2); Set-IniKey $ini $sec $key $Def.Ini[$k] }
+    # View offset: the game reads tyrender\cam.txt each frame. The original file (if any) was saved to $Out\cam.txt.orig and is put back in the finally block.
+    $camFile = Join-Path $Game 'tyrender\cam.txt'
+    if ($Cam) { New-Item -ItemType Directory -Force (Split-Path $camFile) | Out-Null; Set-Content -Path $camFile -Value $Cam -Encoding ascii }
+    else { Remove-Item $camFile -ErrorAction SilentlyContinue }
 
     $boot = & powershell -NoProfile -File (Join-Path $PSScriptRoot 'boot_spot.ps1') -Game $Game -Exe $Def.Exe -Extra $Def.Args -Spot $Spot 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) { $r.Boot = "FAIL $($boot.Trim())"; Stop-Game; Save-GameLog $r; return $r }
@@ -129,6 +138,7 @@ try {
 } finally {
     Stop-Game
     if ($hadIni) { Copy-Item $iniBackup $ini -Force }
+    if ($hadCam) { Copy-Item $camBackup $camFileLive -Force } else { Remove-Item $camFileLive -ErrorAction SilentlyContinue }
     Exit-GameLock $lockToken
 }
 
@@ -157,7 +167,7 @@ $md += ''
 $md += '## Not covered by this script'
 $md += '- Visual judgement (fog colour, shadow quality, portal light, water look): only frames and numbers are produced. A person or a session has to look at contact_sheet.png.'
 $md += '- Flicker is a luma heuristic over a static camera. Animated grass and clouds count as flicker too, which is why the stock ratio is the check.'
-$md += '- Spots other than Rainbow Cliffs (Billabong water, level two trees, red rock, portal) are not wired: they need save files or scripted walking.'
+$md += '- Spots: rainbow (slot 1) and billabong (slot 2, unverified on the PC) are wired. Red rock, skybox and portal views need a -Cam offset or a save from the owner.'
 $md += '- Per-frame GPU and frame times are not parsed from tyrender.log here. The log copies are in each variant folder.'
 $md += '- The game window must be foreground. key.ps1 fails visibly when it is not.'
 $md -join "`n" | Set-Content (Join-Path $Out 'report.md') -Encoding utf8
