@@ -222,11 +222,18 @@ function Get-CheckResult($c, $results) {
 }
 
 $checkResults = @()
+# Written by the visual reviewer after the run: [{ variant, verdict: ok|suspect|broken, evidence }]. Missing file = no visual review yet.
+$visualReview = @()
+$vrFile = Join-Path $Out 'visual_review.json'
+if (Test-Path $vrFile) { $visualReview = @(Get-Content $vrFile -Raw | ConvertFrom-Json) }
 foreach ($c in $planChecks) {
     $res = Get-CheckResult $c $results
     # A shot taken while the game was not foreground is not a valid measurement: the check cannot PASS or FAIL on it.
     $fgBad = @($results | Where-Object { @($c.variants) -contains $_.Name -and $_.FgMiss -gt 0 })
     if ($fgBad.Count -gt 0 -and $c.kind -in @('flicker', 'tyflicker', 'overlay')) { $res = @{ Status = 'INCONCLUSIVE'; Evidence = "game not foreground for shots in: $(($fgBad | ForEach-Object { $_.Name }) -join ', '); shots invalid" } }
+    # Visual review (tools/playtest/review/RUBRIC.md) is advisory: a suspect or broken verdict turns a PASS into INCONCLUSIVE and flags the frame. It never turns a FAIL into a PASS.
+    $vrBad = @($visualReview | Where-Object { @($c.variants) -contains $_.variant -and $_.verdict -in @('suspect', 'broken') })
+    if ($vrBad.Count -gt 0 -and $res.Status -eq 'PASS') { $res = @{ Status = 'INCONCLUSIVE'; Evidence = 'visual review flagged the frames, check the user: ' + (($vrBad | ForEach-Object { "$($_.variant) $($_.verdict) ($($_.evidence))" }) -join '; ') } }
     $checkResults += [pscustomobject]@{ id = $c.id; status = $res.Status; evidence = $res.Evidence; issue = $c.issue; pass = $c.pass; next = $c.next; decides = $c.decides; requests = @($c.requests) }
     Write-RunLog ("check [{0}] {1}: {2}" -f $res.Status, $c.id, $res.Evidence)
 }
@@ -283,6 +290,16 @@ $md -join "`n" | Set-Content (Join-Path $Out 'report.md') -Encoding utf8
 $rows = @($results | Where-Object { $_.Base.Count -ge 1 } | ForEach-Object { @{ Label = $_.Name; Files = @($_.Base[0], $_.Base[1]) } })
 $rows += @($results | Where-Object { $_.OverlayRows.Count -gt 0 } | ForEach-Object { $_.OverlayRows[0] })
 if ($rows.Count -gt 0) { New-ContactSheet -Rows $rows -OutFile (Join-Path $Out 'contact_sheet.png') }
+
+# Hand the sheet to the visual reviewer: latest_for_review holds only the newest run's sheet and the rubric pointer.
+$reviewDir = 'C:\CLAUDE\RESEARCH\autoplaytest\latest_for_review'
+New-Item -ItemType Directory -Force $reviewDir | Out-Null
+Get-ChildItem $reviewDir -File -ErrorAction SilentlyContinue | Remove-Item -Force
+if (Test-Path (Join-Path $Out 'contact_sheet.png')) { Copy-Item (Join-Path $Out 'contact_sheet.png') $reviewDir -Force }
+@"
+Run: $Out
+Rubric: tools/playtest/review/RUBRIC.md. Write $(Join-Path $Out 'visual_review.json') as [{variant, verdict, evidence}].
+"@ | Set-Content (Join-Path $reviewDir 'REVIEW.txt') -Encoding utf8
 
 $md -join "`n"
 "Output: $Out"

@@ -148,6 +148,16 @@ Rerun list for the next plan:
 - `trees_see1` (billabong) failed at boot on the coordinator's run. The likely cause was an empty `-TargetPid` in the ENTER presses of `ty_play.ps1`. `KeyEnter` now throws a clear error when no game window exists, so rerun it to confirm the boot works.
 - The `tyflicker` checks in `next_monitor.json` and `req-80-debugwater` replace the whole-frame flicker check, because that check did not discriminate between the DebugWater variants.
 
+## Visual review (after each run)
+
+The numbers do not show everything, so a reviewer looks at the pictures too.
+
+- The run copies its `contact_sheet.png` to `C:\CLAUDE\RESEARCH\autoplaytest\latest_for_review\` and writes `REVIEW.txt` there, pointing at the rubric.
+- A reviewer (a Haiku subagent with image reading) answers the seven questions in `tools/playtest/review/RUBRIC.md` for each variant, and writes `visual_review.json` in the run folder.
+- The verdict is advisory. `suspect` or `broken` turns a PASS into INCONCLUSIVE and flags the frame for the owner. It never turns a FAIL into a PASS. No `visual_review.json` means no visual review yet.
+
+Not built yet: one contact sheet per effect (the current sheet has one row per variant).
+
 ## Request queue (other threads and agents)
 
 Requests live in `tools\playtest\requests\`, one JSON file each, `req-<id>.json`. Template: `requests\TEMPLATE.json`.
