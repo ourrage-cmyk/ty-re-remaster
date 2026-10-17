@@ -612,8 +612,10 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
 }
 
 // ---------------------------------------------------------------- launcher clash guard (issue #13)
-// Reads the game's own settings.ini and logs a warning when it asks for something the DLL already provides (SSAO).
-// Warn only: settings.ini is never rewritten. Config tyrender.ini [clash] Check=1 (0 = off).
+// Reads the game's own settings.ini [Display] SSAO / MSAA and logs a warning when they duplicate what tyrender.ini already does:
+// SSAO = the DLL's AO runs twice; MSAA on while tyrender's Edge smoothing [post] AA is on = edges smoothed twice.
+// Warn only: settings.ini is never rewritten. Config tyrender.ini [clash] Check=1 (0 = off). The launcher shows the same rules
+// in its status line (GameClashText in launcher_ui.inc); keep the two in step.
 static void CheckGameSettingsClash() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     if (!GetPrivateProfileIntA("clash", "Check", 1, ini)) return;
@@ -622,12 +624,20 @@ static void CheckGameSettingsClash() {
     char path[MAX_PATH]; snprintf(path, sizeof path, "%s\\TY the Tasmanian Tiger\\settings.ini", docs);
     FILE* f = fopen(path, "rb"); if (!f) { logf("[clash] no game settings.ini at %s", path); return; }
     static char buf[16384]; size_t n = fread(buf, 1, sizeof buf - 1, f); fclose(f); buf[n] = 0;
+    bool ssao = false, msaa = false, inDisplay = false;
+    char val[64] = "";
     for (char* line = strtok(buf, "\r\n"); line; line = strtok(nullptr, "\r\n")) {
-        char key[64] = "", val[64] = "";
-        if (sscanf(line, " %63[^= ] = %63s", key, val) != 2) continue;
-        if (!_stricmp(key, "SSAO") && !_stricmp(val, "true"))
-            logf("[clash] settings.ini has SSAO=true; the DLL's own AO runs too and the menu can stall. Set SSAO=false in settings.ini.");
+        char* q = line; while (*q == ' ' || *q == '\t') q++;
+        if (*q == '[') { inDisplay = !_strnicmp(q, "[Display]", 9); continue; }
+        if (!inDisplay) continue;
+        char key[64] = "", v[64] = "";
+        if (sscanf(q, " %63[^= ] = %63s", key, v) != 2) continue;
+        if (!_stricmp(key, "SSAO")) ssao = !_stricmp(v, "true");
+        if (!_stricmp(key, "MSAA")) { strncpy(val, v, sizeof val - 1); msaa = atoi(v) >= 2; }   // "off", "2x", "4x", "8x"
     }
+    int aa = GetPrivateProfileIntA("post", "AA", 2, ini);   // 0 none, 1 FXAA, 2 TAA, 3 TAA + FXAA (fx.inl)
+    if (ssao) logf("[clash] settings.ini [Display] SSAO=true; the DLL's own AO runs too and the menu can stall. Set SSAO=false there.");
+    if (msaa && aa != 0) logf("[clash] settings.ini [Display] MSAA=%s and tyrender Edge smoothing (post AA=%d) both smooth edges. Set MSAA=off there, or AA=0 here.", val, aa);
 }
 
 // ---------------------------------------------------------------- init

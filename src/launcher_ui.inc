@@ -99,6 +99,36 @@ static void SetGameDetail(int high) {
 }
 static int GameDetailIsHigh(void) { wchar_t path[MAX_PATH]; GameSettingsPath(path); FILE* f = _wfopen(path, L"rb"); if (!f) return 0; char b[16384]; size_t n = fread(b, 1, sizeof b - 1, f); fclose(f); b[n] = 0; return strstr(b, "Props = high") != NULL; }
 
+// ------------------------------------------------------------ clash guard (issue #13)
+// tyrender.ini is the single source of truth. The game's own settings.ini has SSAO and MSAA switches of its own that duplicate
+// what tyrender does (the DLL's AO, its Edge smoothing). This only warns, in the status line; nothing is rewritten.
+// Rules mirror CheckGameSettingsClash in tyrender.cpp (which logs the same warning). Config tyrender.ini [clash] Check=0 turns it off.
+static int GameDisplayValue(const char* key, char* val, int vn) {   // [Display] key of the game's settings.ini; 0 = not found
+    wchar_t path[MAX_PATH]; GameSettingsPath(path); FILE* f = _wfopen(path, L"rb"); if (!f) return 0;
+    static char b[16384]; size_t n = fread(b, 1, sizeof b - 1, f); fclose(f); b[n] = 0;
+    int in = 0, found = 0;
+    for (char* p = b; *p && !found; ) {
+        char* e = strchr(p, '\n'); size_t L = e ? (size_t)(e - p) : strlen(p);
+        char line[256]; if (L > 255) L = 255; memcpy(line, p, L); line[L] = 0;
+        char* q = line; while (*q == ' ' || *q == '\t') q++;
+        if (*q == '[') in = !_strnicmp(q, "[Display]", 9);
+        else if (in) { char k[64] = "", v[64] = ""; if (sscanf(q, " %63[^= ] = %63s", k, v) == 2 && !_stricmp(k, key)) { strncpy(val, v, vn - 1); val[vn - 1] = 0; found = 1; } }
+        p = e ? e + 1 : p + L;
+    }
+    return found;
+}
+// Warning text for the status line; empty when the game and tyrender agree or the check is off.
+static void GameClashText(wchar_t* out, int n) {
+    out[0] = 0; if (!GetPrivateProfileIntW(L"clash", L"Check", 1, g_ini)) return;
+    char v[64] = "";
+    int ssao = GameDisplayValue("SSAO", v, sizeof v) && !_stricmp(v, "true");
+    int msaa = GameDisplayValue("MSAA", v, sizeof v) && atoi(v) >= 2;   // "off", "2x", "4x", "8x"
+    int aa = R(L"post", L"AA", 2);                                      // tyrender Edge smoothing: 0 off, 1 FXAA, 2 TAA, 3 TAA + FXAA
+    if (!ssao && !(msaa && aa != 0)) return;
+    swprintf(out, n, L"Settings clash with the game's settings.ini: %ls%ls%ls. Set them there (Display section).",
+        ssao ? L"SSAO is on (AO runs twice)" : L"", (ssao && msaa && aa) ? L" and " : L"", (msaa && aa) ? L"MSAA is on (edges smoothed twice)" : L"");
+}
+
 // ------------------------------------------------------------ window
 enum { ID_P0 = 100, ID_AO = 110, ID_ATMOS, ID_TESS, ID_TESSALL, ID_POST, ID_GI, ID_AA, ID_SHADOW, ID_DETAIL, ID_PLAY = 130, ID_STOCK, ID_STEAM, ID_ADV, ID_RESET, ID_MORE, ID_SL0 = 300 };
 enum { TG_AO, TG_GI, TG_ATM, TG_TESS, TG_TESSALL, TG_POST, TG_AA, TG_SHADOW, TG_DETAIL, TG_N };
@@ -134,10 +164,11 @@ static void LiveReload(void) {   // tell a running tyrender to re-read the ini
     HANDLE h = CreateFileW(p, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL); if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
 }
 static void UpdateStatus(const wchar_t* extra) {
-    wchar_t exe[MAX_PATH], m[400]; swprintf(exe, MAX_PATH, L"%lsTY_tyrender.exe", g_dir);
+    wchar_t exe[MAX_PATH], m[400], clash[300]; swprintf(exe, MAX_PATH, L"%lsTY_tyrender.exe", g_dir);
     int patched = GetFileAttributesW(exe) != INVALID_FILE_ATTRIBUTES;
+    GameClashText(clash, 300);   // re-read every timer tick, so a change in the game's settings.ini shows up within 2 s
     swprintf(m, 400, L"%ls%ls", GameRunning() ? L"Game running: sliders apply live. " : L"",
-        extra ? extra : patched ? L"Ready." : L"Ready to play. The first launch sets itself up; your original game files are never changed.");
+        extra ? extra : clash[0] ? clash : patched ? L"Ready." : L"Ready to play. The first launch sets itself up; your original game files are never changed.");
     SetWindowTextW(h_status, m);
 }
 static void SliderText(int i) {
@@ -291,7 +322,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         c = Ctl(L"BUTTON", L"Advanced (ini)...", WS_TABSTOP, 160, 580, 140, 28, ID_ADV); AddDesc(c, L"Advanced settings", L"Opens tyrender.ini in Notepad for the full list of knobs. For tinkerers.");
         c = Ctl(L"BUTTON", L"Reset sliders", WS_TABSTOP, 304, 580, 152, 28, ID_RESET); AddDesc(c, L"Reset sliders", L"Puts every look slider back to its default position. Your checkboxes and preset stay as they are.");
         c = Ctl(L"BUTTON", L"More options  >>", WS_TABSTOP, LX, 236, 200, 30, ID_MORE); AddDesc(c, L"More options", L"Shows every effect switch, all the look sliders and this help panel. You do not need any of it: the presets already pick good settings.");
-        h_status = Ctl(L"STATIC", L"", 0, LX, 276, 440, 34, 0);
+        h_status = Ctl(L"STATIC", L"", 0, LX, 276, 440, 40, 0);   // 2 lines: the clash warning can be long
         // ---- middle column: sliders
         Ctl(L"BUTTON", L"Look && balance  (tag = performance impact; changes apply live)", BS_GROUPBOX, MX - 8, 4, 394, 568, 0);
         int sy = 26;
