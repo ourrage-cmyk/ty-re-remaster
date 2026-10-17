@@ -8,6 +8,7 @@ Added
 - **F10 settings overlay** (#12): in game, F10 opens a small panel with live brightness, saturation, sharpen, vignette, fog intensity, AO on/off, tess level and shadow taps. `[overlay] Key=F10`, `0` = off. Untested.
 - **Water flicker fix** (#5): `[pbr] WaterStable=1` (default on) drops bump, relief, specular and sky Fresnel from water-tagged draws, aimed at the blue flicker on Ty. Untested.
 - **Distance LOD** (#10): `[lod] Enable/GI/AO/Fog`, `Start=1500`, `End=6000`, `MinScale=0.35`. Off by default. Untested.
+- **Shadow LOD** (#10): `[lod] Enable=1` + `Shadow=1` drops the 3x3/4x4 filter grid on the far shadow cascades (2 and 3), 8 taps instead of 17. Off by default. Untested.
 - **Fog consistency** (#4): `[fog] SeeThruDepth=0` and `LateEmitters=0` (both off by default). Untested.
 - **Emitter light injection** (#9, phase 2): `[emit] Enable=0` (off by default); ranks emitter draws by screen area for the `MaxEmitters` cap. Untested.
 - **Material classes** (#44, #48): one class lookup replaces the separate texture-flag tests. No intended visual change. Untested.

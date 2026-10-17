@@ -141,6 +141,8 @@ static int g_shPatch = 1, g_shMapScale = 2, g_shTaps = 16, g_shTemporal = 0, g_s
  static float g_shRadius = 1.4f, g_shStrength = 0.5f, g_shGrassStrength = 0.35f;
 static std::set<GLuint> g_grassVS;                        // vertex shaders of the grass template (pushOutSpheres / grassTextureUVOffset)
 static std::unordered_map<GLuint, GLint> g_shadowStrengthLoc; // program -> location of tyShadowStrength
+static std::unordered_map<GLuint, GLint> g_shadowLodLoc;      // program -> location of tyShLod (#10 shadow LOD flag)
+static int g_shLod = 0;                                        // [lod] Enable=1 + Shadow=1: far cascades (2, 3) take the cheaper filter
 static void LoadShadowConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
     g_shPatch = GetPrivateProfileIntA("shadows", "Patch", 1, ini); g_shTemporal = GetPrivateProfileIntA("shadows", "Temporal", 0, ini); g_shGrid = GetPrivateProfileIntA("shadows", "Grid", 1, ini);
@@ -149,6 +151,7 @@ static void LoadShadowConfig() {
     GetPrivateProfileStringA("shadows", "Radius", "1.4", b, sizeof b, ini); g_shRadius = (float)atof(b);
     GetPrivateProfileStringA("shadows", "Strength", "0.5", b, sizeof b, ini); g_shStrength = (float)atof(b);
     GetPrivateProfileStringA("shadows", "GrassStrength", "0.35", b, sizeof b, ini); g_shGrassStrength = (float)atof(b);
+    g_shLod = GetPrivateProfileIntA("lod", "Enable", 0, ini) && GetPrivateProfileIntA("lod", "Shadow", 0, ini) ? 1 : 0;   // #10: default off, identical output when 0
 }
 static int ReplaceAll(std::string& s, const std::string& from, const std::string& to) {
     int n = 0; size_t p = 0;
@@ -178,8 +181,9 @@ static bool PatchShadowShader(std::string& s) {
     n += ReplaceAll(s, "shadowCoeff1 = sum / 4.0;", "shadowCoeff1 = sum;");
     n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture1, sampleUV)", "TyPCF(shadowTexture1, sampleUV)");
     n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture1, v_shadowCoord1)", "TyPCF(shadowTexture1, v_shadowCoord1)");
-    n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture2, v_shadowCoord2)", "TyPCF(shadowTexture2, v_shadowCoord2)");
-    n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture3, v_shadowCoord3)", "TyPCF(shadowTexture3, v_shadowCoord3)");
+    // cascades 2 and 3 cover the far distance bands: tyShLod (0/1) selects the cheaper filter there ([lod] Shadow)
+    n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture2, v_shadowCoord2)", "TyPCFL(shadowTexture2, v_shadowCoord2, tyShLod)");
+    n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture3, v_shadowCoord3)", "TyPCFL(shadowTexture3, v_shadowCoord3, tyShLod)");
     n += ReplaceAll(s, "shadowAmount * 0.5", "shadowAmount * tyShadowStrength");   // set per program after link (grass gets its own value)
     if (!n) return false;
     // Filter: 4-tap probe (rotated cross, bilinear compare = 16 depth fetches). Fully lit / fully shadowed neighbourhoods (the vast majority of pixels) stop there.
@@ -187,11 +191,12 @@ static bool PatchShadowShader(std::string& s) {
     EnsureLtDecl(s);
     s.insert(s.rfind("void main"),
         "uniform float tyShadowStrength;\n"
+        "uniform float tyShLod;   // [lod] Shadow: 1 = far cascade, fewer taps (see TyPCFL)\n"
         // explicit LOD 0 (R5 root cause of S1): TyPCF runs in NON-UNIFORM control flow (engine cascade branch + our early-out), so implicit
         // derivatives are undefined in 2x2 quads where some pixels returned early -> the GPU picks a wrong LOD/filter for those taps and
         // writes isolated half-lit pixels: the dotted bright line inside shadows, parallel to the edge at the probe radius.
         "float TyS(sampler2DShadow t, vec3 c, vec2 zg, vec2 o) { vec3 p = vec3(c.xy + o, c.z + dot(zg, o)); return textureLod(t, p, 0.0); }\n"
-        "float TyPCF(sampler2DShadow t, vec3 c) {\n"
+        "float TyPCFL(sampler2DShadow t, vec3 c, float tyFar) {\n"
         "  vec2 texel = tyLt[0].x / vec2(textureSize(t, 0));\n"
         "  vec2 zg = vec2(0.0);   // receiver-plane depth gradient (depth per shadow-map uv): offset taps compare against the receiver plane, not the centre depth\n"
         "  if (tyLt[6].x > 0.5) { vec3 ddx = dFdx(c), ddy = dFdy(c); float det = ddx.x * ddy.y - ddx.y * ddy.x;\n"
@@ -210,6 +215,7 @@ static bool PatchShadowShader(std::string& s) {
         "    // crack closing (R5, S1): occluder on BOTH opposite sides within ~2 texels = the pixel sees light through a 1-3 texel gap in the caster\n"
         "    // (seams between character mesh pieces) -> a dotted bright line inside the shadow. Morphological closing: keep it shadowed.\n"
         "    float cl = tyLt[4].w * max(max(min(p1, p2), min(p3, p4)), max(min(q1, q2), min(q3, q4)));\n"
+        "    if (tyFar > 0.5) return max(s0 * 0.125, cl);   // [lod] far cascade: the 8 probe taps + crack closing, no 3x3/4x4 grid\n"
         "    float acc = 0.0;\n"
         "    if (tyLt[0].z < 24.0) {   // cheaper 3x3 binomial (Medium)\n"
         "      const float W3[3] = float[3](0.25, 0.5, 0.25);\n"
@@ -222,7 +228,7 @@ static bool PatchShadowShader(std::string& s) {
         "  }\n"
         "  float sum = TyS(t, c, zg, d) + TyS(t, c, zg, -d) + TyS(t, c, zg, e) + TyS(t, c, zg, -e);\n"
         "  if (sum < 0.001 || sum > 3.999) return sum * 0.25;\n"
-        "  int N = int(tyLt[0].z); float invN = 1.0 / float(N);\n"
+        "  int N = tyFar > 0.5 ? max(4, int(tyLt[0].z) / 2) : int(tyLt[0].z); float invN = 1.0 / float(N);\n"
         "  float b = a + 0.7853982; vec2 q = vec2(cos(b), sin(b));\n"
         "  const vec2 GA = vec2(-0.7373688, 0.6754903);   // golden angle rotation\n"
         "  for (int i = 0; i < N; i++) {\n"
@@ -230,7 +236,8 @@ static bool PatchShadowShader(std::string& s) {
         "    q = vec2(q.x * GA.x - q.y * GA.y, q.x * GA.y + q.y * GA.x);\n"
         "  }\n"
         "  return sum / (float(N) + 4.0);\n"
-        "}\n");
+        "}\n"
+        "float TyPCF(sampler2DShadow t, vec3 c) { return TyPCFL(t, c, 0.0); }\n");
     if (PbrDefine(s, "SKIN", 1)) { ReplaceAll(s, "if (tyLt[6].x > 0.5) {", "c.z -= tyLt[7].x; if (false) {"); }   // skinned characters: screen derivatives of tiny skinned triangles are noise (hatching) -> no receiver-plane bias there
     return true;
 }
@@ -543,10 +550,11 @@ static void ApplyShadowStrength(GLuint p) {
     auto it = g_shadowStrengthLoc.find(p); if (it == g_shadowStrengthLoc.end() || it->second < 0 || !pu) return;
     bool grass = false; for (GLuint s : g_progShaders[p]) if (g_grassVS.count(s)) grass = true;
     pu(p, it->second, grass ? g_shGrassStrength : g_shStrength);
+    auto lt = g_shadowLodLoc.find(p); if (lt != g_shadowLodLoc.end() && lt->second >= 0) pu(p, lt->second, (float)g_shLod);
 }
 static void AfterLink(GLuint p) {
     GLint loc = o_glGetUniformLocation ? o_glGetUniformLocation(p, "tyShadowStrength") : -1;
-    if (loc >= 0) { g_shadowStrengthLoc[p] = loc; ApplyShadowStrength(p); }
+    if (loc >= 0) { g_shadowStrengthLoc[p] = loc; GLint lodLoc = o_glGetUniformLocation(p, "tyShLod"); if (lodLoc >= 0) g_shadowLodLoc[p] = lodLoc; ApplyShadowStrength(p); }
     PbrOnLink(p); LightOnLink(p); TexOnLink(p); EmitOnLink(p);
 }
 static bool TessRewriteVS(GLuint shader, std::string& src) {
