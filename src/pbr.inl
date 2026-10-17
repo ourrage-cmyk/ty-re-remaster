@@ -190,8 +190,9 @@ static void PbrApply(GLuint p) {
     if (it->second[3] >= 0) pu4(p, it->second[3], g_tsLive > 0.5f ? g_pbrLowBump : 1.0f, g_pbrCavity * g_tsLive, g_pbrValleyRough * g_tsLive, g_pbrSheen * g_tsLive);
 }
 // camera position from the scene VP (same derivation as RunAO) + sun direction; called when the scene depth is copied (end of the 3D pass)
+static int g_shotPhase = 0;      // A/B hotkey state (abshot.inl): 0 idle, 1 first frame of a pair captured
 static void TessABPoll() {
-    if (!g_tsAB) return;
+    if (!g_tsAB || g_shotPhase) return;   // the A/B hotkey (abshot.inl) owns g_tsLive while a pair is captured
     static std::string last; static unsigned lastFrame; if (g_frame - lastFrame < 8) return; lastFrame = g_frame;
     char pth[MAX_PATH]; snprintf(pth, sizeof pth, "%styrender\\cam.txt", g_dir); std::string cur; ReadFileStr(pth, cur);
     if (cur != last) { if (!last.empty() || g_tsLive < 0.5f) g_tsLive = g_tsLive > 0.5f ? 0.0f : 1.0f; last = cur; g_pbrStamp.clear(); g_tessStamp.clear(); logf("[tess] AB toggle: live=%.0f", g_tsLive); }
