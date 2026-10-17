@@ -1,0 +1,12 @@
+{
+  "name": "current_run",
+  "purpose": "Retroactive plan for the first full run on the PC: confirm every variant boots to gameplay, that the F10 overlay closes without breaking geometry, that the fog and emit variants run without log errors, and get the water flicker baseline for the mod against stock.",
+  "checks": [
+    { "id": "boot-all", "kind": "boot", "variants": ["stock", "mod", "overlay", "fog_seethru1", "emit1"], "issue": 12, "decides": "every variant reaches gameplay (state 5)", "pass": "Boot = OK for every variant", "next": "fix ty_play/boot_spot for the variant that failed (see its progress.log line)" },
+    { "id": "overlay-geometry", "kind": "overlay", "variants": ["overlay"], "issue": 79, "decides": "F10 open and close keeps geometry", "pass": "closed frame matches the baseline and the game stays alive", "next": "read the [overlay] state lines in the report; compare the open and closed frames" },
+    { "id": "flicker-water-mod", "kind": "flicker", "variants": ["mod"], "baseline": "stock", "limit": 1.5, "issue": 5, "decides": "mod flicker against stock (heuristic: lower-half temporal std)", "pass": "lower-half ratio <= 1.5", "next": "run the DebugWater bisect (plan next_monitor, #80)" },
+    { "id": "emit-log", "kind": "log", "variants": ["emit1"], "pattern": "\\[emit\\]", "mustMatch": true, "issue": 84, "decides": "emit pass ran with Enable=1", "pass": "at least one [emit] line in tyrender.log", "next": "check [emit] Enable and the portal light in the next run (#84)" },
+    { "id": "no-log-errors", "kind": "log", "variants": ["mod", "overlay", "fog_seethru1", "emit1"], "pattern": "(?i)\\berror\\b|\\bfailed\\b|assert", "mustMatch": false, "issue": 12, "decides": "no error, failed or assert lines in the renderer log", "pass": "0 matching lines", "next": "read the matching lines in the variant folder's tyrender.log" },
+    { "id": "fog-trees-look", "kind": "manual", "variants": ["fog_seethru1"], "issue": 4, "decides": "do the level-two trees still poke through the fog (needs gameplay, not a cutscene)", "pass": "a person looks at the contact sheet", "next": "see the next_monitor plan for the tree check at Billabong" }
+  ]
+}

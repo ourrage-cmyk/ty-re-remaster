@@ -1,0 +1,111 @@
+{
+  "id": "req-80-debugwater",
+  "status": "pending",
+  "priority": 1,
+  "requester": {
+    "issue": 80,
+    "thread": ""
+  },
+  "question": "Which [pbr] DebugWater bit removes the blue flicker on Ty in the water (Billabong)?",
+  "variants": [
+    {
+      "name": "dbg_water_0",
+      "note": "baseline, bit 0 (off)"
+    },
+    {
+      "name": "dbg_water_1",
+      "note": "bit 1"
+    },
+    {
+      "name": "dbg_water_2",
+      "note": "bit 2"
+    },
+    {
+      "name": "dbg_water_4",
+      "note": "bit 4"
+    },
+    {
+      "name": "dbg_water_8",
+      "note": "bit 8"
+    },
+    {
+      "name": "dbg_water_5",
+      "note": "bits 1 and 4"
+    }
+  ],
+  "checks": [
+    {
+      "id": "bisect-bit1",
+      "kind": "tyflicker",
+      "variants": [
+        "dbg_water_1"
+      ],
+      "baseline": "dbg_water_0",
+      "limit": 1.0,
+      "pass": "lower-half ratio vs bit 0 <= 1.0",
+      "decides": "bit 1 removes the flicker",
+      "next": "try the other bits; combine (#80)"
+    },
+    {
+      "id": "bisect-bit2",
+      "kind": "tyflicker",
+      "variants": [
+        "dbg_water_2"
+      ],
+      "baseline": "dbg_water_0",
+      "limit": 1.0,
+      "pass": "lower-half ratio vs bit 0 <= 1.0",
+      "decides": "bit 2 removes the flicker",
+      "next": "try the other bits (#80)"
+    },
+    {
+      "id": "bisect-bit4",
+      "kind": "tyflicker",
+      "variants": [
+        "dbg_water_4"
+      ],
+      "baseline": "dbg_water_0",
+      "limit": 1.0,
+      "pass": "lower-half ratio vs bit 0 <= 1.0",
+      "decides": "bit 4 removes the flicker",
+      "next": "try the other bits (#80)"
+    },
+    {
+      "id": "bisect-bit8",
+      "kind": "tyflicker",
+      "variants": [
+        "dbg_water_8"
+      ],
+      "baseline": "dbg_water_0",
+      "limit": 1.0,
+      "pass": "lower-half ratio vs bit 0 <= 1.0",
+      "decides": "bit 8 removes the flicker",
+      "next": "try the other bits (#80)"
+    },
+    {
+      "id": "bisect-bit5",
+      "kind": "tyflicker",
+      "variants": [
+        "dbg_water_5"
+      ],
+      "baseline": "dbg_water_0",
+      "limit": 1.0,
+      "pass": "lower-half ratio vs bit 0 <= 1.0",
+      "decides": "bits 1 and 4 together remove the flicker",
+      "next": "narrow down (#80)"
+    },
+    {
+      "id": "bits-logged",
+      "kind": "log",
+      "variants": [
+        "dbg_water_8"
+      ],
+      "pattern": "\\[dbgwater\\]",
+      "mustMatch": true,
+      "pass": "[dbgwater] lines in the log",
+      "decides": "the bit was active",
+      "next": "check the value in the ini"
+    }
+  ],
+  "report": ""
+}

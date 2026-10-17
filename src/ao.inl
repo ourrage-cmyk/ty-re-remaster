@@ -564,7 +564,7 @@ static bool InitAO(int w, int h) {
 // ---------------------------------------------------------------- the pass
 static inline void AODraw() { if (!(g_aoExp & 8)) o_glDrawArrays(4, 0, 3); }
 static void RunAO(GLuint depthTex, int w, int h) {
-    if (!g_aoEnable || g_aoOffFile || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
+    if (!g_aoEnable || g_aoOffFile || g_abOff || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
     if (!InitAO(w, h)) return;
     float invVP[16]; if (!Invert4(g_sceneVP, invVP)) return;
     // camera basis from VP rows (VP = P*V, symmetric frustum): row0 ~ right*P00, row1 ~ up*P11, row3 = -back
