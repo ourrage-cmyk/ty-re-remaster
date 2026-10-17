@@ -143,7 +143,8 @@ static void OvDraw(HDC dc) {
     typedef void(WINAPI* gi_t)(GLenum, GLint*); typedef void(WINAPI* fb_t)(GLenum, GLuint); typedef void(WINAPI* en_t)(GLenum);
     static wp_t wp = (wp_t)GLProc("glWindowPos2i");
     static pd_t pd = (pd_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glDrawPixels");
-    static up_t up = (up_t)GLProc("glUseProgram");
+    // The raw entry point, not GLProc(): GLProc returns the DLL hook, and h_glUseProgram runs PbrApply/LightApply and rewrites g_curProg.
+    static up_t up = (up_t)o_glUseProgram;
     static pa_t pushA = (pa_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glPushAttrib");
     static v_t popA = (v_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glPopAttrib");
     static pca_t pushC = (pca_t)GetProcAddress(GetModuleHandleA("opengl32.dll"), "glPushClientAttrib");
