@@ -157,6 +157,7 @@ uniform sampler2DShadow u_sh1; uniform sampler2DShadow u_sh2; uniform mat4 u_shV
 uniform mat4 u_invVP; uniform vec3 u_cam; uniform vec3 u_sunDir; uniform vec3 u_sunCol; uniform vec3 u_ambCol;
 uniform float u_density; uniform float u_falloff; uniform float u_maxDist; uniform float u_g; uniform float u_shaftContrast; uniform float u_volA; uniform vec2 u_vsize;
 uniform sampler2D u_skyTex; uniform float u_hazeSky, u_ambScale;
+uniform float u_lodS; uniform float u_lodE; uniform float u_lodMin;   // [lod] fog ramp in camera distance (parked when off: 2 samples per slice)
 shared vec4 sh[64]; shared vec4 res[64];
 vec3 AmbDyn() {   // ambient in-scatter colour (already * 4pi): level fog hue pulled toward the measured sky colour
   vec3 cpu = u_ambCol; vec4 s = texelFetch(u_skyTex, ivec2(0), 0);
@@ -182,12 +183,19 @@ void main() {
   float cosT = dot(dir, u_sunDir);
   float phase = (1.0 - u_g * u_g) / (12.566 * pow(max(1.0 + u_g * u_g - 2.0 * u_g * cosT, 1e-4), 1.5));
   vec3 Lacc = vec3(0.0); float dens = 0.0; vec3 ambDyn = AmbDyn();
+  // [lod] fog distance LOD: far slices take 1 of the 2 in-slice samples. The count is rounded stochastically per froxel (mean kept), weight 1/n.
+  // Off: 2 samples at 0.25 / 0.75 of the slice and weight 0.5, as before.
+  float lkF = 1.0 - (1.0 - u_lodMin) * smoothstep(u_lodS, u_lodE, 0.5 * (d0 + d1));
+  float nh = fract(52.9829189 * fract(dot(vec2(id) + float(k) * vec2(7.31, 3.17), vec2(0.06711056, 0.00583715))));
+  int nS = max(1, int(floor(2.0 * lkF + nh)));
+  float wgt = 1.0 / float(nS);
   for (int i = 0; i < 2; i++) {
-    float t = mix(d0, d1, 0.25 + 0.5 * float(i));
+    if (i >= nS) break;
+    float t = mix(d0, d1, 0.5 * float(2 * i + 1) / float(nS));
     vec3 X = u_cam + dir * t;
-    dens += 0.5 * u_density * exp(-max(X.y - u_cam.y, -2000.0) * u_falloff);
+    dens += wgt * u_density * exp(-max(X.y - u_cam.y, -2000.0) * u_falloff);
     float vis = mix(1.0, SunVis(X), u_shaftContrast);
-    Lacc += 0.5 * (u_sunCol * (vis * phase) + ambDyn * (1.0 / 12.566));
+    Lacc += wgt * (u_sunCol * (vis * phase) + ambDyn * (1.0 / 12.566));
   }
   float ext = dens * len;
   sh[k] = vec4(Lacc * (1.0 - exp(-ext)), ext);
@@ -435,6 +443,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         u3(o_glGetUniformLocation(cs, "u_ambCol"), amb[0] * g_atAmb * 12.566f, amb[1] * g_atAmb * 12.566f, amb[2] * g_atAmb * 12.566f);
         CF("u_density", g_atDensity * g_atIntensity * g_atFogMul * g_fogAmount / fmaxf(g_fogDistance, 0.05f)); CF("u_falloff", g_atFalloff); CF("u_maxDist", g_atMaxDist);
         CI("u_skyTex", 6); CF("u_hazeSky", useSky ? g_atHazeSky : 0.0f); CF("u_ambScale", g_atAmb); CF("u_g", g_atG); CF("u_shaftContrast", g_atShaftContrast); CF("u_volA", volA); gx.Uniform2f(o_glGetUniformLocation(cs, "u_vsize"), (float)vol.fw, (float)vol.fh);
+        { bool lodF = g_lodEnable && g_lodFog; CF("u_lodS", lodF ? g_lodStart : 1e9f); CF("u_lodE", lodF ? g_lodEnd : 2e9f); CF("u_lodMin", lodF ? g_lodMin : 1.0f); }
         vol.BindImage(0, vol.tex, 0, 1, 0, 0x88B9 /*WRITE_ONLY*/, 0x881A);
         vol.Dispatch(vol.fw, vol.fh, 1);
         vol.Barrier(0x20 | 0x8);

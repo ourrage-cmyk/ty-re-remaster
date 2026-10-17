@@ -12,19 +12,10 @@ static int g_giMode = 1, g_giAtrous = 3, g_giHizIter = 0, g_giProf = 0;
 static int g_giCharOn = 1; static float g_giCharKeep = 0.0f, g_giCharGI = 0.3f, g_giCharH = 160.0f, g_giCharR = 70.0f;   // [gi] Characters/CharacterColour/CharacterGI/CharacterHeight/CharacterRadius
 static float g_giSigmaL = 4.0f, g_giBlur = 0.0f; static int g_giNoiseCycle = 0;   // [gi] SourceBlur (cone footprint px per px of ray length, 0 = off), NoiseCycle (0 = noise changes every frame, N = repeats every N frames, 1 = static)
  static int g_giSweep = 0; static const char* g_giVarName = "";
-// [lod] Enable=0 (default, unchanged output). Distance LOD for the screen-space GI rays: pixels closer than Start trace every ray; from Start to End
-// (view depth, world units) the share of traced rays falls smoothly to MinScale. Only has an effect while [gi] is on.
-static int g_lodEnable = 0; static float g_lodStart = 1500.0f, g_lodEnd = 6000.0f, g_lodMin = 0.35f;
-static void LoadLodConfig() {
-    char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
-    g_lodEnable = GetPrivateProfileIntA("lod", "Enable", 0, ini);
-    GetPrivateProfileStringA("lod", "Start", "1500", b, sizeof b, ini); g_lodStart = (float)atof(b);
-    GetPrivateProfileStringA("lod", "End", "6000", b, sizeof b, ini); g_lodEnd = (float)atof(b); if (g_lodEnd < g_lodStart + 1.0f) g_lodEnd = g_lodStart + 1.0f;
-    GetPrivateProfileStringA("lod", "MinScale", "0.35", b, sizeof b, ini); g_lodMin = (float)atof(b); if (g_lodMin < 0.0f) g_lodMin = 0.0f; if (g_lodMin > 1.0f) g_lodMin = 1.0f;
-}
-// Uniform values for the trace pass. Disabled: the ramp is parked far away with MinScale 1, so lk is exactly 1 and every ray is traced as before.
-static void LodUniforms(GLint s, GLint e, GLint m) {
-    if (g_lodEnable) { gx.Uniform1f(s, g_lodStart); gx.Uniform1f(e, g_lodEnd); gx.Uniform1f(m, g_lodMin); }
+// Uniform values for a distance-LOD ramp (globals and [lod] loader are in ao.inl). Off: the ramp is parked far away with MinScale 1,
+// so the keep factor is exactly 1 and the shader output is unchanged.
+static void LodUniforms(GLint s, GLint e, GLint m, bool on) {
+    if (on) { gx.Uniform1f(s, g_lodStart); gx.Uniform1f(e, g_lodEnd); gx.Uniform1f(m, g_lodMin); }
     else { gx.Uniform1f(s, 1e9f); gx.Uniform1f(e, 2e9f); gx.Uniform1f(m, 1.0f); }
 }
 // [gi] Sweep=1 (benchmark helper): cycles through variants every 150 frames and logs the per-pass GPU times of each.
@@ -458,7 +449,7 @@ static bool GIHiz(GLuint depthTex, int w, int h, const float* invVP, const float
     gx.Uniform1f(UL(g2.progTrace, "u_radius"), g_giRadius); gx.Uniform1f(UL(g2.progTrace, "u_thick"), g_giThick);
     gx.Uniform1i(UL(g2.progTrace, "u_rays"), g_giRays < 1 ? 1 : g_giRays); gx.Uniform1i(UL(g2.progTrace, "u_iters"), g_giHizIter > 0 ? g_giHizIter : (g_giSteps < 2 ? 8 : g_giSteps * 4));
     gx.Uniform1i(UL(g2.progTrace, "u_levels"), g2.levels); gx.Uniform1f(UL(g2.progTrace, "u_frame"), (float)(g_giNoiseCycle > 0 ? (g_frame % g_giNoiseCycle) : (g_frame & 4095))); gx.Uniform1f(UL(g2.progTrace, "u_blur"), g_giBlur);
-    LodUniforms(UL(g2.progTrace, "u_lodS"), UL(g2.progTrace, "u_lodE"), UL(g2.progTrace, "u_lodMin"));
+    LodUniforms(UL(g2.progTrace, "u_lodS"), UL(g2.progTrace, "u_lodE"), UL(g2.progTrace, "u_lodMin"), g_lodEnable && g_lodGI);
     o_glActiveTexture(0x84C1); o_glBindTexture(0x0DE1, g2.texHz);
     o_glActiveTexture(0x84C2); o_glBindTexture(0x0DE1, g_colorCopyTex);
     o_glDrawArrays(4, 0, 3);
