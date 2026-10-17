@@ -10,6 +10,10 @@
 #include <stdarg.h>
 #include <math.h>
 #include <string>
+#include <vector>
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unordered_map>
 #include <set>
 
@@ -83,6 +87,7 @@ static float g_fogDistance = 1.0f, g_fogAmount = 1.0f;   // [fog] Distance / Amo
 static bool GIMaskBegin(); static void GIMaskEnd(); static void RunGI(GLuint depthTex, int w, int h); static void LoadGIConfig(); static void PollGIFlags();
 static int g_pendingShadowUnit[2] = {-1, -1}; static GLuint g_shadowTex[2];   // engine cascade shadow maps (resolved at draw time)
 static void GProf(int m); static void GProfNextFrame();
+static void FogDiagDraw();
 static void RunAtmos(GLuint depthTex, int w, int h); static void LoadAtmosConfig(); static void PollAtmosFlags();
 static void OnNamedUniformMat(int id, const GLfloat* v, GLboolean t); static void OnNamedUniform4(int id, const GLfloat* v);
 static bool TessRewriteVS(GLuint shader, std::string& src); static void TessOnAttach(GLuint p, GLuint s); static void TessLink(GLuint p); static void LoadTessConfig();
@@ -243,7 +248,7 @@ HOOK(void, glDisable, (GLenum c)) { CAP("glDisable %#x", c); o_glDisable(c); }
 HOOK(void, glBlendFunc, (GLenum s, GLenum d)) { CAP("glBlendFunc %#x %#x", s, d); o_glBlendFunc(s, d); }
 HOOK(void, glDepthMask, (GLboolean f)) { CAP("glDepthMask %d", f); o_glDepthMask(f); }
 HOOK(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) { CAP("glColorMask %d%d%d%d", r, g, b, a); o_glColorMask(r, g, b, a); }
-HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep();
+HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); FogDiagDraw();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; }   // tessellated programs only accept GL_PATCHES
     for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } CAP("glDrawElements %#x n=%d", m, n); o_glDrawElements(m, n, t, idx); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } }
 HOOK(void, glDrawArrays, (GLenum m, GLint f, GLsizei n)) { g_draws++; TexDrawPrep();
@@ -524,6 +529,7 @@ static void Snapshot(HDC dc) {
 #include "light.inl"
 #include "debugcam.inl"
 #include "gpuprof.inl"
+#include "abshot.inl"
 static void ApplyShadowStrength(GLuint p) {
     typedef void(WINAPI* pu1f_t)(GLuint, GLint, GLfloat); static pu1f_t pu = (pu1f_t)o_wglGetProcAddress("glProgramUniform1f");
     auto it = g_shadowStrengthLoc.find(p); if (it == g_shadowStrengthLoc.end() || it->second < 0 || !pu) return;
@@ -567,7 +573,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
         Snapshot(dc); PollDebugCam(); MotionPoll(); PollAOFlags(); PollAtmosFlags(); PollGIFlags();
         char p[MAX_PATH]; snprintf(p, sizeof p, "%styrender\\post_off", g_dir); g_fxOffFile = GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES;
         snprintf(p, sizeof p, "%styrender\\reload", g_dir);
-        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
+        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); LoadShotConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
             for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);
             { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
               GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
@@ -576,6 +582,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
     }   // poll the trigger file every 8 frames
     TexReport();
     GProf(9);                                      // GPU timestamp: end of this frame's commands (before present, so vsync waits are not counted)
+    ABShotFrame(dc);                               // A/B hotkey (abshot.inl): reads the frame just drawn, F11 by default
     BOOL r = o_SwapBuffers(dc);
     GProfNextFrame();
     g_frame++;
@@ -659,7 +666,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
       GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
       GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); }
     LoadTessConfig();
-    LoadPbrConfig(); LoadLightConfig(); LoadTexTags();
+    LoadPbrConfig(); LoadLightConfig(); LoadShotConfig(); LoadTexTags();
     logf("tyrender stage1 loaded. game dir %s  capture=%d,%d dump=%d override=%d", g_dir, g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
     Install();
     CheckOrig("SwapBuffers", (void*)o_SwapBuffers);

@@ -18,7 +18,7 @@ uniform sampler2D u_color;
 uniform vec3 u_cam; uniform vec3 u_sunDir; uniform vec3 u_sunCol; uniform vec3 u_ambCol;
 uniform float u_density; uniform float u_falloff; uniform int u_steps; uniform float u_maxDist; uniform float u_g; uniform float u_frameNoise; uniform int u_debug;
 uniform int u_mode; uniform sampler2D u_low; uniform vec2 u_halfSize;   // u_mode: 0 full-res, 1 half-res march (scat,T), 2 full-res composite
-uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH;
+uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH; uniform float u_fogSat; uniform sampler2D u_wmask; uniform float u_waterFog;
 uniform sampler2D u_skyTex; uniform float u_hazeSky, u_ambScale; uniform float u_blurStart, u_blurRange, u_blurPx; uniform vec2 u_rcp;
 const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
 // haze colour: the CPU level-fog hue, pulled toward the colour of the actual sky near the horizon (measured on the GPU, smoothed over time)
@@ -84,6 +84,11 @@ void main() {
     if (s < 1.0 / u_volN) v = mix(vec4(0.0, 0.0, 0.0, 1.0), v, s * u_volN);
     if (u_debug == 1) { o = vec4(v.rgb, 1); return; }
     if (u_debug == 2) { o = vec4(vec3(SunVis(P + vec3(0.0, 2.0, 0.0))), 1); return; }
+    v.rgb = mix(vec3(dot(v.rgb, vec3(0.2126, 0.7152, 0.0722))), v.rgb, u_fogSat);   // FogSaturation: keep the haze from tinting the scene
+    if (u_waterFog > 0.0 && !skyp && texture(u_wmask, uv).a < 0.25) {   // GI source mask (alpha 0 = water/glass/glow drawn here): thicken the fog over water so what is under it stays hidden
+      float T2 = pow(v.a, 1.0 + u_waterFog);
+      v.rgb *= min((1.0 - T2) / max(1.0 - v.a, 1e-4), 1.0 + u_waterFog); v.a = T2;
+    }
     float omT = 1.0 - v.a;
     if (skyp) {
       // painted sky (mountains/mesas): same aerial perspective as the world, strongest at the horizon, fading with view elevation
@@ -221,7 +226,7 @@ typedef void(WINAPI* glDeleteTextures_t)(GLsizei, const GLuint*);
 typedef GLenum(WINAPI* glGetError_t)();
 static struct { bool tried, ok, failed; GLuint prog, tex; int fw, fh; glDispatchCompute_t Dispatch; glBindImageTexture_t BindImage; glMemoryBarrier_t Barrier; glTexImage3D_t TexImage3D; glDeleteTextures_t DelTex; glGetError_t GetErr; } vol;
 static int g_atFroxel = 1, g_atFroxelPx = 12;
-static float g_atSkyH = 0.25f, g_atHazeHue = 0.25f, g_atIntensity = 2.5f, g_atDesat = 0.7f, g_atLift = 0.35f, g_atSkyHaze = 0.5f;
+static float g_atSkyH = 0.45f, g_atHazeHue = 0.15f, g_atFogSat = 0.5f, g_atIntensity = 2.5f, g_atDesat = 0.7f, g_atLift = 0.35f, g_atSkyHaze = 0.8f, g_atWaterFog = 1.0f;
 
 static bool InitVolume() {
     if (vol.tried) return vol.ok && !vol.failed;
@@ -256,7 +261,7 @@ static bool EnsureVolTex(int w, int h) {
 }
 
 static struct { bool init, failed; GLuint prog, tex, low; int w, h, lw, lh; } atm;
-static int g_atHalf = 1; static int g_atEnable = 1, g_atSteps = 24, g_atDebug; static bool g_atOffFile; static float g_atContact = 0.35f, g_atContactLen = 25.0f, g_atContactThick = 6.0f, g_atShaftContrast = 0.5f, g_atFogMul = 1.0f;
+static int g_atHalf = 1; static int g_atEnable = 1, g_atSteps = 24, g_atDebug; static bool g_atOffFile; static float g_atContact = 0.35f, g_atContactLen = 25.0f, g_atContactThick = 6.0f, g_atShaftContrast = 0.5f, g_atFogMul = 0.8f;
 static float g_atDensity = 0.000015f, g_atFalloff = 0.0015f, g_atMaxDist = 40000.0f, g_atSunInt = 1.4f, g_atG = 0.6f, g_atAmb = 1.0f, g_atSunCol[3] = {1.0f, 0.86f, 0.66f};
 
 static void LoadAtmosConfig() {
@@ -265,8 +270,8 @@ static void LoadAtmosConfig() {
 #define F(key, def, var) GetPrivateProfileStringA("atmos", key, def, b, sizeof b, ini); var = (float)atof(b);
     F("Density", "0.000015", g_atDensity) F("HeightFalloff", "0.0015", g_atFalloff) F("MaxDist", "40000", g_atMaxDist)
     F("SunIntensity", "1.4", g_atSunInt) F("Anisotropy", "0.6", g_atG) F("AmbientScale", "1.0", g_atAmb)
-    F("ContactShadows", "0.35", g_atContact) F("ContactLength", "25", g_atContactLen) F("ContactThickness", "6", g_atContactThick) F("FogAmount", "1.0", g_atFogMul)
-    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.5", g_atSkyHaze) F("SkyHazeHeight", "0.25", g_atSkyH) F("HazeHue", "0.25", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
+    F("ContactShadows", "0.35", g_atContact) F("ContactLength", "25", g_atContactLen) F("ContactThickness", "6", g_atContactThick) F("FogAmount", "0.8", g_atFogMul)
+    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.8", g_atSkyHaze) F("SkyHazeHeight", "0.45", g_atSkyH) F("FogSaturation", "0.5", g_atFogSat) F("WaterFog", "1.0", g_atWaterFog) F("HazeHue", "0.15", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
 #undef F
@@ -279,7 +284,21 @@ static void PollAtmosFlags() {
     snprintf(p, sizeof p, "%styrender\\atmos_debug", g_dir); g_atDebug = ReadFileStr(p, s) ? atoi(s.c_str()) : 0;
 }
 
+// Diagnostic for trees poking through the fog (log only, no visual change): once in 60 frames, count transparent-tagged non-character draws
+// by (before/after this frame's fog pass) x (depth write on/off) x (blend on/off); the totals are logged every 600 frames.
+// If foliage draws come AFTER the fog pass the fog cannot see them; if they come before with depth write off it fogs the surface behind them.
+static unsigned g_atRanFrame, g_fdCnt[2][2][2], g_fdLast;
+static void FogDiagDraw() {
+    if (g_frame % 60 != 0 || !g_curProg || !gx.GetBooleanv || !gx.IsEnabled || !g_texFlagArr) return;
+    uint8_t f = TexFlags(g_bound2D[g_progDiffUnit[g_curProg < 8192 ? g_curProg : 0] & 31]);
+    if (!(f & TF_KNOWN) || !(f & TF_TRANSPARENT) || (f & TF_CHARACTER)) return;
+    GLboolean dm = 0; gx.GetBooleanv(0x0B72, &dm);
+    g_fdCnt[g_atRanFrame == g_frame ? 1 : 0][dm ? 1 : 0][gx.IsEnabled(0x0BE2) ? 1 : 0]++;
+}
 static void RunAtmos(GLuint depthTex, int w, int h) {
+    if (g_frame - g_fdLast >= 600) { g_fdLast = g_frame; logf("[fogdiag] transparent-tagged draws (sampled): before-fog depthW0/blend0=%u d0/b1=%u d1/b0=%u d1/b1=%u | after-fog d0/b0=%u d0/b1=%u d1/b0=%u d1/b1=%u",
+        g_fdCnt[0][0][0], g_fdCnt[0][0][1], g_fdCnt[0][1][0], g_fdCnt[0][1][1], g_fdCnt[1][0][0], g_fdCnt[1][0][1], g_fdCnt[1][1][0], g_fdCnt[1][1][1]); memset(g_fdCnt, 0, sizeof g_fdCnt); }
+    g_atRanFrame = g_frame;
     if ((!g_atEnable && g_atContact <= 0) || g_atOffFile || atm.failed || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
     if (!LoadGX()) { atm.failed = true; return; }
     if (!atm.init) {
@@ -392,7 +411,9 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         o_glActiveTexture(0x84C5); o_glBindTexture(0x806F, vol.tex);
         o_glActiveTexture(0x84C0);
         o_glUseProgram(p);
-        I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH);
+        I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH); F("u_fogSat", g_atFogSat);
+        { bool wm = g_atWaterFog > 0.0f && g_giMask && g_giMaskRan == g_frame && g_giMaskFrame == g_frame && g_giMaskFrameDraws > 0 && g2.texMask;   // best guess, untested: fog water harder via the GI source mask
+          I("u_wmask", 7); F("u_waterFog", wm ? g_atWaterFog : 0.0f); if (wm) { o_glActiveTexture(0x84C7); o_glBindTexture(0x0DE1, g2.texMask); o_glActiveTexture(0x84C0); } }
         u3(o_glGetUniformLocation(p, "u_haze"), amb[0] * g_atAmb, amb[1] * g_atAmb, amb[2] * g_atAmb);
         I("u_mode", 3);
     } else
@@ -411,7 +432,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
     } else { I("u_mode", 0); }
     o_glDrawArrays(4, 0, 3);
     if (g_atHalf) { o_glActiveTexture(0x84C4); o_glBindTexture(0x0DE1, 0); o_glActiveTexture(0x84C0); }
-    if (useVol) { o_glActiveTexture(0x84C5); o_glBindTexture(0x806F, 0); o_glActiveTexture(0x84C0); }
+    if (useVol) { o_glActiveTexture(0x84C5); o_glBindTexture(0x806F, 0); o_glActiveTexture(0x84C7); o_glBindTexture(0x0DE1, 0); o_glActiveTexture(0x84C0); }
     if (useSky) { o_glActiveTexture(0x84C6); o_glBindTexture(0x0DE1, 0); o_glActiveTexture(0x84C0); }
     g_sceneModified = true;
 

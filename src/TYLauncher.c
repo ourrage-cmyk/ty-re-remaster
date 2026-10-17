@@ -64,6 +64,32 @@ static int PatchExe(const wchar_t* in, const wchar_t* out, wchar_t* err, int err
 #define TY_VERSION L"v0.3.5-rc"
 #define TY_WINDOW_TITLE L"TY HD Renderer " TY_VERSION L"  build " TY_BUILD_ID
 static void Fail(const wchar_t* what) { wchar_t m[600]; swprintf(m, 600, L"%ls (error %lu)", what, GetLastError()); MessageBoxW(NULL, m, L"TYLauncher", MB_ICONERROR); }
+// ------------------------------------------------------------ embedded payload (tyrender.dll + default ini)
+// build.ps1 links the matching tyrender.dll (resource 1) and default_tyrender.ini (resource 2) into this exe, so TYLauncher.exe alone
+// is the release: it installs the DLL next to itself and creates tyrender.ini when there is none. Builds without a payload skip this.
+static const BYTE* PayloadRes(int id, DWORD* size) {
+    HRSRC r = FindResourceW(NULL, MAKEINTRESOURCEW(id), (LPCWSTR)RT_RCDATA); if (!r) return NULL;
+    HGLOBAL g = LoadResource(NULL, r); if (!g) return NULL;
+    *size = SizeofResource(NULL, r); return (const BYTE*)LockResource(g);
+}
+// Writes data to path when the file is missing (or, unless onlyIfMissing, when its bytes differ). Returns 1 when the file is current afterwards.
+static int PayloadWrite(const wchar_t* path, const BYTE* data, DWORD size, int onlyIfMissing) {
+    HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (f != INVALID_HANDLE_VALUE) {
+        if (onlyIfMissing) { CloseHandle(f); return 1; }
+        DWORD have = GetFileSize(f, NULL), rd = 0; int same = 0;
+        if (have == size) { BYTE* b = (BYTE*)malloc(size); if (b && ReadFile(f, b, size, &rd, NULL) && rd == size) same = !memcmp(b, data, size); free(b); }
+        CloseHandle(f); if (same) return 1;
+    }
+    HANDLE w = CreateFileW(path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL); if (w == INVALID_HANDLE_VALUE) return 0;
+    DWORD wr = 0; int ok = WriteFile(w, data, size, &wr, NULL) && wr == size; CloseHandle(w); return ok;
+}
+static void EnsurePayload(void) {
+    DWORD n = 0; const BYTE* d; wchar_t p[MAX_PATH]; swprintf(p, MAX_PATH, L"%lstyrender.dll", g_dir);
+    if ((d = PayloadRes(1, &n)) && !PayloadWrite(p, d, n, 0))
+        MessageBoxW(NULL, L"Could not update tyrender.dll next to the launcher (is the game running?). The existing DLL stays in use.", L"TYLauncher", MB_ICONWARNING);
+    if ((d = PayloadRes(2, &n))) PayloadWrite(g_ini, d, n, 1);   // never overwrite the user's settings
+}
 static int StartGame(int inject) {
     wchar_t exe[MAX_PATH], dll[MAX_PATH], cl[4400];
     swprintf(dll, MAX_PATH, L"%lstyrender.dll", g_dir);
