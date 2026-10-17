@@ -44,18 +44,22 @@ $defs = @{
     fog_seethru1 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '1' };       Flicker = $false; Overlay = $false }
     emit1        = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1' };            Flicker = $false; Overlay = $false }
     # Requested A/B variants, opt-in with -Variants. The water, trees and portal spots are not wired yet (see docs), so these run at the Rainbow Cliffs spot.
-    dbg_water_0  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '0' };         Flicker = $true;  Overlay = $false }
-    dbg_water_1  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '1' };         Flicker = $true;  Overlay = $false }
-    dbg_water_2  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '2' };         Flicker = $true;  Overlay = $false }
-    dbg_water_4  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '4' };         Flicker = $true;  Overlay = $false }
-    dbg_water_8  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '8' };         Flicker = $true;  Overlay = $false }
-    dbg_water_5  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '5' };         Flicker = $true;  Overlay = $false }
+    dbg_water_0  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '0' };         Flicker = $true;  Overlay = $false; Spot = 'billabong' }
+    dbg_water_1  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '1' };         Flicker = $true;  Overlay = $false; Spot = 'billabong' }
+    dbg_water_2  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '2' };         Flicker = $true;  Overlay = $false; Spot = 'billabong' }
+    dbg_water_4  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '4' };         Flicker = $true;  Overlay = $false; Spot = 'billabong' }
+    dbg_water_8  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '8' };         Flicker = $true;  Overlay = $false; Spot = 'billabong' }
+    dbg_water_5  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'pbr.DebugWater' = '5' };         Flicker = $true;  Overlay = $false; Spot = 'billabong' }
     skyfog_012   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'atmos.SkyFogDist' = '0.12' };     Flicker = $false; Overlay = $false }   # needs #58 on main
     skyfog_045   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'atmos.SkyFogDist' = '0.45' };     Flicker = $false; Overlay = $false }   # needs #58 on main
-    trees_see0   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '0' };        Flicker = $false; Overlay = $false }
-    trees_see1   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '1' };        Flicker = $false; Overlay = $false }
+    trees_see0   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '0' };        Flicker = $false; Overlay = $false; Spot = 'billabong' }
+    trees_see1   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '1' };        Flicker = $false; Overlay = $false; Spot = 'billabong' }
     portal_comp0 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1'; 'emit.Compensate' = '0' }; Flicker = $false; Overlay = $false }
     portal_comp1 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1'; 'emit.Compensate' = '1' }; Flicker = $false; Overlay = $false }
+    sky_yaw000  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 0 0' }
+    sky_yaw090  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 90 0' }
+    sky_yaw180  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 180 0' }
+    sky_yaw270  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 270 0' }
 }
 
 function Stop-Game { Get-GameProcs $Game | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800 }
@@ -80,10 +84,14 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
     foreach ($k in $Def.Ini.Keys) { $sec, $key = $k.Split('.', 2); Set-IniKey $ini $sec $key $Def.Ini[$k] }
     # View offset: the game reads tyrender\cam.txt each frame. The original file (if any) was saved to $Out\cam.txt.orig and is put back in the finally block.
     $camFile = Join-Path $Game 'tyrender\cam.txt'
-    if ($Cam) { New-Item -ItemType Directory -Force (Split-Path $camFile) | Out-Null; Set-Content -Path $camFile -Value $Cam -Encoding ascii }
+    $cam = if ($Def.ContainsKey('Cam')) { $Def.Cam } else { $Cam }
+    $spot = if ($Def.ContainsKey('Spot')) { $Def.Spot } else { $Spot }
+    # Billabong (slot 2) starts with a real-time cutscene on every load, so give it longer to settle.
+    $settle = if ($spot -eq 'billabong' -or $spot -eq 'slot2') { 45 } else { 12 }
+    if ($cam) { New-Item -ItemType Directory -Force (Split-Path $camFile) | Out-Null; Set-Content -Path $camFile -Value $cam -Encoding ascii }
     else { Remove-Item $camFile -ErrorAction SilentlyContinue }
 
-    $boot = & powershell -NoProfile -File (Join-Path $PSScriptRoot 'boot_spot.ps1') -Game $Game -Exe $Def.Exe -Extra $Def.Args -Spot $Spot 2>&1 | Out-String
+    $boot = & powershell -NoProfile -File (Join-Path $PSScriptRoot 'boot_spot.ps1') -Game $Game -Exe $Def.Exe -Extra $Def.Args -Spot $spot -Settle $settle 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) { $r.Boot = "FAIL $($boot.Trim())"; Stop-Game; Save-GameLog $r; return $r }
     $r.Boot = 'OK'
 
@@ -167,7 +175,7 @@ $md += ''
 $md += '## Not covered by this script'
 $md += '- Visual judgement (fog colour, shadow quality, portal light, water look): only frames and numbers are produced. A person or a session has to look at contact_sheet.png.'
 $md += '- Flicker is a luma heuristic over a static camera. Animated grass and clouds count as flicker too, which is why the stock ratio is the check.'
-$md += '- Spots: rainbow (slot 1) and billabong (slot 2, unverified on the PC) are wired. Red rock, skybox and portal views need a -Cam offset or a save from the owner.'
+$md += '- Spots: rainbow (slot 1, the Red Mountain start per the owner) and billabong (slot 2, cutscene start). The red rock view is found by the sky_yaw sweep (free camera via tyrender\cam.txt). Portal: not yet.'
 $md += '- Per-frame GPU and frame times are not parsed from tyrender.log here. The log copies are in each variant folder.'
 $md += '- The game window must be foreground. key.ps1 fails visibly when it is not.'
 $md -join "`n" | Set-Content (Join-Path $Out 'report.md') -Encoding utf8
