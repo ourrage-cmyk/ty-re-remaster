@@ -452,7 +452,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         o_glActiveTexture(0x84C0);
         o_glUseProgram(p);
         I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH); F("u_fogSat", g_atFogSat); F("u_hueLock", g_atHueLock);
-        { bool wm = g_atWaterFog > 0.0f && g_giMask && g_giMaskRan == g_frame && g_giMaskFrame == g_frame && g_giMaskFrameDraws > 0 && g2.texMask;   // best guess, untested: fog water harder via the GI source mask
+        { bool wm = !(g_dbgWater & 4) && g_atWaterFog > 0.0f && g_giMask && g_giMaskRan == g_frame && g_giMaskFrame == g_frame && g_giMaskFrameDraws > 0 && g2.texMask;   // best guess, untested: fog water harder via the GI source mask
           I("u_wmask", 7); F("u_waterFog", wm ? g_atWaterFog : 0.0f); if (wm) { o_glActiveTexture(0x84C7); o_glBindTexture(0x0DE1, g2.texMask); o_glActiveTexture(0x84C0); } }
         u3(o_glGetUniformLocation(p, "u_haze"), amb[0] * g_atAmb, amb[1] * g_atAmb, amb[2] * g_atAmb);
         I("u_mode", 3);

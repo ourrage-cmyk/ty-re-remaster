@@ -42,7 +42,8 @@ static bool LightRewriteFS(std::string& s) {
         EnsureLtDecl(s); ReplaceAll(s, kRecv, std::string(kRecv) + kView); }
     bool doTint = g_ltShadowTint && s.find(kRecv) != std::string::npos && s.find("float shadowAmount") != std::string::npos;
     bool doHemi = g_ltHemi && s.find("diffuseColour *= light;") != std::string::npos && s.find("P_IN lowp vec3 v_normal;") != std::string::npos && !grass;
-    if (g_ltSkipSkin && PbrDefine(s, "SKIN", 1)) { doTint = false; doHemi = false; }   // characters keep the engine shading (no tint)
+    if (g_ltSkipSkin && PbrDefine(s, "SKIN", 1)) { doTint = false; doHemi = false; }
+    if (g_dbgWater & 8) { doTint = false; doHemi = false; }   // DebugWater bit 8 (issue #5 bisect): all programs   // characters keep the engine shading (no tint)
     if (!doTint && !doHemi) return s.find(kView) != std::string::npos;
     EnsureLtDecl(s);
     std::string h = "const vec3 TY_LUM = vec3(0.2126, 0.7152, 0.0722);\n";
