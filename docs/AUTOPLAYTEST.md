@@ -107,3 +107,84 @@ Procedure: the Fix plan thread sets `phase.txt` to `TEST` once all merges are do
 - `overlay` runs on slot 1 and `overlay_billabong` on slot 2 (after the 45 s cutscene settle). Each sets `[overlay] Key=F10`, then does: baseline frame, F10 open and frame, F10 close and frame. The closed frame must match the baseline.
 - `report.md` lists every `[overlay]` line from `tyrender.log` (the GL state dumps from #72) under its variant.
 - Not built: the chapter reload check. It needs the menu steps to reload a chapter, and those are not wired yet.
+
+## Watching a run live
+
+Every run writes to stable files that can be tailed while it is going:
+
+- `C:\CLAUDE\RESEARCH\autoplaytest\progress.log`: one timestamped line per event (run start, each variant start, boot OK or FAILED, variant done, run end), plus a heartbeat every 20 s. The heartbeat shows whether a game from the run's folder is alive (pid and CPU seconds), the newest screenshot and the last write time of `tyrender.log`.
+- `C:\CLAUDE\RESEARCH\autoplaytest\status.json`: state (`running` or `finished`), the current variant, how many variants are done, and the last update time.
+
+Every line is also printed to the console. To follow it in PowerShell:
+
+```
+Get-Content C:\CLAUDE\RESEARCH\autoplaytest\progress.log -Wait -Tail 20
+Get-Content C:\CLAUDE\RESEARCH\autoplaytest\status.json
+```
+
+The heartbeat runs as a background job and stops when the run ends. A stale heartbeat (no new lines for more than a minute) means the run has stopped or hung.
+
+## Plans: every run states its purpose and checks
+
+`autoplaytest.ps1 -Plan <file>` is required. The run refuses to start if:
+- no plan is given, or the plan file is missing, or
+- a variant in the run is not used by any check in the plan.
+
+A plan is JSON (`tools\playtest\plans\<name>.json`) with `name`, `purpose`, and `checks`. Each check has:
+- `id`, `kind` (`boot`, `overlay`, `flicker`, `tyflicker`, `log` or `manual`), and `variants`
+- `issue` and `decides`: what the check settles, and which issue it feeds
+- `pass`: the criterion in words, and `next`: what to try when it fails
+- for `flicker`: `baseline` and `limit` (lower-half temporal std ratio). The whole-frame metric is mostly background (grass, clouds, sky), so it does not separate the DebugWater variants (about 40 to 41 for 0, 1 and 2).
+- for `tyflicker`: `baseline` and `limit`. Same idea, but measured over Ty's rectangle only (x 0.41 to 0.605, y 0.39 to 0.90): the temporal std of the blue excess inside it, divided by the baseline's. Use this for water and Ty-flicker questions (#5, #80).
+- for `log`: `pattern` (regex) and `mustMatch` (true = the line must appear, false = it must not)
+
+Each check is decided and logged as it runs (`[PASS]`, `[FAIL]`, `[INCONCLUSIVE]`). A missing variant or log gives INCONCLUSIVE, never a guess. `manual` checks are INCONCLUSIVE until a person looks at `contact_sheet.png`.
+
+`report.md` in the run folder starts with the purpose, then a table of check results with evidence, then an Issues section: PASS means "supported by this run, issue closes only after the owner's playtest", FAIL gives the `next` step.
+
+Plans: `current_run.json` (the first full run, written after the fact) and `next_monitor.json` (issues #79 to #84 and #86).
+
+Rerun list for the next plan:
+- `trees_see1` (billabong) failed at boot on the coordinator's run. The likely cause was an empty `-TargetPid` in the ENTER presses of `ty_play.ps1`. `KeyEnter` now throws a clear error when no game window exists, so rerun it to confirm the boot works.
+- The `tyflicker` checks in `next_monitor.json` and `req-80-debugwater` replace the whole-frame flicker check, because that check did not discriminate between the DebugWater variants.
+
+## Visual review (after each run)
+
+The numbers do not show everything, so a reviewer looks at the pictures too.
+
+- The run copies its `contact_sheet.png` to `C:\CLAUDE\RESEARCH\autoplaytest\latest_for_review\` and writes `REVIEW.txt` there, pointing at the rubric.
+- A reviewer (a Haiku subagent with image reading) answers the seven questions in `tools/playtest/review/RUBRIC.md` for each variant, and writes `visual_review.json` in the run folder.
+- The verdict is advisory. `suspect` or `broken` turns a PASS into INCONCLUSIVE and flags the frame for the owner. It never turns a FAIL into a PASS. No `visual_review.json` means no visual review yet.
+
+Not built yet: one contact sheet per effect (the current sheet has one row per variant).
+
+## Request queue (other threads and agents)
+
+Requests live in `tools\playtest\requests\`, one JSON file each, `req-<id>.json`. Template: `requests\TEMPLATE.json`.
+
+Flow:
+1. A thread or agent adds a request file (`status: pending`) with its issue number, the question, the variants it needs (existing names from `autoplaytest.ps1`), and checks with the pass criterion.
+2. Before a run, the harness owner runs `build_plan.ps1`. It merges all pending requests into `plans\merged_<stamp>.json`, de-duplicates checks, and lists the variants to run. A request that needs a variant the harness doesn't define is marked blocked and written to `requests\BACKLOG.md` with the missing capability named. Nothing is dropped silently.
+3. Run the merged plan: `autoplaytest.ps1 -Plan plans\merged_<stamp>.json -Variants <list>` (in the TEST phase only).
+4. After the run, the owner posts each request's PASS, FAIL or INCONCLUSIVE with evidence on its issue, tells the requesting thread through the coordinator, and moves the request file to `requests\done\` with a link to the report.
+
+Seeded requests: `req-79-overlay`, `req-80-debugwater`, `req-81-fog`, `req-82-waterboost` (blocked: needs WaterBoost variants), `req-83-gi-lod-cost`, `req-84-portal-emit`, `req-85-harness` (backlog), `req-86-recording-ambiguity` (backlog: a human recording). Pending PRs (#89 FoliageBoost, WaterMaskSoft, AtrousFar) are not seeded until they exist.
+
+Template:
+
+```json
+{
+  "id": "req-<issue-or-short-name>",
+  "status": "pending",
+  "priority": 2,
+  "requester": { "issue": 0, "thread": "" },
+  "question": "What must be validated, in one sentence.",
+  "variants": [ { "name": "existing_variant_name", "note": "why" } ],
+  "checks": [ {
+      "id": "short-check-id", "kind": "log", "variants": ["existing_variant_name"],
+      "pattern": "regex", "mustMatch": true,
+      "pass": "the criterion", "decides": "what a PASS or FAIL means", "next": "what to try if it fails"
+  } ],
+  "report": ""
+}
+```

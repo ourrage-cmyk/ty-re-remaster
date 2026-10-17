@@ -1,0 +1,25 @@
+{
+  "id": "req-<issue-or-short-name>",
+  "status": "pending",
+  "priority": 2,
+  "requester": { "issue": 0, "thread": "" },
+  "question": "One sentence: what must be validated, in the requester's words.",
+  "variants": [
+    { "name": "existing_variant_name_in_autoplaytest", "note": "why this variant" }
+  ],
+  "checks": [
+    {
+      "id": "short-check-id",
+      "kind": "log | flicker | overlay | boot | manual",
+      "variants": ["existing_variant_name_in_autoplaytest"],
+      "pattern": "regex, for kind log only",
+      "mustMatch": true,
+      "baseline": "variant name, for kind flicker only",
+      "limit": 1.5,
+      "pass": "the criterion, in words",
+      "decides": "what a PASS or FAIL means for the requester",
+      "next": "what to try if it FAILS"
+    }
+  ],
+  "report": ""
+}

@@ -18,7 +18,7 @@ uniform sampler2D u_color;
 uniform vec3 u_cam; uniform vec3 u_sunDir; uniform vec3 u_sunCol; uniform vec3 u_ambCol;
 uniform float u_density; uniform float u_falloff; uniform int u_steps; uniform float u_maxDist; uniform float u_g; uniform float u_frameNoise; uniform int u_debug;
 uniform int u_mode; uniform sampler2D u_low; uniform vec2 u_halfSize;   // u_mode: 0 full-res, 1 half-res march (scat,T), 2 full-res composite
-uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH; uniform float u_fogSat; uniform sampler2D u_wmask; uniform float u_waterFog; uniform float u_hueLock; uniform float u_skyFog;
+uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH; uniform float u_fogSat; uniform sampler2D u_wmask; uniform float u_waterFog; uniform float u_wsoft; uniform float u_hueLock; uniform float u_skyFog;
 uniform sampler2D u_skyTex; uniform float u_hazeSky, u_ambScale; uniform float u_blurStart, u_blurRange, u_blurPx; uniform vec2 u_rcp;
 const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
 // haze colour: the CPU level-fog hue, pulled toward the colour of the actual sky near the horizon (measured on the GPU, smoothed over time)
@@ -89,9 +89,16 @@ void main() {
       vec3 H = u_haze / max(dot(u_haze, LW), 1e-3);
       v.rgb = mix(v.rgb, H * dot(v.rgb, LW), u_hueLock);
     }
-    if (u_waterFog > 0.0 && !skyp && texture(u_wmask, uv).a < 0.25) {   // GI source mask (alpha 0 = water/glass/glow drawn here): thicken the fog over water so what is under it stays hidden
-      float T2 = pow(v.a, 1.0 + u_waterFog);
-      v.rgb *= min((1.0 - T2) / max(1.0 - v.a, 1e-4), 1.0 + u_waterFog); v.a = T2;
+    float wgt = texture(u_wmask, uv).a < 0.25 ? 1.0 : 0.0;   // GI source mask (alpha 0 = water/glass/glow drawn here): hard 0/1 cut
+    if (u_wsoft > 0.5 && u_waterFog > 0.0 && !skyp) {   // [fog] WaterMaskSoft: 3x3 average of the mask, smoothstep weight, so the cut edge does not flicker
+      vec2 mpx = 1.0 / vec2(textureSize(u_wmask, 0));
+      float ms = 0.0;
+      for (int jy = -1; jy <= 1; jy++) for (int ix = -1; ix <= 1; ix++) ms += texture(u_wmask, uv + vec2(float(ix), float(jy)) * mpx).a;
+      wgt = 1.0 - smoothstep(0.2, 0.8, ms / 9.0);
+    }
+    if (u_waterFog > 0.0 && !skyp && wgt > 0.0) {
+      float T2 = mix(v.a, pow(v.a, 1.0 + u_waterFog), wgt);
+      v.rgb *= min((1.0 - T2) / max(1.0 - v.a, 1e-4), 1.0 + u_waterFog * wgt); v.a = T2;
     }
     float omT = 1.0 - v.a;
     if (skyp) {
@@ -240,6 +247,7 @@ typedef GLenum(WINAPI* glGetError_t)();
 static struct { bool tried, ok, failed; GLuint prog, tex; int fw, fh; glDispatchCompute_t Dispatch; glBindImageTexture_t BindImage; glMemoryBarrier_t Barrier; glTexImage3D_t TexImage3D; glDeleteTextures_t DelTex; glGetError_t GetErr; } vol;
 static int g_atFroxel = 1, g_atFroxelPx = 12;
 static float g_atSkyH = 0.45f, g_atHazeHue = 0.15f, g_atFogSat = 0.5f, g_atIntensity = 2.5f, g_atDesat = 0.7f, g_atLift = 0.35f, g_atSkyHaze = 0.8f, g_atWaterFog = 1.0f;
+static float g_fogWaterSoft = 0.0f;   // [fog] WaterMaskSoft (default 0 = hard GI-mask cut, 1 = 3x3 averaged smoothstep edge)
 static float g_atSkyFog = 0.45f;   // [atmos] SkyFogDist (fraction of MaxDist, default 0.45; 0.12 = the old fixed sky slab, restore with the key)
 static float g_atHueLock = 1.0f;   // [atmos] HueLock (#3): 1 = froxel in-scatter keeps its brightness but takes the haze hue, so the sun-facing glow no longer tints the fog as the camera turns
 
@@ -290,6 +298,7 @@ static void LoadAtmosConfig() {
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
     g_fogSeeThruDepth = GetPrivateProfileIntA("fog", "SeeThruDepth", 0, ini); g_fogLateEmit = GetPrivateProfileIntA("fog", "LateEmitters", 0, ini);
     { char wb[32]; GetPrivateProfileStringA("fog", "WaterBoost", "1.0", wb, sizeof wb, ini); g_fogWaterBoost = (float)atof(wb); }   // 1 = off (water keeps LateBoost)
+    g_fogWaterSoft = GetPrivateProfileIntA("fog", "WaterMaskSoft", 0, ini) ? 1.0f : 0.0f;   // 0 = hard GI-mask cut (default)
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
 #undef F
     GetPrivateProfileStringA("atmos", "SunColor", "1.0,0.86,0.66", b, sizeof b, ini);
@@ -344,7 +353,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
     if (g_frame - g_fdLast >= 600) { g_fdLast = g_frame; logf("[fogdiag] transparent-tagged draws (sampled): before-fog depthW0/blend0=%u d0/b1=%u d1/b0=%u d1/b1=%u | after-fog d0/b0=%u d0/b1=%u d1/b0=%u d1/b1=%u",
         g_fdCnt[0][0][0], g_fdCnt[0][0][1], g_fdCnt[0][1][0], g_fdCnt[0][1][1], g_fdCnt[1][0][0], g_fdCnt[1][0][1], g_fdCnt[1][1][0], g_fdCnt[1][1][1]); memset(g_fdCnt, 0, sizeof g_fdCnt); }
     g_atRanFrame = g_frame;
-    if ((!g_atEnable && g_atContact <= 0) || g_atOffFile || atm.failed || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
+    if ((!g_atEnable && g_atContact <= 0) || g_atOffFile || g_abOff || atm.failed || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex) return;
     if (!LoadGX()) { atm.failed = true; return; }
     if (!atm.init) {
         atm.prog = CompileProg("atmos", kVS, "#version 330\n", kCommon, kAtmos);
@@ -459,7 +468,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         o_glUseProgram(p);
         I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH); F("u_fogSat", g_atFogSat); F("u_hueLock", g_atHueLock); F("u_skyFog", g_atSkyFog);
         { bool wm = !(g_dbgWater & 4) && g_atWaterFog > 0.0f && g_giMask && g_giMaskRan == g_frame && g_giMaskFrame == g_frame && g_giMaskFrameDraws > 0 && g2.texMask;   // best guess, untested: fog water harder via the GI source mask
-          I("u_wmask", 7); F("u_waterFog", wm ? g_atWaterFog : 0.0f); if (wm) { o_glActiveTexture(0x84C7); o_glBindTexture(0x0DE1, g2.texMask); o_glActiveTexture(0x84C0); } }
+          I("u_wmask", 7); F("u_waterFog", wm ? g_atWaterFog : 0.0f); F("u_wsoft", g_fogWaterSoft); if (wm) { o_glActiveTexture(0x84C7); o_glBindTexture(0x0DE1, g2.texMask); o_glActiveTexture(0x84C0); } }
         u3(o_glGetUniformLocation(p, "u_haze"), amb[0] * g_atAmb, amb[1] * g_atAmb, amb[2] * g_atAmb);
         I("u_mode", 3);
     } else

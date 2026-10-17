@@ -106,13 +106,14 @@ static void LightFrame() {
     gndM[0] = (1.0f / skyM[0]) / gl * 1.04f; gndM[1] = (1.0f / skyM[1]) / gl; gndM[2] = (1.0f / skyM[2]) / gl * 0.94f;   // complementary warm bounce
     bool taa = g_jitterOn;
     int taps = (taa && g_shTemporal) ? std::max(4, g_shTaps / 2) : g_shTaps;   // stable noise (Temporal=0) cannot be integrated by TAA -> keep full taps
+    const bool ltOn = g_ltEnable && !g_abOff;   // A/B off frame (abshot.inl): the light features read as Enable=0
     g_ltBlock[0][0] = g_shRadius; g_ltBlock[0][1] = (taa && g_shTemporal) ? (float)(g_frame % 8) * 5.588238f : 0.0f; g_ltBlock[0][2] = (float)taps; g_ltBlock[0][3] = 0.8f;
     for (int i = 0; i < 3; i++) { g_ltBlock[1][i] = T[i]; g_ltBlock[2][i] = skyM[i]; g_ltBlock[3][i] = gndM[i]; }
-    g_ltBlock[1][3] = g_ltEnable && g_ltShadowTint ? g_ltTintAmt : 0.0f;
-    g_ltBlock[2][3] = g_ltEnable && g_ltHemi ? g_ltHemiAmt : 0.0f;
-    g_ltBlock[3][3] = g_ltEnable && g_ltShadowTint ? g_ltResat : 0.0f;
-    g_ltBlock[4][0] = g_ltEnable && g_ltFoliage ? g_ltFoliageAmt : 0.0f; g_ltBlock[4][1] = g_ltHemiStatic; g_ltBlock[4][2] = g_shGrid ? 0.0f : 1.0f; g_ltBlock[4][3] = g_shClose;
-    for (int i = 0; i < 3; i++) g_ltBlock[5][i] = g_ltEnable && g_ltShadowTint ? g_ltFill * g_ltSky[i] : 0.0f; g_ltBlock[5][3] = g_ltEnable && g_ltShadowTint ? g_ltDepth : 0.0f;
+    g_ltBlock[1][3] = ltOn && g_ltShadowTint ? g_ltTintAmt : 0.0f;
+    g_ltBlock[2][3] = ltOn && g_ltHemi ? g_ltHemiAmt : 0.0f;
+    g_ltBlock[3][3] = ltOn && g_ltShadowTint ? g_ltResat : 0.0f;
+    g_ltBlock[4][0] = ltOn && g_ltFoliage ? g_ltFoliageAmt : 0.0f; g_ltBlock[4][1] = g_ltHemiStatic; g_ltBlock[4][2] = g_shGrid ? 0.0f : 1.0f; g_ltBlock[4][3] = g_shClose;
+    for (int i = 0; i < 3; i++) g_ltBlock[5][i] = ltOn && g_ltShadowTint ? g_ltFill * g_ltSky[i] : 0.0f; g_ltBlock[5][3] = ltOn && g_ltShadowTint ? g_ltDepth : 0.0f;
     g_ltBlock[7][0] = g_shSkinBias; g_ltBlock[6][0] = g_shPlane ? 1.0f : 0.0f; g_ltBlock[6][1] = g_ltView ? 1.0f : 0.0f; g_ltBlock[6][2] = g_shPlaneClamp; g_ltBlock[6][3] = g_shZOff;
     static bool once; if (!once && g_haveFog) { once = true; logf("[light] fog=%.2f,%.2f,%.2f -> shade tint %.2f,%.2f,%.2f", g_fogColour[0], g_fogColour[1], g_fogColour[2], T[0], T[1], T[2]); }
 }

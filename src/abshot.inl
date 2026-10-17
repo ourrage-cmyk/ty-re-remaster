@@ -96,6 +96,16 @@ static void ShotCapture(HDC dc, const char* label) {
     // on-screen confirmation: flash the window title for ~2.5 s
     if (g_shotWnd) { char t[320]; snprintf(t, sizeof t, "%s  |  A/B %s saved", g_shotTitle, label); SetWindowTextA(g_shotWnd, t); g_shotTitleUntil = GetTickCount64() + 2500; }
 }
+// Push the current relief/PBR values straight to every known program. The pushes otherwise run only from glUseProgram, so a
+// program that stays bound across the flip would keep the old values.
+static void ApplyShadowStrength(GLuint p);   // tyrender.cpp
+static void ABRepush() {
+    std::vector<GLuint> progs;
+    for (auto& kv : g_pbrLocs) progs.push_back(kv.first);
+    for (auto& kv : g_tessLoc) if (!g_pbrLocs.count(kv.first)) progs.push_back(kv.first);
+    for (GLuint p : progs) { g_pbrStamp.erase(p); g_tessStamp.erase(p); PbrApply(p); }
+    for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);   // the shadow factor also flips with the off frame
+}
 // Once per frame, after the frame is drawn and before SwapBuffers.
 static void ABShotFrame(HDC dc) {
     if (g_shotTitleUntil && GetTickCount64() > g_shotTitleUntil && g_shotWnd) { SetWindowTextA(g_shotWnd, g_shotTitle); g_shotTitleUntil = 0; }
@@ -110,13 +120,13 @@ static void ABShotFrame(HDC dc) {
         g_shotOrigLive = g_tsLive;
         ShotCapture(dc, g_tsLive > 0.5f ? "shaders-on" : "shaders-off");
         g_tsLive = g_shotOrigLive > 0.5f ? 0.0f : 1.0f;             // the next frame renders the other state
-        g_pbrStamp.clear(); g_tessStamp.clear();
+        g_abOff = g_shotOrigLive > 0.5f; ABRepush();                // with shaders on, the next frame is the vanilla off frame (passes skip)
         g_shotPhase = 1;
         return;
     }
     // phase 1: the frame drawn with the flipped state is now complete
     ShotCapture(dc, g_tsLive > 0.5f ? "shaders-on" : "shaders-off");
     g_tsLive = g_shotOrigLive;
-    g_pbrStamp.clear(); g_tessStamp.clear();
+    g_abOff = false; ABRepush();
     g_shotPhase = 0;
 }

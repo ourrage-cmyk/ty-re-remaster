@@ -25,12 +25,14 @@ public class MM { [StructLayout(LayoutKind.Sequential)] public struct PT { publi
  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
  public static void MoveFrac(IntPtr h, double fx, double fy) { RECT r; GetClientRect(h, out r); PT p; p.X = (int)((r.R - r.L) * fx); p.Y = (int)((r.B - r.T) * fy); ClientToScreen(h, ref p); SetCursorPos(p.X, p.Y); } }
 '@
+# Press ENTER in the game window. Fails clearly when no game window is up (an empty -TargetPid used to leave key.ps1 with a missing argument).
+function KeyEnter([int]$DelayMs) { $gp = GameProc; if (-not $gp) { throw "no $proc window to press ENTER in" }; & powershell -NoProfile -File (Join-Path $PSScriptRoot 'focus_game.ps1') -TargetPid $gp.Id | Out-Null; & powershell -NoProfile -File $key -Keys 'ENTER' -DelayMs $DelayMs -TargetPid $gp.Id | Out-Null }
 function Pointer($fx, $fy) { $gp = GameProc; if ($gp) { [MM]::MoveFrac($gp.MainWindowHandle, $fx, $fy); Start-Sleep -Milliseconds 500 } }
 Pointer 0.01 0.01
-& powershell -NoProfile -File $key -Keys 'ENTER' -DelayMs 2500 -TargetPid (GameProc).Id | Out-Null
+KeyEnter 2500
 Start-Sleep 1; $sx = if ($env:TY_SLOT -eq '2') { 0.50 } else { 0.324 }; Pointer ($sx - 0.044) 0.42; Pointer $sx 0.489   # the hover selection needs a real mouse-MOVE on the Load screen: approach from an offset, then land on slot GAME 1
-& powershell -NoProfile -File $key -Keys 'ENTER' -DelayMs 500 -TargetPid (GameProc).Id | Out-Null
-if (-not (WaitState 5 25)) { Pointer ($sx - 0.024) 0.45; Pointer $sx 0.489; & powershell -NoProfile -File $key -Keys 'ENTER' -DelayMs 500 -TargetPid (GameProc).Id | Out-Null; if (-not (WaitState 5 60)) { throw 'gameplay (state 5) not reached' } }
+KeyEnter 500
+if (-not (WaitState 5 25)) { Pointer ($sx - 0.024) 0.45; Pointer $sx 0.489; KeyEnter 500; if (-not (WaitState 5 60)) { throw 'gameplay (state 5) not reached' } }
 Start-Sleep $Settle
 'gameplay ready'
 

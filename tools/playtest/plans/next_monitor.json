@@ -1,0 +1,148 @@
+{
+  "name": "next_monitor",
+  "purpose": "Next run: close the open monitor items that need a measurement, not a guess. Water flicker bisect (#80), sky and tree fog (#81), water fog multiplier (#82, values for a person to judge), GI and LOD cost (#83), portal emitter (#84), and the overlay in a level (#79). Each variant has a check that decides it.",
+  "checks": [
+    {
+      "id": "water-bisect-flicker",
+      "kind": "tyflicker",
+      "variants": [
+        "dbg_water_8"
+      ],
+      "baseline": "dbg_water_0",
+      "limit": 1.0,
+      "issue": 80,
+      "decides": "which DebugWater bit removes the Ty blue flicker in the water (bit 8 shown; repeat for 1, 2, 4, 5)",
+      "pass": "lower-half ratio vs dbg_water_0 <= 1.0 means the bit is the cause",
+      "next": "run the other bits and combine (#80)"
+    },
+    {
+      "id": "water-bisect-log",
+      "kind": "log",
+      "variants": [
+        "dbg_water_8"
+      ],
+      "pattern": "\\[dbgwater\\]",
+      "mustMatch": true,
+      "issue": 80,
+      "decides": "the bit was active during the run",
+      "pass": "[dbgwater] lines in tyrender.log",
+      "next": "check the DebugWater value and the log"
+    },
+    {
+      "id": "skyfog-sky",
+      "kind": "manual",
+      "variants": [
+        "skyfog_012",
+        "skyfog_045"
+      ],
+      "issue": 81,
+      "decides": "sky and red rock fog: 0.12 (old) vs 0.45 (new) look",
+      "pass": "a person picks the better look on the contact sheet",
+      "next": "try a higher SkyFogDist if neither is right"
+    },
+    {
+      "id": "trees-seethru",
+      "kind": "manual",
+      "variants": [
+        "trees_see0",
+        "trees_see1"
+      ],
+      "issue": 81,
+      "decides": "level-two trees in front of the fog with SeeThruDepth 0 vs 1 (gameplay, not cutscene)",
+      "pass": "a person picks the better look and sees no new artifacts",
+      "next": "keep SeeThruDepth 0 if 1 adds artifacts"
+    },
+    {
+      "id": "emit-portal-log",
+      "kind": "log",
+      "variants": [
+        "portal_comp0",
+        "portal_comp1"
+      ],
+      "pattern": "\\[emit\\]",
+      "mustMatch": true,
+      "issue": 84,
+      "decides": "the emitter was active for both compensation settings",
+      "pass": "[emit] lines in both logs",
+      "next": "turn on [tex] LogUnknown=1 for the portal run (#84)"
+    },
+    {
+      "id": "overlay-level-billabong",
+      "kind": "overlay",
+      "variants": [
+        "overlay_billabong"
+      ],
+      "issue": 79,
+      "decides": "F10 open and close in a level (Billabong), geometry intact",
+      "pass": "closed frame matches the baseline and the game stays alive",
+      "next": "read the [overlay] lines; see #79"
+    },
+    {
+      "id": "overlay-level-red-mountain",
+      "kind": "overlay",
+      "variants": [
+        "overlay"
+      ],
+      "issue": 79,
+      "decides": "F10 open and close on Red Mountain (slot 1), geometry intact",
+      "pass": "closed frame matches the baseline and the game stays alive",
+      "next": "read the [overlay] lines; see #79"
+    },
+    {
+      "id": "gi-checker-cost",
+      "kind": "log",
+      "variants": [
+        "gi_checker1"
+      ],
+      "pattern": "\\[gpusub\\]",
+      "mustMatch": true,
+      "issue": 83,
+      "decides": "GI Checker timings are logged (ms per option comes from [gpusub] lines)",
+      "pass": "[gpusub] lines in the log; compare to the mod baseline by hand",
+      "next": "measure the mod baseline and this variant at the same spot (#83)"
+    },
+    {
+      "id": "lod-enable-cost",
+      "kind": "log",
+      "variants": [
+        "lod_enable1"
+      ],
+      "pattern": "\\[gpusub\\]",
+      "mustMatch": true,
+      "issue": 83,
+      "decides": "[lod] Enable timings are logged",
+      "pass": "[gpusub] lines in the log; compare to the mod baseline by hand",
+      "next": "measure the mod baseline and this variant (#83)"
+    },
+    {
+      "id": "water-boost",
+      "kind": "manual",
+      "variants": [
+        "mod"
+      ],
+      "issue": 82,
+      "decides": "WaterBoost value for the water and lily look (values to try are for the owner to choose)",
+      "pass": "a person chooses a value from the contact sheet",
+      "next": "try the next WaterBoost value (#82)"
+    },
+    {
+      "id": "no-log-errors",
+      "kind": "log",
+      "variants": [
+        "mod",
+        "dbg_water_8",
+        "skyfog_045",
+        "trees_see1",
+        "portal_comp1",
+        "gi_checker1",
+        "lod_enable1"
+      ],
+      "pattern": "(?i)\\berror\\b|\\bfailed\\b|assert",
+      "mustMatch": false,
+      "issue": 12,
+      "decides": "no error, failed or assert lines in the renderer log",
+      "pass": "0 matching lines",
+      "next": "read the matching lines"
+    }
+  ]
+}

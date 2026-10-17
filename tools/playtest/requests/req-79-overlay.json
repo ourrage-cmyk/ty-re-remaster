@@ -1,0 +1,43 @@
+{
+  "id": "req-79-overlay",
+  "status": "pending",
+  "priority": 1,
+  "requester": {
+    "issue": 79,
+    "thread": ""
+  },
+  "question": "Does opening and closing the F10 overlay keep geometry intact, in a level (Red Mountain and Billabong)?",
+  "variants": [
+    {
+      "name": "overlay",
+      "note": "slot 1 (Red Mountain)"
+    },
+    {
+      "name": "overlay_billabong",
+      "note": "slot 2 (Billabong)"
+    }
+  ],
+  "checks": [
+    {
+      "id": "overlay-red-mountain",
+      "kind": "overlay",
+      "variants": [
+        "overlay"
+      ],
+      "pass": "closed frame matches the baseline; game stays alive",
+      "decides": "overlay safe on Red Mountain",
+      "next": "read the [overlay] lines in the report (#73)"
+    },
+    {
+      "id": "overlay-billabong",
+      "kind": "overlay",
+      "variants": [
+        "overlay_billabong"
+      ],
+      "pass": "closed frame matches the baseline; game stays alive",
+      "decides": "overlay safe at Billabong",
+      "next": "read the [overlay] lines in the report (#73)"
+    }
+  ],
+  "report": ""
+}

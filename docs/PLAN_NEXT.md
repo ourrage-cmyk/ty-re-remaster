@@ -7,7 +7,7 @@ Updated 2026-10-17, after the playtest of build cda9364.
 - Last full release: v0.3.5 (c255ae8).
 - Merged since v0.3.5: #36, #38, #40, #42, #43, #45, #46, #47, #48, #49, #50, #51, #52, #54, #58, #60, #74, #75, #78.
 - Playtest of cda9364:
-  - Fog colour looked steady (#3), awaiting a yaw sweep.
+  - Fog colour looked steady (#3). #3 is closed; the yaw sweep is no longer tracked here.
   - Fog: level-two trees poke through, sky and red rock not fogged, water and lilies wrong (#4).
   - Ty still flickers blue in water (#5).
   - Footprints are just bright white, not a light (#8, closed).
@@ -21,14 +21,13 @@ Updated 2026-10-17, after the playtest of build cda9364.
 1. Unblock desktop permissions and install the newest main.
 2. F10 overlay regression fix (#12). Verify in game before re-enabling the key.
 3. Fog (#4):
-   - Sky: [atmos] SkyFogDist (#58, merged, untested in game). atmos.inl caps sky fog at 0.12*maxDist (lines ~80 and ~129); verify in the playtest.
+   - Sky: [atmos] SkyFogDist is already merged in #58 (default 0.45; untested in game). Verify in the playtest.
    - Trees: A/B test [fog] SeeThruDepth=1 against the default 0.
    - Water and lilies: WaterBoost fogs water draws (#74, merged, untested in game). Check whether lilies are covered.
 4. Water blue flicker (#5): bisect with in-game measurement, no more guesses.
 5. Portal light (#9): test via [emit] Enable=1 (forward-render light cap is 16).
 6. LOD follow-ups (#10): tessellation (#60) and shadow (#78) distance LOD, both default off; measure in game.
 7. Low priority:
-   - Character/grass shadow checkerboard (#11).
    - Tessellation tuning: ReliefCurve and Knee seem to help low-res textures.
 8. Next release v0.3.6, only after the next playtest.
 

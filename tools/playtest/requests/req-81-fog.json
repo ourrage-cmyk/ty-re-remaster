@@ -1,0 +1,53 @@
+{
+  "id": "req-81-fog",
+  "status": "pending",
+  "priority": 1,
+  "requester": {
+    "issue": 81,
+    "thread": ""
+  },
+  "question": "Sky and red rock fog (SkyFogDist 0.12 vs 0.45) and level-two trees (SeeThruDepth 0 vs 1): which look right?",
+  "variants": [
+    {
+      "name": "skyfog_012",
+      "note": "SkyFogDist 0.12 (needs #58 on main)"
+    },
+    {
+      "name": "skyfog_045",
+      "note": "SkyFogDist 0.45"
+    },
+    {
+      "name": "trees_see0",
+      "note": "SeeThruDepth 0 at Billabong"
+    },
+    {
+      "name": "trees_see1",
+      "note": "SeeThruDepth 1 at Billabong"
+    }
+  ],
+  "checks": [
+    {
+      "id": "skyfog-look",
+      "kind": "manual",
+      "variants": [
+        "skyfog_012",
+        "skyfog_045"
+      ],
+      "pass": "a person picks the better look",
+      "decides": "sky and red rock fog value",
+      "next": "try a higher SkyFogDist"
+    },
+    {
+      "id": "trees-look",
+      "kind": "manual",
+      "variants": [
+        "trees_see0",
+        "trees_see1"
+      ],
+      "pass": "a person picks the better look with no new artifacts",
+      "decides": "tree fog at Billabong (gameplay, not the cutscene)",
+      "next": "keep SeeThruDepth 0 if 1 adds artifacts"
+    }
+  ],
+  "report": ""
+}

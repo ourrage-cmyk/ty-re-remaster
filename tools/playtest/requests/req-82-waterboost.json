@@ -1,0 +1,29 @@
+{
+  "id": "req-82-waterboost",
+  "status": "pending",
+  "priority": 3,
+  "requester": {
+    "issue": 82,
+    "thread": ""
+  },
+  "question": "Which [fog] WaterBoost value gives the right water and lily fog at Billabong? Values to try are the owner's choice.",
+  "variants": [
+    {
+      "name": "waterboost_<value>",
+      "note": "one variant per value; not defined yet"
+    }
+  ],
+  "checks": [
+    {
+      "id": "waterboost-look",
+      "kind": "manual",
+      "variants": [
+        "waterboost_<value>"
+      ],
+      "pass": "a person picks the value from the contact sheet",
+      "decides": "WaterBoost value",
+      "next": "try the next value"
+    }
+  ],
+  "report": ""
+}
