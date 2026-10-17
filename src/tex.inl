@@ -14,6 +14,7 @@ static const GLuint kTexProgs = 8192;
 static GLint g_progTyTexLoc[kTexProgs]; static float g_progTyTexLast[kTexProgs];   // per program: tyTex uniform location, last value (g_progDiffUnit = albedo sampler unit, in tyrender.cpp)
 static GLint g_progTyWaterLoc[kTexProgs]; static float g_progTyWaterLast[kTexProgs]; static int g_texWaterNoFresnel;   // ini [pbr] SkyFresnelSkipWater (default 0 = off): per-draw tyWater uniform, 1 = water-tagged draw
 static std::unordered_map<std::string, uint8_t> g_tagByName;      // lowercase file name -> flags
+static int g_spillLog = 0; static std::unordered_map<GLuint, unsigned> g_spillCnt; static std::unordered_map<GLuint, std::string> g_texNameById;   // #9 step 1 (SpillLogDraw)
 static std::mutex g_texMu; static std::unordered_map<GLuint, std::string> g_texInfo;   // debug: id -> "name WxH"
 static unsigned g_texUploads, g_texNamed, g_texTagged, g_texReads;
 
@@ -33,6 +34,7 @@ static std::string TexBase(const std::string& p) {
 static void LoadTexTags() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     g_texEnable = GetPrivateProfileIntA("tex", "Enable", 1, ini); g_texDebug = GetPrivateProfileIntA("tex", "Debug", 0, ini);
+    g_spillLog = g_texEnable && GetPrivateProfileIntA("spill", "LogEmitters", 0, ini);   // #9 step 1: log additive draws per texture (every 600 frames)
     g_texSkinTags = g_texEnable && GetPrivateProfileIntA("tex", "SkinnedByTag", 1, ini);   // skinned shaders get the detail code too; tags switch it per draw
     for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = g_progTyWaterLoc[i] = -1;
     if (!g_texFlagArr) g_texFlagArr = (uint8_t*)calloc(kTexArr, 1);
@@ -144,6 +146,7 @@ static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const voi
     }
     if (nm) { g_texNamed++; auto it = g_tagByName.find(nm); if (it != g_tagByName.end()) { fl = it->second; if (fl & TF_KNOWN) g_texTagged++; } }
     g_texFlagArr[id] = fl;
+    if (g_spillLog && nm) g_texNameById[id] = nm;
     if (g_texDebug) { char b[160]; snprintf(b, sizeof b, "%s %dx%d ifmt=%#x", nm ? nm : "?", w, h, ifmt); g_texInfo[id] = b; }
     if (g_texDebug && g_texUploads < 500) logf("[tex] upload id=%u %dx%d ifmt=%#x bytes=%d px=%p name=%s flags=%u", id, w, h, ifmt, bytes, px, nm ? nm : "?", fl);
 }
@@ -181,8 +184,20 @@ static void TexDrawPrep() {
     if (!pu1) return;
     pu1(p, loc, v); g_progTyTexLast[p] = v; g_texDrawSet++;
 }
+// #9 step 1 (portal / crystal light, design in docs/agent-tasks/light2.md): ini [spill] LogEmitters=1 counts the additive draws
+// (glBlendFunc src SRC_ALPHA or ONE, dst ONE) per albedo texture, so the emitter key can be picked from data. Logging only, no visual change.
+static void SpillLogDraw() {
+    if (!g_spillLog || g_blendD != 1 || (g_blendS != 0x0302 && g_blendS != 1)) return;
+    GLuint tex = g_bound2D[g_progDiffUnit[g_curProg < 8192 ? g_curProg : 0] & 31];
+    g_spillCnt[tex]++;
+}
 static void TexReport() {
     static unsigned last; if (g_frame - last < 600) return; last = g_frame;
+    for (auto& kv : g_spillCnt) {
+        auto it = g_texNameById.find(kv.first);
+        logf("[spill] additive draws=%u tex=%u name=%s emissive=%d (last 600 frames)", kv.second, kv.first, it == g_texNameById.end() ? "?" : it->second.c_str(), TexIsEmissive(kv.first) ? 1 : 0);
+    }
+    g_spillCnt.clear();
     logf("[tex] stats frame=%u reads=%u uploads(with data)=%u named=%u tagged=%u | relief-program draws since last: %u (character %u, tagged non-character %u, untagged %u) uniform sets %u", g_frame, g_texReads, g_texUploads, g_texNamed, g_texTagged, g_texDraws, g_texDrawChar, g_texDrawKnown, g_texDrawUnknown, g_texDrawSet);
     if (g_texDebug) {
         std::vector<std::pair<unsigned, GLuint>> v; for (GLuint i = 0; i < kTexArr; i++) if (g_texUntagCnt[i]) v.push_back({g_texUntagCnt[i], i});
