@@ -53,18 +53,16 @@
       "next": "keep SeeThruDepth 0 if 1 adds artifacts"
     },
     {
-      "id": "emit-portal-log",
-      "kind": "log",
+      "id": "emit-portal-look",
+      "kind": "manual",
       "variants": [
         "portal_comp0",
         "portal_comp1"
       ],
-      "pattern": "\\[emit\\]",
-      "mustMatch": true,
       "issue": 84,
-      "decides": "the emitter was active for both compensation settings",
-      "pass": "[emit] lines in both logs",
-      "next": "turn on [tex] LogUnknown=1 for the portal run (#84)"
+      "decides": "the portal ground is lit with Enable=1, and whether Compensate changes it. The log line only shows the emitter ran, so it cannot pass this check.",
+      "pass": "in the contact sheet frames, the ground at the portal is lit (judged by a person or the visual reviewer), not just [emit] lines in tyrender.log",
+      "next": "get the portal view first (#85, no save yet), then turn on [tex] LogUnknown=1 (#84)"
     },
     {
       "id": "overlay-level-billabong",
