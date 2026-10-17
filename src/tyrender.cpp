@@ -278,7 +278,7 @@ HOOK(void, glCopyTexImage2D, (GLenum t, GLint lvl, GLenum ifmt, GLint x, GLint y
             PbrUpdate();
             GProf(1); RunAO(g_bound2D[g_activeUnit], w, h); GProf(2);
             GProf(3); if (!g_aoDebug) RunGI(g_bound2D[g_activeUnit], w, h); GProf(4);            // debug views are exclusive: nothing layered on top
-            if (!g_aoDebug && !g_giDebug) RunEmit(w, h);
+            GProf(20); if (!g_aoDebug && !g_giDebug) RunEmit(w, h); GProf(21);   // emit pass timer (emit.inl), reported as [gpusub] emit
             GProf(5); if (!g_aoDebug && !g_giDebug) RunAtmos(g_bound2D[g_activeUnit], w, h); GProf(6);
             if (g_sceneModified && g_colorCopyTex && !(g_aoExp & 1)) {   // engine capture texture must include our changes (bloom reads it)
                 GLuint keep = g_bound2D[g_activeUnit];
