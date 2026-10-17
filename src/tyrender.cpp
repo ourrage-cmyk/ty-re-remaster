@@ -91,7 +91,7 @@ static void OnNamedUniformMat(int id, const GLfloat* v, GLboolean t); static voi
 static bool TessRewriteVS(GLuint shader, std::string& src); static void TessOnAttach(GLuint p, GLuint s); static void TessLink(GLuint p); static void LoadTessConfig();
 static void LoadLightConfig(); static bool LightRewriteFS(std::string& s); static void LightOnLink(GLuint p); static void LightApply(GLuint p); static void EnsureLtDecl(std::string& s); static bool DebugCamApply(float* m); static void PollDebugCam(); static void MotionPoll(); static void MotionFrame(HDC dc);
 static void LoadPbrConfig(); static bool PbrRewriteVS(std::string& s); static bool PbrRewriteFS(std::string& s); static void PbrOnLink(GLuint p); static void PbrApply(GLuint p); static void PbrUpdate();
-static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const void* px, int bytes); static void LoadTexTags(); static void TexReport(); static void TexDrawPrep(); static int g_progDiffUnit[8192];
+static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const void* px, int bytes); static void LoadTexTags(); static void TexReport(); static void TexDrawPrep(); static void SpillLogDraw(); static int g_progDiffUnit[8192];
 static bool DecalRewriteFS(std::string& s); static void TexOnLink(GLuint p);
 static bool g_curProgTess; static unsigned g_tessBadDrawsExt; static bool IsTessProg(GLuint p); static void TessPatchMode();
 
@@ -239,15 +239,16 @@ HOOK(void, glViewport, (GLint x, GLint y, GLsizei w, GLsizei h)) {
     if (g_shPatch && g_shMapScale > 1 && g_curFBO != 0 && w == 2048 && h == 2048) { w *= g_shMapScale; h *= g_shMapScale; }   // shadow pass into enlarged map
     CAP("glViewport %d %d %d %d", x, y, w, h); o_glViewport(x, y, w, h);
 }
+static GLenum g_blendS = 1, g_blendD = 0;   // last glBlendFunc (#9 spill log: additive draws)
 static unsigned g_activeUnit; static GLuint g_bound2D[32];   // texture id bound to GL_TEXTURE_2D per unit (to name RT allocations)
 HOOK(void, glBindTexture, (GLenum t, GLuint tex)) { if (t == 0x0DE1 && g_activeUnit < 32) g_bound2D[g_activeUnit] = tex; CAP("glBindTexture %#x %u", t, tex); o_glBindTexture(t, tex); }
 HOOK(void, glClear, (GLbitfield m)) { CAP("glClear %#x", m); o_glClear(m); }
 static unsigned g_stencilEnables; HOOK(void, glEnable, (GLenum c)) { if (c == 0x0B90) g_stencilEnables++; CAP("glEnable %#x", c); o_glEnable(c); }
 HOOK(void, glDisable, (GLenum c)) { CAP("glDisable %#x", c); o_glDisable(c); }
-HOOK(void, glBlendFunc, (GLenum s, GLenum d)) { CAP("glBlendFunc %#x %#x", s, d); o_glBlendFunc(s, d); }
+HOOK(void, glBlendFunc, (GLenum s, GLenum d)) { CAP("glBlendFunc %#x %#x", s, d); g_blendS = s; g_blendD = d; o_glBlendFunc(s, d); }
 HOOK(void, glDepthMask, (GLboolean f)) { CAP("glDepthMask %d", f); o_glDepthMask(f); }
 HOOK(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) { CAP("glColorMask %d%d%d%d", r, g, b, a); o_glColorMask(r, g, b, a); }
-HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); FogDiagDraw(); bool lateFog = LateFogBegin();
+HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); SpillLogDraw(); FogDiagDraw(); bool lateFog = LateFogBegin();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; }   // tessellated programs only accept GL_PATCHES
     for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } CAP("glDrawElements %#x n=%d", m, n); o_glDrawElements(m, n, t, idx); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } }
 HOOK(void, glDrawArrays, (GLenum m, GLint f, GLsizei n)) { g_draws++; TexDrawPrep();
