@@ -25,6 +25,7 @@ static std::unordered_map<GLuint, std::vector<GLuint>> g_progShaders; // program
 static std::set<GLuint> g_tessProgs;                                   // programs linked with TCS/TES
 static std::unordered_map<std::string, std::pair<GLuint, GLuint>> g_tessStages; // varying signature -> compiled (tcs, tes)
 static unsigned g_tessBadDraws;
+static int g_portTessVerGate = 1;   // [portability] TessVersionGate: 1 = skip tessellation stages below GL 4.0 (portable default), 0 = always try
 
 static void LoadTessConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
@@ -61,6 +62,29 @@ static void LoadTessConfig() {
     g_tsAB = GetPrivateProfileIntA("tess", "ABToggle", 0, ini);
     g_tsCull = GetPrivateProfileIntA("tess", "Cull", 1, ini);                                                          // TCS frustum + back-face patch culling
     g_tsMaxLevel = GetPrivateProfileIntA("tess", "MaxLevel", 8, ini); if (g_tsMaxLevel < 1) g_tsMaxLevel = 1; if (g_tsMaxLevel > 32) g_tsMaxLevel = 32;
+    g_portTessVerGate = GetPrivateProfileIntA("portability", "TessVersionGate", 1, ini);
+}
+
+// GL version from GL_VERSION, parsed once. Unknown version (no glGetString hook yet) counts as "at least" so nothing is gated by accident.
+static bool GLAtLeast(int wantMaj, int wantMin) {
+    static bool parsed = false; static int gMaj = 0, gMin = 0;
+    if (!parsed) {
+        const char* v = o_glGetString ? (const char*)o_glGetString(0x1F02) : nullptr;
+        int a = 0, b = 0; if (!v || sscanf(v, "%d.%d", &a, &b) != 2) return true;
+        gMaj = a; gMin = b; parsed = true;
+    }
+    return gMaj > wantMaj || (gMaj == wantMaj && gMin >= wantMin);
+}
+// Tessellation needs these entry points (fetched via wglGetProcAddress, which can return NULL on some legacy or partial contexts).
+// Checked once; without them tessellation stays off and the programs link as before.
+static bool TessEntryPointsOk() {
+    static int ok = -1;
+    if (ok < 0) {
+        ok = o_wglGetProcAddress && o_wglGetProcAddress("glCompileShader") && o_wglGetProcAddress("glGetShaderiv") && o_wglGetProcAddress("glGetShaderInfoLog") &&
+             o_wglGetProcAddress("glGetProgramiv") && o_wglGetProcAddress("glGetProgramInfoLog") && o_wglGetProcAddress("glDetachShader") ? 1 : 0;
+        if (!ok) logf("[tess] GL entry points missing (shader compile/query/detach) -> tessellation off");
+    }
+    return ok == 1;
 }
 
 // Rewrite a standard-template VS. Returns false if the variant is not suitable.
@@ -362,6 +386,8 @@ static bool TessBeforeLink(GLuint prog) {
     const std::vector<TessVar>* vars = nullptr;
     for (GLuint sh : it->second) { auto t = g_tessVS.find(sh); if (t != g_tessVS.end()) vars = &t->second; }
     if (!vars) return false;
+    if (g_portTessVerGate && !GLAtLeast(4, 0)) { static int once; if (!once++) logf("[tess] GL below 4.0: tessellation stages skipped (TessVersionGate=1)"); return false; }
+    if (!TessEntryPointsOk()) return false;
     std::string sig = TessSignature(*vars);
     auto st = g_tessStages.find(sig);
     if (st == g_tessStages.end()) {
