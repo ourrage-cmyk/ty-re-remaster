@@ -15,6 +15,14 @@ static GLuint g_emitFbo, g_emitVao, g_emitTex[2], g_emitProgBlur, g_emitProgComp
 static GLuint g_emitDepthFull, g_emitDepthHalf; static int g_emitFullW, g_emitFullH;   // full-res copy of the scene depth; half-res depth of the emission buffer
 static unsigned g_emitFrame, g_emitCount, g_emitComposed; static bool g_emitCleared, g_emitActive;
 static GLint g_progTyEmitLoc[8192];   // per program: tyEmit uniform location (-1 = shader not rewritten, no emission from it)
+// ranking (lagged): each emitter draw gets an ordinal k in draw order; an occlusion query around its normal draw gives the visible sample count (screen area
+// after the depth test). RunEmit ranks the ordinals with a known count and keeps the top MaxEmitters for the next frame. Unscored ordinals are kept.
+static const int kEmitOrdMax = 256;
+static GLuint g_emitQ[kEmitOrdMax]; static bool g_emitQInit, g_emitQFail, g_emitQOpen;
+static unsigned g_emitScore[kEmitOrdMax], g_emitQPend[kEmitOrdMax]; static bool g_emitScoreKnown[kEmitOrdMax], g_emitKeep[kEmitOrdMax];
+static int g_emitOrd, g_emitDrawOrd = -1;   // ordinals issued this frame; ordinal of the draw being issued (-1 = not an emitter draw)
+typedef void(WINAPI* emGenQ_t)(GLsizei, GLuint*); typedef void(WINAPI* emBeginQ_t)(GLenum, GLuint); typedef void(WINAPI* emEndQ_t)(GLenum); typedef void(WINAPI* emGetQ_t)(GLuint, GLenum, GLuint*);
+static emGenQ_t emGenQ; static emBeginQ_t emBeginQ; static emEndQ_t emEndQ; static emGetQ_t emGetQ;
 typedef void(WINAPI* emDrawBufs_t)(GLsizei, const GLenum*); typedef void(WINAPI* emClearBufv_t)(GLenum, GLint, const GLfloat*); typedef void(WINAPI* emDelTex_t)(GLsizei, const GLuint*);
 typedef void(WINAPI* emDepthFunc_t)(GLenum); typedef void(WINAPI* emUniform1f_t)(GLint, GLfloat);
 static emDrawBufs_t emDrawBufs; static emClearBufv_t emClearBufv; static emDelTex_t emDelTex; static emDepthFunc_t emDepthFunc; static emUniform1f_t emUniform1f;
@@ -27,6 +35,7 @@ static void LoadEmitConfig() {
     GetPrivateProfileStringA("emit", "Radius", "12", b, sizeof b, ini); g_emitRadius = (float)atof(b);
     if (g_emitMax < 0) g_emitMax = 0;
     for (int i = 0; i < 8192; i++) g_progTyEmitLoc[i] = -1;
+    for (int k = 0; k < kEmitOrdMax; k++) g_emitKeep[k] = true;
     if (g_emitEnable) logf("[emit] enabled: strength %.2f radius %.1f max %d", g_emitStrength, g_emitRadius, g_emitMax);
 }
 
@@ -118,16 +127,52 @@ static bool EmitInit(int w, int h) {
     return true;
 }
 
+static void EmitSyncFrame() {
+    if (g_emitFrame != g_frame) { g_emitFrame = g_frame; g_emitCount = 0; g_emitCleared = false; g_emitOrd = 0; }
+}
+// Around the normal draw of every emitter-class draw: an occlusion query (visible samples = screen area). Sets g_emitDrawOrd for EmitBegin.
+static void EmitQBegin() {
+    g_emitDrawOrd = -1;
+    if (!g_emitEnable || g_emitActive || !g_emitW || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_texEnable) return;
+    if (!MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]).emissive || g_progTyEmitLoc[g_curProg] < 0) return;
+    EmitSyncFrame();
+    if (g_emitOrd >= kEmitOrdMax) return;
+    int k = g_emitOrd++; g_emitDrawOrd = k;
+    if (!g_emitQInit) {
+        g_emitQInit = true; emGenQ = (emGenQ_t)GLProc("glGenQueries"); emBeginQ = (emBeginQ_t)GLProc("glBeginQuery"); emEndQ = (emEndQ_t)GLProc("glEndQuery"); emGetQ = (emGetQ_t)GLProc("glGetQueryObjectuiv");
+        if (!emGenQ || !emBeginQ || !emEndQ || !emGetQ) { g_emitQFail = true; logf("[emit] occlusion query entry points missing: ranking off, draw order cap"); }
+        else emGenQ(kEmitOrdMax, g_emitQ);
+    }
+    if (g_emitQFail) return;
+    g_emitQPend[k] = g_frame + 1; emBeginQ(0x8914 /*SAMPLES_PASSED*/, g_emitQ[k]); g_emitQOpen = true;
+}
+static void EmitQEnd() { if (g_emitQOpen) { emEndQ(0x8914); g_emitQOpen = false; } }
+// Reads finished queries and ranks the ordinals for the next frame: top MaxEmitters by visible samples; unscored ordinals are kept.
+static void EmitRankPoll() {
+    if (g_emitQFail || !g_emitQInit) return;
+    for (int k = 0; k < kEmitOrdMax; k++) {
+        if (!g_emitQPend[k]) continue;
+        GLuint avail = 0; emGetQ(g_emitQ[k], 0x8867 /*RESULT_AVAILABLE*/, &avail);
+        if (!avail) continue;
+        GLuint v = 0; emGetQ(g_emitQ[k], 0x8866 /*RESULT*/, &v);
+        g_emitScore[k] = v; g_emitScoreKnown[k] = true; g_emitQPend[k] = 0;
+    }
+    int idx[kEmitOrdMax], n = 0;
+    for (int k = 0; k < kEmitOrdMax; k++) if (g_emitScoreKnown[k]) idx[n++] = k;
+    std::sort(idx, idx + n, [](int a, int b) { return g_emitScore[a] > g_emitScore[b]; });
+    for (int k = 0; k < kEmitOrdMax; k++) g_emitKeep[k] = !g_emitScoreKnown[k];
+    for (int i = 0; i < n && i < g_emitMax; i++) g_emitKeep[idx[i]] = true;
+}
+
 // Called before an emitter draw has been issued (the caller then re-issues the draw with the original gl call, and calls EmitEnd).
 // Returns false when the draw is not an emitter, the cap is reached, the shader has no tyEmit uniform, or the draw is not into the default framebuffer.
 // Sets up: scene depth copy -> half-res depth (max of 2x2) on the emission buffer -> splat state (depth LEQUAL, additive, albedo output).
 static bool EmitBegin() {
     // Init (textures, shaders) happens in RunEmit at end of frame, never inside a draw: texture creation would rebind the draw's textures.
     if (!g_emitEnable || g_emitActive || !g_emitW || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_texEnable) return false;
-    GLuint tex = g_bound2D[g_progDiffUnit[g_curProg] & 31];
-    if (!MatPolicy(tex).emissive) return false;
+    int k = g_emitDrawOrd; if (k < 0 || !g_emitKeep[k]) return false;   // not an emitter draw, past the ordinal limit, or ranked out last frame
     GLint tyLoc = g_progTyEmitLoc[g_curProg]; if (tyLoc < 0) return false;
-    if (g_emitFrame != g_frame) { g_emitFrame = g_frame; g_emitCount = 0; g_emitCleared = false; }
+    EmitSyncFrame();
     if (g_emitCount >= (unsigned)g_emitMax) return false;
     g_emitCount++; g_emitActive = true;
     gx.GetIntegerv(0x8CA6, &emS.fbo); gx.GetIntegerv(0x8CAA /*READ_FRAMEBUFFER_BINDING*/, &emS.readFbo); gx.GetIntegerv(0x0BA2, emS.vp); gx.GetIntegerv(0x85B5, &emS.vao); gx.GetIntegerv(0x8B8D, &emS.prog);
@@ -174,6 +219,7 @@ static void EmitEnd() {
 // Once per frame, from the end-of-3D-pass block (after GI, before atmos): blur the emission buffer and add it to FB0.
 static void RunEmit(int w, int h) {
     if (!g_emitEnable || !EmitInit(w, h)) return;
+    EmitRankPoll();
     if (g_emitFrame != g_frame || !g_emitCount || g_emitComposed == g_frame) return;
     g_emitComposed = g_frame;
     GLint prevFBO, prevVP[4], prevVAO, prevProg, prevBS, prevBD, prevUnit, prevTex0; GLboolean prevCM[4], prevDM, blend, depth, cull, stencil, scissor;
