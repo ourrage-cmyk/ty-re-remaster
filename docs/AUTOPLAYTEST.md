@@ -123,3 +123,53 @@ Get-Content C:\CLAUDE\RESEARCH\autoplaytest\status.json
 ```
 
 The heartbeat runs as a background job and stops when the run ends. A stale heartbeat (no new lines for more than a minute) means the run has stopped or hung.
+
+## Plans: every run states its purpose and checks
+
+`autoplaytest.ps1 -Plan <file>` is required. The run refuses to start if:
+- no plan is given, or the plan file is missing, or
+- a variant in the run is not used by any check in the plan.
+
+A plan is JSON (`tools\playtest\plans\<name>.json`) with `name`, `purpose`, and `checks`. Each check has:
+- `id`, `kind` (`boot`, `overlay`, `flicker`, `log` or `manual`), and `variants`
+- `issue` and `decides`: what the check settles, and which issue it feeds
+- `pass`: the criterion in words, and `next`: what to try when it fails
+- for `flicker`: `baseline` and `limit` (lower-half temporal std ratio)
+- for `log`: `pattern` (regex) and `mustMatch` (true = the line must appear, false = it must not)
+
+Each check is decided and logged as it runs (`[PASS]`, `[FAIL]`, `[INCONCLUSIVE]`). A missing variant or log gives INCONCLUSIVE, never a guess. `manual` checks are INCONCLUSIVE until a person looks at `contact_sheet.png`.
+
+`report.md` in the run folder starts with the purpose, then a table of check results with evidence, then an Issues section: PASS means "supported by this run, issue closes only after the owner's playtest", FAIL gives the `next` step.
+
+Plans: `current_run.json` (the first full run, written after the fact) and `next_monitor.json` (issues #79 to #84 and #86).
+
+## Request queue (other threads and agents)
+
+Requests live in `tools\playtest\requests\`, one JSON file each, `req-<id>.json`. Template: `requests\TEMPLATE.json`.
+
+Flow:
+1. A thread or agent adds a request file (`status: pending`) with its issue number, the question, the variants it needs (existing names from `autoplaytest.ps1`), and checks with the pass criterion.
+2. Before a run, the harness owner runs `build_plan.ps1`. It merges all pending requests into `plans\merged_<stamp>.json`, de-duplicates checks, and lists the variants to run. A request that needs a variant the harness doesn't define is marked blocked and written to `requests\BACKLOG.md` with the missing capability named. Nothing is dropped silently.
+3. Run the merged plan: `autoplaytest.ps1 -Plan plans\merged_<stamp>.json -Variants <list>` (in the TEST phase only).
+4. After the run, the owner posts each request's PASS, FAIL or INCONCLUSIVE with evidence on its issue, tells the requesting thread through the coordinator, and moves the request file to `requests\done\` with a link to the report.
+
+Seeded requests: `req-79-overlay`, `req-80-debugwater`, `req-81-fog`, `req-82-waterboost` (blocked: needs WaterBoost variants), `req-83-gi-lod-cost`, `req-84-portal-emit`, `req-85-harness` (backlog), `req-86-recording-ambiguity` (backlog: a human recording). Pending PRs (#89 FoliageBoost, WaterMaskSoft, AtrousFar) are not seeded until they exist.
+
+Template:
+
+```json
+{
+  "id": "req-<issue-or-short-name>",
+  "status": "pending",
+  "priority": 2,
+  "requester": { "issue": 0, "thread": "" },
+  "question": "What must be validated, in one sentence.",
+  "variants": [ { "name": "existing_variant_name", "note": "why" } ],
+  "checks": [ {
+      "id": "short-check-id", "kind": "log", "variants": ["existing_variant_name"],
+      "pattern": "regex", "mustMatch": true,
+      "pass": "the criterion", "decides": "what a PASS or FAIL means", "next": "what to try if it fails"
+  } ],
+  "report": ""
+}
+```

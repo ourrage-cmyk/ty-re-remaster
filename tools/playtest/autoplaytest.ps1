@@ -7,6 +7,7 @@ param(
     [string]$Game = 'C:\CLAUDE\TY the Tasmanian Tiger',
     [string[]]$Variants = @('stock', 'mod', 'overlay', 'fog_seethru1', 'emit1'),
     [ValidateSet('rainbow', 'billabong', 'slot2')][string]$Spot = 'rainbow',
+    [string]$Plan = '',        # REQUIRED: a plan file (tools\playtest\plans\<name>.json). Every variant must be used by a check, or the run refuses to start.
     [string]$Cam = '',         # optional view offset "dx dy dz yawDeg pitchDeg" written to tyrender\cam.txt (debugcam.inl), relative to the spot's start camera. Empty = none.
     [int]$FlickerFrames = 10,
     [double]$FlickerRatioMax = 1.5,
@@ -16,13 +17,21 @@ param(
 )
 . "$PSScriptRoot\common.ps1"
 # Phase gate and game lock: nothing launches unless the phase is TEST, and this run holds the one game slot until it ends.
+if (-not $Plan) { throw 'a plan file is required: -Plan tools\playtest\plans\<name>.json' }
+if (-not (Test-Path $Plan)) { throw "plan not found: $Plan" }
+$planObj = Get-Content -Raw $Plan | ConvertFrom-Json
+$planChecks = @($planObj.checks)
+$referenced = @($planChecks | ForEach-Object { @($_.variants) })
+$unreferenced = @($Variants | Where-Object { $referenced -notcontains $_ })
+if ($unreferenced.Count -gt 0) { throw "refusing to start: variant(s) not referenced by any check in $($planObj.name): $($unreferenced -join ', ')" }
 Assert-TestPhase
 $lockToken = Enter-GameLock 'autoplaytest'
 
 if (-not $Out) { $Out = Join-Path 'C:\CLAUDE\RESEARCH\autoplaytest' (Get-Date -Format 'yyyyMMdd_HHmmss') }
 New-Item -ItemType Directory -Force $Out | Out-Null
 $hbJob = Start-Heartbeat $Game
-Write-RunLog "run start: variants=$($Variants -join ',') spot=$Spot game=$Game out=$Out"
+Write-RunLog "run start: plan=$($planObj.name) variants=$($Variants -join ',') spot=$Spot game=$Game out=$Out"
+Write-RunLog "purpose: $($planObj.purpose)"
 if ($Copy) {
     $copy = Join-Path $Out 'game'
     & robocopy $Game $copy /E /XD Screenshots /NFL /NDL /NJH /NJS /NP | Out-Null
@@ -58,6 +67,8 @@ $defs = @{
     trees_see0   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '0' };        Flicker = $false; Overlay = $false; Spot = 'billabong' }
     trees_see1   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.SeeThruDepth' = '1' };        Flicker = $false; Overlay = $false; Spot = 'billabong' }
     portal_comp0 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1'; 'emit.Compensate' = '0' }; Flicker = $false; Overlay = $false }
+    gi_checker1  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'gi.Checker' = '1' };     Flicker = $false; Overlay = $false }
+    lod_enable1  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'lod.Enable' = '1' };      Flicker = $false; Overlay = $false }
     portal_comp1 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1'; 'emit.Compensate' = '1' }; Flicker = $false; Overlay = $false }
     sky_yaw000  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 0 0' }
     sky_yaw090  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 90 0' }
@@ -164,6 +175,49 @@ try {
     Exit-GameLock $lockToken
 }
 
+# Check evaluation. Each check decides PASS, FAIL or INCONCLUSIVE from the run's results and logs. Nothing here guesses: a missing variant or log gives INCONCLUSIVE.
+function Get-CheckResult($c, $results) {
+    $vs = @($c.variants)
+    $rs = @{}; foreach ($r in $results) { $rs[$r.Name] = $r }
+    $missing = @($vs | Where-Object { -not $rs.ContainsKey($_) })
+    if ($missing.Count -gt 0) { return @{ Status = 'INCONCLUSIVE'; Evidence = "variant(s) not in this run: $($missing -join ', ')" } }
+    switch ($c.kind) {
+        'boot' {
+            $bad = @($vs | Where-Object { $rs[$_].Boot -ne 'OK' })
+            if ($bad.Count -gt 0) { return @{ Status = 'FAIL'; Evidence = "boot failed: $($bad -join ', ')" } }
+            return @{ Status = 'PASS'; Evidence = "booted to gameplay: $($vs -join ', ')" }
+        }
+        'overlay' {
+            $v = $rs[$vs[0]]
+            if ($null -eq $v.OverlayPass) { return @{ Status = 'INCONCLUSIVE'; Evidence = 'overlay check did not run' } }
+            return @{ Status = $(if ($v.OverlayPass) { 'PASS' } else { 'FAIL' }); Evidence = $v.Overlay }
+        }
+        'flicker' {
+            $v = $rs[$vs[0]]; $b = $rs[$c.baseline]
+            if (-not $b -or $v.FlickerLower -lt 0 -or $b.FlickerLower -lt 0) { return @{ Status = 'INCONCLUSIVE'; Evidence = "no flicker values for $($vs[0]) or baseline $($c.baseline)" } }
+            $ratio = $v.FlickerLower / [Math]::Max(0.0001, $b.FlickerLower)
+            return @{ Status = $(if ($ratio -le $c.limit) { 'PASS' } else { 'FAIL' }); Evidence = ('lower-half ratio {0:N2} vs {1} (limit {2})' -f $ratio, $c.baseline, $c.limit) }
+        }
+        'log' {
+            $log = Join-Path (Join-Path $Out $vs[0]) 'tyrender.log'
+            if (-not (Test-Path $log)) { return @{ Status = 'INCONCLUSIVE'; Evidence = "no tyrender.log for $($vs[0])" } }
+            $hits = @(Select-String -Path $log -Pattern $c.pattern)
+            $ok = if ($c.mustMatch) { $hits.Count -gt 0 } else { $hits.Count -eq 0 }
+            $first = (@($hits | Select-Object -First 3 | ForEach-Object { $_.Line.Trim() })) -join ' | '
+            return @{ Status = $(if ($ok) { 'PASS' } else { 'FAIL' }); Evidence = "$($hits.Count) matching line(s) in $($vs[0])$(if ($first) { ': ' + $first })" }
+        }
+        'manual' { return @{ Status = 'INCONCLUSIVE'; Evidence = "needs a person to look: $(Join-Path $Out 'contact_sheet.png') (variants: $($vs -join ', '))" } }
+        default { return @{ Status = 'INCONCLUSIVE'; Evidence = "unknown check kind $($c.kind)" } }
+    }
+}
+
+$checkResults = @()
+foreach ($c in $planChecks) {
+    $res = Get-CheckResult $c $results
+    $checkResults += [pscustomobject]@{ id = $c.id; status = $res.Status; evidence = $res.Evidence; issue = $c.issue; pass = $c.pass; next = $c.next; decides = $c.decides; requests = @($c.requests) }
+    Write-RunLog ("check [{0}] {1}: {2}" -f $res.Status, $c.id, $res.Evidence)
+}
+
 # Report
 $stock = $results | Where-Object { $_.Name -eq 'stock' -and $_.FlickerLower -ge 0 } | Select-Object -First 1
 $iniOk = (-not $hadIni) -or ((Get-FileHash $ini -Algorithm SHA1).Hash -eq (Get-FileHash $iniBackup -Algorithm SHA1).Hash)
@@ -195,6 +249,22 @@ $md += '- Flicker is a luma heuristic over a static camera. Animated grass and c
 $md += '- Spots: rainbow (slot 1, the Red Mountain start per the owner) and billabong (slot 2, cutscene start). The red rock view is found by the sky_yaw sweep (free camera via tyrender\cam.txt). Portal: not yet.'
 $md += '- Per-frame GPU and frame times are not parsed from tyrender.log here. The log copies are in each variant folder.'
 $md += '- The game window must be foreground. key.ps1 fails visibly when it is not.'
+$md = @("# Purpose", "", $planObj.purpose, "", "Plan: $($planObj.name) ($Plan)", "") + $md
+$md += '## Check results'
+$md += ''
+$md += '| check | status | issue | requests | decides | evidence |'
+$md += '|---|---|---|---|---|---|'
+foreach ($cr in $checkResults) { $md += "| $($cr.id) | $($cr.status) | #$($cr.issue) | $(@($cr.requests) -join ', ') | $($cr.decides) | $($cr.evidence) |" }
+$md += ''
+$md += '## Issues'
+foreach ($cr in $checkResults) {
+    $line = switch ($cr.status) {
+        'PASS' { "- #$($cr.issue) ($($cr.id)): supported by this run. Issues close only after the owner's playtest." }
+        'FAIL' { "- #$($cr.issue) ($($cr.id)): not supported. Next: $($cr.next)" }
+        default { "- #$($cr.issue) ($($cr.id)): inconclusive. $($cr.evidence)" }
+    }
+    $md += $line
+}
 $md -join "`n" | Set-Content (Join-Path $Out 'report.md') -Encoding utf8
 
 $rows = @($results | Where-Object { $_.Base.Count -ge 1 } | ForEach-Object { @{ Label = $_.Name; Files = @($_.Base[0], $_.Base[1]) } })
