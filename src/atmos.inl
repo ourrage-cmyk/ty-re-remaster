@@ -18,7 +18,7 @@ uniform sampler2D u_color;
 uniform vec3 u_cam; uniform vec3 u_sunDir; uniform vec3 u_sunCol; uniform vec3 u_ambCol;
 uniform float u_density; uniform float u_falloff; uniform int u_steps; uniform float u_maxDist; uniform float u_g; uniform float u_frameNoise; uniform int u_debug;
 uniform int u_mode; uniform sampler2D u_low; uniform vec2 u_halfSize;   // u_mode: 0 full-res, 1 half-res march (scat,T), 2 full-res composite
-uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH; uniform float u_fogSat; uniform sampler2D u_wmask; uniform float u_waterFog;
+uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH; uniform float u_fogSat; uniform sampler2D u_wmask; uniform float u_waterFog; uniform float u_hueLock;
 uniform sampler2D u_skyTex; uniform float u_hazeSky, u_ambScale; uniform float u_blurStart, u_blurRange, u_blurPx; uniform vec2 u_rcp;
 const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
 // haze colour: the CPU level-fog hue, pulled toward the colour of the actual sky near the horizon (measured on the GPU, smoothed over time)
@@ -85,6 +85,10 @@ void main() {
     if (u_debug == 1) { o = vec4(v.rgb, 1); return; }
     if (u_debug == 2) { o = vec4(vec3(SunVis(P + vec3(0.0, 2.0, 0.0))), 1); return; }
     v.rgb = mix(vec3(dot(v.rgb, vec3(0.2126, 0.7152, 0.0722))), v.rgb, u_fogSat);   // FogSaturation: keep the haze from tinting the scene
+    if (u_hueLock > 0.0) {   // HueLock (#3): the sun term is warm and forward-peaked, the ambient term is cool, so their mix hue depended on view yaw; keep the luminance, fix the hue
+      vec3 H = u_haze / max(dot(u_haze, LW), 1e-3);
+      v.rgb = mix(v.rgb, H * dot(v.rgb, LW), u_hueLock);
+    }
     if (u_waterFog > 0.0 && !skyp && texture(u_wmask, uv).a < 0.25) {   // GI source mask (alpha 0 = water/glass/glow drawn here): thicken the fog over water so what is under it stays hidden
       float T2 = pow(v.a, 1.0 + u_waterFog);
       v.rgb *= min((1.0 - T2) / max(1.0 - v.a, 1e-4), 1.0 + u_waterFog); v.a = T2;
@@ -153,6 +157,7 @@ uniform sampler2DShadow u_sh1; uniform sampler2DShadow u_sh2; uniform mat4 u_shV
 uniform mat4 u_invVP; uniform vec3 u_cam; uniform vec3 u_sunDir; uniform vec3 u_sunCol; uniform vec3 u_ambCol;
 uniform float u_density; uniform float u_falloff; uniform float u_maxDist; uniform float u_g; uniform float u_shaftContrast; uniform float u_volA; uniform vec2 u_vsize;
 uniform sampler2D u_skyTex; uniform float u_hazeSky, u_ambScale;
+uniform float u_lodS; uniform float u_lodE; uniform float u_lodMin;   // [lod] fog ramp in camera distance (parked when off: 2 samples per slice)
 shared vec4 sh[64]; shared vec4 res[64];
 vec3 AmbDyn() {   // ambient in-scatter colour (already * 4pi): level fog hue pulled toward the measured sky colour
   vec3 cpu = u_ambCol; vec4 s = texelFetch(u_skyTex, ivec2(0), 0);
@@ -178,12 +183,19 @@ void main() {
   float cosT = dot(dir, u_sunDir);
   float phase = (1.0 - u_g * u_g) / (12.566 * pow(max(1.0 + u_g * u_g - 2.0 * u_g * cosT, 1e-4), 1.5));
   vec3 Lacc = vec3(0.0); float dens = 0.0; vec3 ambDyn = AmbDyn();
+  // [lod] fog distance LOD: far slices take 1 of the 2 in-slice samples. The count is rounded stochastically per froxel (mean kept), weight 1/n.
+  // Off: 2 samples at 0.25 / 0.75 of the slice and weight 0.5, as before.
+  float lkF = 1.0 - (1.0 - u_lodMin) * smoothstep(u_lodS, u_lodE, 0.5 * (d0 + d1));
+  float nh = fract(52.9829189 * fract(dot(vec2(id) + float(k) * vec2(7.31, 3.17), vec2(0.06711056, 0.00583715))));
+  int nS = max(1, int(floor(2.0 * lkF + nh)));
+  float wgt = 1.0 / float(nS);
   for (int i = 0; i < 2; i++) {
-    float t = mix(d0, d1, 0.25 + 0.5 * float(i));
+    if (i >= nS) break;
+    float t = mix(d0, d1, 0.5 * float(2 * i + 1) / float(nS));
     vec3 X = u_cam + dir * t;
-    dens += 0.5 * u_density * exp(-max(X.y - u_cam.y, -2000.0) * u_falloff);
+    dens += wgt * u_density * exp(-max(X.y - u_cam.y, -2000.0) * u_falloff);
     float vis = mix(1.0, SunVis(X), u_shaftContrast);
-    Lacc += 0.5 * (u_sunCol * (vis * phase) + ambDyn * (1.0 / 12.566));
+    Lacc += wgt * (u_sunCol * (vis * phase) + ambDyn * (1.0 / 12.566));
   }
   float ext = dens * len;
   sh[k] = vec4(Lacc * (1.0 - exp(-ext)), ext);
@@ -217,6 +229,7 @@ void main() {
 )";
 static struct { GLuint prog, tex[2]; int idx; bool failed, init; } skyE;
 static int g_atHazeFromSky = 1; static float g_atHazeSky = 0.0f, g_atBlurPx = 0.0f, g_atBlurStart = 4000.0f, g_atBlurRange = 12000.0f; static int g_atContactStable = 1;
+static int g_fogSeeThruDepth = 0, g_fogLateEmit = 0;   // [fog] SeeThruDepth / LateEmitters (issue #4), read in LoadAtmosConfig; see LateFogBegin and SeeThruDepthBegin
 
 typedef void(WINAPI* glDispatchCompute_t)(GLuint, GLuint, GLuint);
 typedef void(WINAPI* glBindImageTexture_t)(GLuint, GLuint, GLint, GLboolean, GLint, GLenum, GLenum);
@@ -227,6 +240,7 @@ typedef GLenum(WINAPI* glGetError_t)();
 static struct { bool tried, ok, failed; GLuint prog, tex; int fw, fh; glDispatchCompute_t Dispatch; glBindImageTexture_t BindImage; glMemoryBarrier_t Barrier; glTexImage3D_t TexImage3D; glDeleteTextures_t DelTex; glGetError_t GetErr; } vol;
 static int g_atFroxel = 1, g_atFroxelPx = 12;
 static float g_atSkyH = 0.45f, g_atHazeHue = 0.15f, g_atFogSat = 0.5f, g_atIntensity = 2.5f, g_atDesat = 0.7f, g_atLift = 0.35f, g_atSkyHaze = 0.8f, g_atWaterFog = 1.0f;
+static float g_atHueLock = 1.0f;   // [atmos] HueLock (#3): 1 = froxel in-scatter keeps its brightness but takes the haze hue, so the sun-facing glow no longer tints the fog as the camera turns
 
 static bool InitVolume() {
     if (vol.tried) return vol.ok && !vol.failed;
@@ -271,8 +285,9 @@ static void LoadAtmosConfig() {
     F("Density", "0.000015", g_atDensity) F("HeightFalloff", "0.0015", g_atFalloff) F("MaxDist", "40000", g_atMaxDist)
     F("SunIntensity", "1.4", g_atSunInt) F("Anisotropy", "0.6", g_atG) F("AmbientScale", "1.0", g_atAmb)
     F("ContactShadows", "0.35", g_atContact) F("ContactLength", "25", g_atContactLen) F("ContactThickness", "6", g_atContactThick) F("FogAmount", "0.8", g_atFogMul)
-    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.8", g_atSkyHaze) F("SkyHazeHeight", "0.45", g_atSkyH) F("FogSaturation", "0.5", g_atFogSat) F("WaterFog", "1.0", g_atWaterFog) F("HazeHue", "0.15", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
+    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.8", g_atSkyHaze) F("SkyHazeHeight", "0.45", g_atSkyH) F("FogSaturation", "0.5", g_atFogSat) F("WaterFog", "1.0", g_atWaterFog) F("HueLock", "1.0", g_atHueLock) F("HazeHue", "0.15", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
+    g_fogSeeThruDepth = GetPrivateProfileIntA("fog", "SeeThruDepth", 0, ini); g_fogLateEmit = GetPrivateProfileIntA("fog", "LateEmitters", 0, ini);
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
 #undef F
     GetPrivateProfileStringA("atmos", "SunColor", "1.0,0.86,0.66", b, sizeof b, ini);
@@ -297,14 +312,28 @@ static void FogDiagDraw() {
 // Draws that come after the fog pass (transparent-tagged: water, glass, particles, distant foliage cards; ~15% of them in the fogdiag log) never see the
 // volumetric fog, only the engine's own per-vertex fog. [fog] LateBoost (default 1 = off; 2.0 was tried and fogged everything) multiplies that engine fog strength for just those draws.
 static GLfloat g_lateSaved[4]; static GLuint g_lateProg;
+// [fog] LateEmitters (issue #4, default 0): the same late boost also covers emissive draws after the fog pass (cave fire, particles), which were never hazed.
 static bool LateFogBegin() {
     if (g_lateFog <= 1.0f || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
-    if (!MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]).seeThru) return false;
+    const MatRow& row = MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]);
+    if (!row.seeThru && !(g_fogLateEmit && row.emissive)) return false;
     memcpy(g_lateSaved, g_progFog[g_curProg], sizeof g_lateSaved); g_lateProg = g_curProg;
     GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * g_lateFog, 1.0f - b[0]);
     o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, b); return true;
 }
 static void LateFogEnd() { if (g_lateProg == g_curProg) o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, g_lateSaved); }
+// [fog] SeeThruDepth (issue #4, default 0): see-through draws (foliage cards, water, glass) are drawn with depth write off, so the fog pass reads the
+// surface BEHIND them. A tree over sky then gets only the 0.12*MaxDist sky slab of fog and looks in front of the fog; water gets the rock depth under it.
+// 1 = write depth for those draws while they are drawn before the scene depth copy (the fog pass input). Emissive draws are excluded.
+static bool SeeThruDepthBegin() {
+    if (!g_fogSeeThruDepth || g_sceneDepthFrame == g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_texFlagArr) return false;
+    const MatRow& row = MatPolicy(g_bound2D[g_progDiffUnit[g_curProg] & 31]);
+    if (!row.seeThru || row.emissive) return false;
+    GLboolean dm = 1; gx.GetBooleanv(0x0B72, &dm);
+    if (dm || !gx.IsEnabled(0x0B71)) return false;   // depth write already on, or no depth test: nothing to change
+    o_glDepthMask(1); return true;
+}
+static void SeeThruDepthEnd() { o_glDepthMask(0); }   // restores the state SeeThruDepthBegin saw (depth write off)
 static void RunAtmos(GLuint depthTex, int w, int h) {
     if (g_frame - g_fdLast >= 600) { g_fdLast = g_frame; logf("[fogdiag] transparent-tagged draws (sampled): before-fog depthW0/blend0=%u d0/b1=%u d1/b0=%u d1/b1=%u | after-fog d0/b0=%u d0/b1=%u d1/b0=%u d1/b1=%u",
         g_fdCnt[0][0][0], g_fdCnt[0][0][1], g_fdCnt[0][1][0], g_fdCnt[0][1][1], g_fdCnt[1][0][0], g_fdCnt[1][0][1], g_fdCnt[1][1][0], g_fdCnt[1][1][1]); memset(g_fdCnt, 0, sizeof g_fdCnt); }
@@ -414,6 +443,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         u3(o_glGetUniformLocation(cs, "u_ambCol"), amb[0] * g_atAmb * 12.566f, amb[1] * g_atAmb * 12.566f, amb[2] * g_atAmb * 12.566f);
         CF("u_density", g_atDensity * g_atIntensity * g_atFogMul * g_fogAmount / fmaxf(g_fogDistance, 0.05f)); CF("u_falloff", g_atFalloff); CF("u_maxDist", g_atMaxDist);
         CI("u_skyTex", 6); CF("u_hazeSky", useSky ? g_atHazeSky : 0.0f); CF("u_ambScale", g_atAmb); CF("u_g", g_atG); CF("u_shaftContrast", g_atShaftContrast); CF("u_volA", volA); gx.Uniform2f(o_glGetUniformLocation(cs, "u_vsize"), (float)vol.fw, (float)vol.fh);
+        { bool lodF = g_lodEnable && g_lodFog; CF("u_lodS", lodF ? g_lodStart : 1e9f); CF("u_lodE", lodF ? g_lodEnd : 2e9f); CF("u_lodMin", lodF ? g_lodMin : 1.0f); }
         vol.BindImage(0, vol.tex, 0, 1, 0, 0x88B9 /*WRITE_ONLY*/, 0x881A);
         vol.Dispatch(vol.fw, vol.fh, 1);
         vol.Barrier(0x20 | 0x8);
@@ -421,7 +451,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         o_glActiveTexture(0x84C5); o_glBindTexture(0x806F, vol.tex);
         o_glActiveTexture(0x84C0);
         o_glUseProgram(p);
-        I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH); F("u_fogSat", g_atFogSat);
+        I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH); F("u_fogSat", g_atFogSat); F("u_hueLock", g_atHueLock);
         { bool wm = g_atWaterFog > 0.0f && g_giMask && g_giMaskRan == g_frame && g_giMaskFrame == g_frame && g_giMaskFrameDraws > 0 && g2.texMask;   // best guess, untested: fog water harder via the GI source mask
           I("u_wmask", 7); F("u_waterFog", wm ? g_atWaterFog : 0.0f); if (wm) { o_glActiveTexture(0x84C7); o_glBindTexture(0x0DE1, g2.texMask); o_glActiveTexture(0x84C0); } }
         u3(o_glGetUniformLocation(p, "u_haze"), amb[0] * g_atAmb, amb[1] * g_atAmb, amb[2] * g_atAmb);

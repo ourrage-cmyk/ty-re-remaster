@@ -89,7 +89,7 @@ static float g_fogDistance = 1.0f, g_fogAmount = 1.0f;   // [fog] Distance / Amo
 static bool GIMaskBegin(); static void GIMaskEnd(); static void RunGI(GLuint depthTex, int w, int h); static void LoadGIConfig(); static void PollGIFlags();
 static int g_pendingShadowUnit[2] = {-1, -1}; static GLuint g_shadowTex[2];   // engine cascade shadow maps (resolved at draw time)
 static void GProf(int m); static void GProfNextFrame();
-static void FogDiagDraw(); static bool LateFogBegin(); static void LateFogEnd();
+static void FogDiagDraw(); static bool LateFogBegin(); static void LateFogEnd(); static bool SeeThruDepthBegin(); static void SeeThruDepthEnd();
 static void RunAtmos(GLuint depthTex, int w, int h); static void LoadAtmosConfig(); static void PollAtmosFlags();
 static bool EmitBegin(); static void EmitEnd(); static void EmitQBegin(); static void EmitQEnd(); static void RunEmit(int w, int h); static void LoadEmitConfig();   // emit.inl (phase 2)
 static void OnNamedUniformMat(int id, const GLfloat* v, GLboolean t); static void OnNamedUniform4(int id, const GLfloat* v);
@@ -255,7 +255,7 @@ HOOK(void, glDepthMask, (GLboolean f)) { CAP("glDepthMask %d", f); o_glDepthMask
 HOOK(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) { CAP("glColorMask %d%d%d%d", r, g, b, a); o_glColorMask(r, g, b, a); }
 HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); SpillLogDraw(); FogDiagDraw(); bool lateFog = LateFogBegin();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; }   // tessellated programs only accept GL_PATCHES
-    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } CAP("glDrawElements %#x n=%d", m, n); EmitQBegin(); o_glDrawElements(m, n, t, idx); EmitQEnd(); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } if (EmitBegin()) { o_glDrawElements(m, n, t, idx); EmitEnd(); } }
+    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } bool zFix = SeeThruDepthBegin(); CAP("glDrawElements %#x n=%d", m, n); EmitQBegin(); o_glDrawElements(m, n, t, idx); EmitQEnd(); if (zFix) SeeThruDepthEnd(); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } if (EmitBegin()) { o_glDrawElements(m, n, t, idx); EmitEnd(); } }
 HOOK(void, glDrawArrays, (GLenum m, GLint f, GLsizei n)) { g_draws++; TexDrawPrep();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; } CAP("glDrawArrays %#x first=%d n=%d", m, f, n); EmitQBegin(); o_glDrawArrays(m, f, n); EmitQEnd(); if (GIMaskBegin()) { o_glDrawArrays(m, f, n); GIMaskEnd(); } if (EmitBegin()) { o_glDrawArrays(m, f, n); EmitEnd(); } }
 HOOK(void, glTexImage2D, (GLenum t, GLint lvl, GLint ifmt, GLsizei w, GLsizei h, GLint b, GLenum fmt, GLenum ty, const GLvoid* px)) {
@@ -537,6 +537,7 @@ static void Snapshot(HDC dc) {
 #include "debugcam.inl"
 #include "gpuprof.inl"
 #include "abshot.inl"
+#include "overlay.inl"
 static void ApplyShadowStrength(GLuint p) {
     typedef void(WINAPI* pu1f_t)(GLuint, GLint, GLfloat); static pu1f_t pu = (pu1f_t)o_wglGetProcAddress("glProgramUniform1f");
     auto it = g_shadowStrengthLoc.find(p); if (it == g_shadowStrengthLoc.end() || it->second < 0 || !pu) return;
@@ -580,7 +581,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
         Snapshot(dc); PollDebugCam(); MotionPoll(); PollAOFlags(); PollAtmosFlags(); PollGIFlags();
         char p[MAX_PATH]; snprintf(p, sizeof p, "%styrender\\post_off", g_dir); g_fxOffFile = GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES;
         snprintf(p, sizeof p, "%styrender\\reload", g_dir);
-        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadEmitConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); LoadShotConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
+        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadEmitConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); LoadShotConfig(); LoadOverlayConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
             for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);
             { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
               GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
@@ -590,6 +591,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
     TexReport();
     GProf(9);                                      // GPU timestamp: end of this frame's commands (before present, so vsync waits are not counted)
     ABShotFrame(dc);                               // A/B hotkey (abshot.inl): reads the frame just drawn, F11 by default
+    OverlayFrame(dc);                              // settings overlay (overlay.inl): drawn after the A/B read so screenshots stay clean
     BOOL r = o_SwapBuffers(dc);
     GProfNextFrame();
     g_frame++;
@@ -613,8 +615,10 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
 }
 
 // ---------------------------------------------------------------- launcher clash guard (issue #13)
-// Reads the game's own settings.ini and logs a warning when it asks for something the DLL already provides (SSAO).
-// Warn only: settings.ini is never rewritten. Config tyrender.ini [clash] Check=1 (0 = off).
+// Reads the game's own settings.ini [Display] SSAO / MSAA and logs a warning when they duplicate what tyrender.ini already does:
+// SSAO = the DLL's AO runs twice; MSAA on while tyrender's Edge smoothing [post] AA is on = edges smoothed twice.
+// Warn only: settings.ini is never rewritten. Config tyrender.ini [clash] Check=1 (0 = off). The launcher shows the same rules
+// in its status line (GameClashText in launcher_ui.inc); keep the two in step.
 static void CheckGameSettingsClash() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     if (!GetPrivateProfileIntA("clash", "Check", 1, ini)) return;
@@ -623,12 +627,20 @@ static void CheckGameSettingsClash() {
     char path[MAX_PATH]; snprintf(path, sizeof path, "%s\\TY the Tasmanian Tiger\\settings.ini", docs);
     FILE* f = fopen(path, "rb"); if (!f) { logf("[clash] no game settings.ini at %s", path); return; }
     static char buf[16384]; size_t n = fread(buf, 1, sizeof buf - 1, f); fclose(f); buf[n] = 0;
+    bool ssao = false, msaa = false, inDisplay = false;
+    char val[64] = "";
     for (char* line = strtok(buf, "\r\n"); line; line = strtok(nullptr, "\r\n")) {
-        char key[64] = "", val[64] = "";
-        if (sscanf(line, " %63[^= ] = %63s", key, val) != 2) continue;
-        if (!_stricmp(key, "SSAO") && !_stricmp(val, "true"))
-            logf("[clash] settings.ini has SSAO=true; the DLL's own AO runs too and the menu can stall. Set SSAO=false in settings.ini.");
+        char* q = line; while (*q == ' ' || *q == '\t') q++;
+        if (*q == '[') { inDisplay = !_strnicmp(q, "[Display]", 9); continue; }
+        if (!inDisplay) continue;
+        char key[64] = "", v[64] = "";
+        if (sscanf(q, " %63[^= ] = %63s", key, v) != 2) continue;
+        if (!_stricmp(key, "SSAO")) ssao = !_stricmp(v, "true");
+        if (!_stricmp(key, "MSAA")) { strncpy(val, v, sizeof val - 1); msaa = atoi(v) >= 2; }   // "off", "2x", "4x", "8x"
     }
+    int aa = GetPrivateProfileIntA("post", "AA", 2, ini);   // 0 none, 1 FXAA, 2 TAA, 3 TAA + FXAA (fx.inl)
+    if (ssao) logf("[clash] settings.ini [Display] SSAO=true; the DLL's own AO runs too and the menu can stall. Set SSAO=false there.");
+    if (msaa && aa != 0) logf("[clash] settings.ini [Display] MSAA=%s and tyrender Edge smoothing (post AA=%d) both smooth edges. Set MSAA=off there, or AA=0 here.", val, aa);
 }
 
 // ---------------------------------------------------------------- init
@@ -693,7 +705,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
       GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
       GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "1.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
     LoadTessConfig();
-    LoadPbrConfig(); LoadLightConfig(); LoadShotConfig(); LoadTexTags(); LoadEmitConfig();
+    LoadPbrConfig(); LoadLightConfig(); LoadShotConfig(); LoadOverlayConfig(); LoadTexTags(); LoadEmitConfig();
     logf("tyrender stage1 loaded. game dir %s  capture=%d,%d dump=%d override=%d", g_dir, g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
     Install();
     CheckOrig("SwapBuffers", (void*)o_SwapBuffers);

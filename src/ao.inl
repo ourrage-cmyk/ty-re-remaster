@@ -223,6 +223,7 @@ in vec2 uv; out vec4 o;
 uniform sampler2D u_dmip; uniform vec2 u_halfSize; uniform float u_radius; uniform float u_p00; uniform float u_p11; uniform int u_slices; uniform int u_steps;
 uniform int u_debug; uniform int u_frameIdx; uniform float u_thin; uniform float u_mipOff; uniform float u_radius2; uniform float u_wide; uniform int u_wslices;
 uniform int u_nCap; uniform vec4 u_cap[16];   // character capsules, view space: [2i] = (base, radius), [2i+1] = (top, 0)
+uniform float u_lodS; uniform float u_lodE; uniform float u_lodMin;   // [lod] AO ramp in view depth (parked when off: exact u_steps)
 const float PI = 3.14159265;
 vec3 VP(vec2 puv, float z) { vec2 n = puv * 2.0 - 1.0; return vec3(n.x * z / u_p00, n.y * z / u_p11, -z); }
 // true if a view-space point is inside a character capsule: characters are never AO occluders (no dark halo behind Ty)
@@ -303,10 +304,13 @@ void main() {
   if (radPx < 0.75) { o = vec4(1.0, P.z, 0, 0); return; }
   uint hi = Hilbert(uint(p.x) & 63u, uint(p.y) & 63u) + 288u * uint(u_frameIdx & 63);
   vec2 nz = fract(0.5 + float(hi) * vec2(0.75487766624669276, 0.56984029099805327));   // R2 sequence over the Hilbert index: spatially + temporally stratified
-  float vis = Occ(P, V, N, nz, u_radius, radPx, u_steps, u_slices);
+  // [lod] distance LOD: fewer horizon steps per slice with distance. Stochastic rounding per pixel (dithered; the temporal pass averages it), off = exactly u_steps
+  float lkA = 1.0 - (1.0 - u_lodMin) * smoothstep(u_lodS, u_lodE, zc);
+  int stepsL = max(1, int(floor(float(u_steps) * lkA + fract(float(hi) * 0.41421356 + 0.5))));
+  float vis = Occ(P, V, N, nz, u_radius, radPx, stepsL, u_slices);
   if (u_wide > 0.0) {                                                    // large-scale occlusion (corners, under overhangs): second, wide horizon search over the coarse depth mips
     float rp2 = min(u_radius2 * u_p11 * 0.5 * u_halfSize.y / zc, 0.25 * u_halfSize.y);
-    if (rp2 > 2.0) vis *= mix(1.0, Occ(P, V, N, fract(nz + 0.37), u_radius2, rp2, max(u_steps - 2, 3), u_wslices), u_wide);
+    if (rp2 > 2.0) vis *= mix(1.0, Occ(P, V, N, fract(nz + 0.37), u_radius2, rp2, max(stepsL - 2, 3), u_wslices), u_wide);
   }
   o = vec4(vis, P.z, 0, 0);
 }
@@ -466,9 +470,24 @@ static int g_aoWSlices = 0, g_aoNoiseFrames = 64, g_aoBlurR = 2; static float g_
 static float g_aoFadeS = 0.0f, g_aoFadeE = 0.0f;   // [ao] FadeStart / FadeEnd: view distance where AO fades out (FadeEnd 0 = off)
 static float g_aoCharR = 40.0f, g_aoCharH = 120.0f; // [ao] CharRadius / CharHeight: character capsule for the AO occluder mask (CharRadius 0 = off)
 
+// [lod] distance LOD (issue #10). Master Enable (default 0) plus one key per effect (GI, AO, Fog; default 0). An effect is reduced with distance
+// only when Enable=1 and its own key is 1. Start/End: view depth in world units; MinScale: share of the work kept at End (smooth ramp, no hard step).
+// Used by the GI trace (gi2.inl), the AO horizon search (kGTAO2) and the froxel fog (kAtmosCS). Loaded from LoadAOConfig, which runs at startup and on reload.
+static int g_lodEnable = 0, g_lodGI = 0, g_lodAO = 0, g_lodFog = 0;
+static float g_lodStart = 1500.0f, g_lodEnd = 6000.0f, g_lodMin = 0.35f;
+static void LoadLodConfig() {
+    char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
+    g_lodEnable = GetPrivateProfileIntA("lod", "Enable", 0, ini);
+    g_lodGI = GetPrivateProfileIntA("lod", "GI", 0, ini); g_lodAO = GetPrivateProfileIntA("lod", "AO", 0, ini); g_lodFog = GetPrivateProfileIntA("lod", "Fog", 0, ini);
+    GetPrivateProfileStringA("lod", "Start", "1500", b, sizeof b, ini); g_lodStart = (float)atof(b);
+    GetPrivateProfileStringA("lod", "End", "6000", b, sizeof b, ini); g_lodEnd = (float)atof(b); if (g_lodEnd < g_lodStart + 1.0f) g_lodEnd = g_lodStart + 1.0f;
+    GetPrivateProfileStringA("lod", "MinScale", "0.35", b, sizeof b, ini); g_lodMin = (float)atof(b); if (g_lodMin < 0.0f) g_lodMin = 0.0f; if (g_lodMin > 1.0f) g_lodMin = 1.0f;
+}
+
 static void LoadAOConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     char b[32];
+    LoadLodConfig();
     g_dbgForce = GetPrivateProfileIntA("debug", "ForceFallback", 0, ini);
     g_aoEnable = GetPrivateProfileIntA("ao", "Enable", 1, ini);
     GetPrivateProfileStringA("ao", "WideRadius", "400", b, sizeof b, ini); g_aoRadius2 = (float)atof(b);
@@ -626,6 +645,7 @@ static void RunAO(GLuint depthTex, int w, int h) {
         U1i(ao.progAO2, "u_dmip", 1); U2f(ao.progAO2, "u_halfSize", (float)hw, (float)hh);
         U1f(ao.progAO2, "u_radius", g_aoRadius); U1f(ao.progAO2, "u_p00", p00); U1f(ao.progAO2, "u_p11", p11);
         U1i(ao.progAO2, "u_slices", g_aoSlices); U1i(ao.progAO2, "u_steps", g_aoSteps); U1i(ao.progAO2, "u_debug", g_aoDebug);
+        { bool lodA = g_lodEnable && g_lodAO; U1f(ao.progAO2, "u_lodS", lodA ? g_lodStart : 1e9f); U1f(ao.progAO2, "u_lodE", lodA ? g_lodEnd : 2e9f); U1f(ao.progAO2, "u_lodMin", lodA ? g_lodMin : 1.0f); }
         // noise steps every 8 frames (not every frame), so the temporal pass sees a stable pattern (less shimmer and grain)
         U1i(ao.progAO2, "u_frameIdx", g_aoTemporal ? (int)((g_frame / 8u) % (unsigned)(g_aoNoiseFrames < 1 ? 1 : g_aoNoiseFrames)) : 0); U1f(ao.progAO2, "u_thin", g_aoThin); U1f(ao.progAO2, "u_mipOff", g_aoMipOff); U1f(ao.progAO2, "u_radius2", g_aoRadius2); U1f(ao.progAO2, "u_wide", g_aoWide); U1i(ao.progAO2, "u_wslices", g_aoWSlices > 0 ? g_aoWSlices : g_aoSlices);
         AODraw(); GProf(17);

@@ -12,6 +12,12 @@ static int g_giMode = 1, g_giAtrous = 3, g_giHizIter = 0, g_giProf = 0;
 static int g_giCharOn = 1; static float g_giCharKeep = 0.0f, g_giCharGI = 0.3f, g_giCharH = 160.0f, g_giCharR = 70.0f;   // [gi] Characters/CharacterColour/CharacterGI/CharacterHeight/CharacterRadius
 static float g_giSigmaL = 4.0f, g_giBlur = 0.0f; static int g_giNoiseCycle = 0;   // [gi] SourceBlur (cone footprint px per px of ray length, 0 = off), NoiseCycle (0 = noise changes every frame, N = repeats every N frames, 1 = static)
  static int g_giSweep = 0; static const char* g_giVarName = "";
+// Uniform values for a distance-LOD ramp (globals and [lod] loader are in ao.inl). Off: the ramp is parked far away with MinScale 1,
+// so the keep factor is exactly 1 and the shader output is unchanged.
+static void LodUniforms(GLint s, GLint e, GLint m, bool on) {
+    if (on) { gx.Uniform1f(s, g_lodStart); gx.Uniform1f(e, g_lodEnd); gx.Uniform1f(m, g_lodMin); }
+    else { gx.Uniform1f(s, 1e9f); gx.Uniform1f(e, 2e9f); gx.Uniform1f(m, 1.0f); }
+}
 // [gi] Sweep=1 (benchmark helper): cycles through variants every 150 frames and logs the per-pass GPU times of each.
 static void GISweepApply() {
     static const struct { const char* n; int mode, rays, atrous, iters; } V[] = {
@@ -129,6 +135,7 @@ static const char* kGITrace2 = GI_CHAR_GLSL R"(
 in vec2 uv; layout(location = 0) out vec4 o0; layout(location = 1) out vec4 o1;
 uniform sampler2D u_hz; uniform sampler2D u_color; uniform sampler2D u_mask; uniform int u_useMask;
 uniform float u_radius; uniform float u_thick; uniform int u_rays; uniform int u_iters; uniform int u_levels; uniform float u_frame; uniform float u_blur;
+uniform float u_lodS; uniform float u_lodE; uniform float u_lodMin;   // [lod] ramp in view depth (world units); lodMin = share of rays kept at the far end
 float IGN(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
 float H0(ivec2 p) { return texelFetch(u_hz, clamp(p, ivec2(0), ivec2(u_full) - 1), 0).r; }
 vec3 Trace(vec3 Ps, vec3 dir) {
@@ -202,13 +209,18 @@ void main() {
   float n1 = fract(IGN(gl_FragCoord.xy) + u_frame * 0.7548776662), n2 = fract(IGN(gl_FragCoord.xy + 17.0) + u_frame * 0.5698402910);
   vec3 sum = vec3(0.0);
   vec3 Ps = P + N * 2.0;
+  // [lod] distance LOD: lk = share of rays kept at this depth (1 = all, the default). Each ray is kept with probability lk, decided per pixel and
+  // per frame, so far pixels get fewer traces without a hard step. The divisor is the expected count, so the mean stays unbiased.
+  float lk = 1.0 - (1.0 - u_lodMin) * smoothstep(u_lodS, u_lodE, -P.z);
+  float nd = fract(IGN(gl_FragCoord.xy + 91.0) + u_frame * 0.3819660);
   for (int rr = 0; rr < u_rays; rr++) {
+    if (fract(nd + float(rr) * 0.618034) >= lk) continue;
     float u1 = fract(n1 + float(rr) / float(u_rays)), u2 = fract(n2 + float(rr) * 0.618034);
     float phi = 6.2831853 * u2, cr = sqrt(u1);
     vec3 dir = normalize(T * (cos(phi) * cr) + B * (sin(phi) * cr) + N * sqrt(max(1.0 - u1, 0.0)));
     sum += Trace(Ps, dir);
   }
-  o0 = vec4(sum / float(u_rays), 0.0);
+  o0 = vec4(sum / max(float(u_rays) * lk, 1e-3), 0.0);
   o1 = vec4(N, -P.z);
 }
 )";
@@ -437,6 +449,7 @@ static bool GIHiz(GLuint depthTex, int w, int h, const float* invVP, const float
     gx.Uniform1f(UL(g2.progTrace, "u_radius"), g_giRadius); gx.Uniform1f(UL(g2.progTrace, "u_thick"), g_giThick);
     gx.Uniform1i(UL(g2.progTrace, "u_rays"), g_giRays < 1 ? 1 : g_giRays); gx.Uniform1i(UL(g2.progTrace, "u_iters"), g_giHizIter > 0 ? g_giHizIter : (g_giSteps < 2 ? 8 : g_giSteps * 4));
     gx.Uniform1i(UL(g2.progTrace, "u_levels"), g2.levels); gx.Uniform1f(UL(g2.progTrace, "u_frame"), (float)(g_giNoiseCycle > 0 ? (g_frame % g_giNoiseCycle) : (g_frame & 4095))); gx.Uniform1f(UL(g2.progTrace, "u_blur"), g_giBlur);
+    LodUniforms(UL(g2.progTrace, "u_lodS"), UL(g2.progTrace, "u_lodE"), UL(g2.progTrace, "u_lodMin"), g_lodEnable && g_lodGI);
     o_glActiveTexture(0x84C1); o_glBindTexture(0x0DE1, g2.texHz);
     o_glActiveTexture(0x84C2); o_glBindTexture(0x0DE1, g_colorCopyTex);
     o_glDrawArrays(4, 0, 3);
