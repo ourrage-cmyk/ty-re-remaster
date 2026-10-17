@@ -78,12 +78,12 @@ static void AddChar(const GLfloat* v, GLboolean t) {
     for (int i = 0; i < g_nChars; i++) if (fabsf(g_chars[i][0] - p[0]) + fabsf(g_chars[i][1] - p[1]) + fabsf(g_chars[i][2] - p[2]) < 20.0f) return;
     if (g_nChars < 8) { memcpy(g_chars[g_nChars], p, sizeof p); g_nChars++; }
 }
-static float g_fogC[4] = {0, 0, 1e9f, 0}; static bool g_haveFogC;   // last engine fogCoords (after override): AO fades with the same fog fraction
+static float g_fogC[4] = {0, 0, 1e9f, 0}; static bool g_haveFogC; static float g_progFog[8192][4]; static GLint g_progFogLoc1[8192]; static float g_lateFog = 2.0f;   // per program: last engine fogCoords (after override) + location+1; [fog] LateBoost   // last engine fogCoords (after override): AO fades with the same fog fraction
 static float g_fogDistance = 1.0f, g_fogAmount = 1.0f;   // [fog] Distance / Amount: scale the engine fog (fogCoords) and the volumetric fog
 static bool GIMaskBegin(); static void GIMaskEnd(); static void RunGI(GLuint depthTex, int w, int h); static void LoadGIConfig(); static void PollGIFlags();
 static int g_pendingShadowUnit[2] = {-1, -1}; static GLuint g_shadowTex[2];   // engine cascade shadow maps (resolved at draw time)
 static void GProf(int m); static void GProfNextFrame();
-static void FogDiagDraw();
+static void FogDiagDraw(); static bool LateFogBegin(); static void LateFogEnd();
 static void RunAtmos(GLuint depthTex, int w, int h); static void LoadAtmosConfig(); static void PollAtmosFlags();
 static void OnNamedUniformMat(int id, const GLfloat* v, GLboolean t); static void OnNamedUniform4(int id, const GLfloat* v);
 static bool TessRewriteVS(GLuint shader, std::string& src); static void TessOnAttach(GLuint p, GLuint s); static void TessLink(GLuint p); static void LoadTessConfig();
@@ -244,9 +244,9 @@ HOOK(void, glDisable, (GLenum c)) { CAP("glDisable %#x", c); o_glDisable(c); }
 HOOK(void, glBlendFunc, (GLenum s, GLenum d)) { CAP("glBlendFunc %#x %#x", s, d); o_glBlendFunc(s, d); }
 HOOK(void, glDepthMask, (GLboolean f)) { CAP("glDepthMask %d", f); o_glDepthMask(f); }
 HOOK(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) { CAP("glColorMask %d%d%d%d", r, g, b, a); o_glColorMask(r, g, b, a); }
-HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); FogDiagDraw();
+HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); FogDiagDraw(); bool lateFog = LateFogBegin();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; }   // tessellated programs only accept GL_PATCHES
-    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } CAP("glDrawElements %#x n=%d", m, n); o_glDrawElements(m, n, t, idx); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } }
+    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } CAP("glDrawElements %#x n=%d", m, n); o_glDrawElements(m, n, t, idx); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } }
 HOOK(void, glDrawArrays, (GLenum m, GLint f, GLsizei n)) { g_draws++; TexDrawPrep();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; } CAP("glDrawArrays %#x first=%d n=%d", m, f, n); o_glDrawArrays(m, f, n); if (GIMaskBegin()) { o_glDrawArrays(m, f, n); GIMaskEnd(); } }
 HOOK(void, glTexImage2D, (GLenum t, GLint lvl, GLint ifmt, GLsizei w, GLsizei h, GLint b, GLenum fmt, GLenum ty, const GLvoid* px)) {
@@ -389,7 +389,7 @@ HOOK(void, glUniform4fv, (GLint l, GLsizei c, const GLfloat* v)) {
     if (c == 1 && !g_namedLocs.empty()) {
         auto it = g_namedLocs.find(((uint64_t)g_curProg << 32) | (uint32_t)l);
         if (it != g_namedLocs.end()) {
-            if (it->second == 7) { GLfloat f[4] = {v[0], v[1], v[2], v[3]}; FogOverride(f); o_glUniform4fv(l, 1, f); return; }
+            if (it->second == 7) { GLfloat f[4] = {v[0], v[1], v[2], v[3]}; FogOverride(f); if (g_curProg < 8192) { memcpy(g_progFog[g_curProg], f, sizeof f); g_progFogLoc1[g_curProg] = l + 1; } o_glUniform4fv(l, 1, f); return; }
             if (g_curFBO == 0) OnNamedUniform4(it->second, v);
         }
     }
@@ -398,7 +398,7 @@ HOOK(void, glUniform4fv, (GLint l, GLsizei c, const GLfloat* v)) {
 HOOK(void, glUniform4f, (GLint l, GLfloat a, GLfloat b, GLfloat c, GLfloat d)) {
     if (!g_namedLocs.empty()) { auto it = g_namedLocs.find(((uint64_t)g_curProg << 32) | (uint32_t)l); if (it != g_namedLocs.end()) {
         GLfloat v[4] = {a, b, c, d};
-        if (it->second == 7) { FogOverride(v); o_glUniform4f(l, v[0], v[1], v[2], v[3]); return; }
+        if (it->second == 7) { FogOverride(v); if (g_curProg < 8192) { memcpy(g_progFog[g_curProg], v, sizeof v); g_progFogLoc1[g_curProg] = l + 1; } o_glUniform4f(l, v[0], v[1], v[2], v[3]); return; }
         if (g_curFBO == 0) OnNamedUniform4(it->second, v); } }
     o_glUniform4f(l, a, b, c, d);
 }
@@ -572,7 +572,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
             for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);
             { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
               GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
-              GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); }
+              GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "2.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
             logf("[cfg] reloaded all"); }
     }   // poll the trigger file every 8 frames
     TexReport();
@@ -658,7 +658,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
     LoadGIConfig();
     { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
       GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
-      GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); }
+      GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "2.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
     LoadTessConfig();
     LoadPbrConfig(); LoadLightConfig(); LoadTexTags();
     logf("tyrender stage1 loaded. game dir %s  capture=%d,%d dump=%d override=%d", g_dir, g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
