@@ -18,6 +18,11 @@ static void LoadPbrConfig() {
     g_pbrEnable = GetPrivateProfileIntA("pbr", "Enable", 1, ini); g_pbrLitProps = GetPrivateProfileIntA("pbr", "LitProps", 1, ini); g_pbrDebug = GetPrivateProfileIntA("pbr", "Debug", 0, ini);   // LitProps=0: dynamically lit (LIT=1) non-skinned props stay stock too
     // water-tagged draws (emissive/transparent): WaterStable=1 (default, issue #5) drops their bump, relief, specular and sky Fresnel so the water colour does not change frame to frame; SkyFresnelSkipWater=1 is the older, Fresnel-only subset
     g_texWaterNoFresnel = GetPrivateProfileIntA("pbr", "WaterStable", 1, ini) | GetPrivateProfileIntA("pbr", "SkyFresnelSkipWater", 0, ini);
+    // DebugWater (issue #5 bisect, default 0 = off): bitmask, each bit switches one per-frame term OFF for every draw, so one playtest per bit isolates the source
+    //   1 = PBR specular + sky Fresnel + sheen   2 = bump / relief   4 = atmos WaterFog (fog thickening over the GI water mask)   8 = hemisphere + shadow tint
+    g_dbgWater = GetPrivateProfileIntA("pbr", "DebugWater", 0, ini);
+    static const char* kDbgNames[4] = {"spec+fresnel+sheen", "bump+relief", "waterfog", "hemisphere+shadowtint"};
+    for (int i = 0; i < 4; i++) if (g_dbgWater & (1 << i)) logf("[dbgwater] term OFF: %s (DebugWater bit %d)", kDbgNames[i], 1 << i);
 #define PF(key, def, var) GetPrivateProfileStringA("pbr", key, def, b, sizeof b, ini); var = (float)atof(b);
     PF("NormalStrength", "1.0", g_pbrNormal) PF("Specular", "0.5", g_pbrSpec) PF("Roughness", "0.65", g_pbrRough) PF("HeightScale", "3.0", g_pbrHeight)
     PF("LowFreqBump", "0.6", g_pbrLowBump) PF("Cavity", "0.30", g_pbrCavity) PF("ValleyRough", "0.30", g_pbrValleyRough) PF("Sheen", "0.12", g_pbrSheen)
@@ -126,10 +131,13 @@ static bool PbrRewriteFS(std::string& s) {
     size_t lp = s.find("#if (LIT==1) || (OMNI==1)");
     if (lite) {   // vertex-lit surface: detail layer + fake relight of the bumped normal against the sun (baked vertex colour keeps the base lighting)
         std::string t = nblk;
+        if (g_dbgWater & 2) ReplaceAll(t, "float tyOn = (1.0 - tyTex) * (1.0 - tyWater);", "float tyOn = 0.0;");
         t += "  { vec3 N0 = normalize(v_normal); float sh = dot(tyN, tySunDir) - dot(N0, tySunDir); diffuseColour.rgb *= clamp(1.0 + 0.5 * sh * TyDist(tyCamDist) * tyPbr.x * tyOn, 0.5, 1.6); }\n";
         s.insert(lp, t); return true;
     }
-    s.insert(lp, nblk);
+    std::string nb = nblk;
+    if (g_dbgWater & 2) ReplaceAll(nb, "float tyOn = (1.0 - tyTex) * (1.0 - tyWater);", "float tyOn = 0.0;");
+    s.insert(lp, nb);
     ReplaceAll(s, "normalize(v_normal),1.0)", "tyN,1.0)");                       // lightApply
     ReplaceAll(s, "dot(v_normal, normalize(toLight))", "dot(tyN, normalize(toLight))");
     // 2) GGX sun specular + Fresnel sky sheen, before shadows/fog so both still apply
@@ -151,7 +159,9 @@ static bool PbrRewriteFS(std::string& s) {
         "    diffuseColour.rgb += spec * vec3(1.0, 0.94, 0.82) + Fr * (1.0 - rough) * 0.35 * fade * occl * env;\n"
         "    diffuseColour.rgb *= 1.0 + tyPbr2.w * pow(1.0 - NoV, 3.0) * rough * fade * occl * (1.0 - 0.5 * tyValley);   // soft dust / fibre sheen at grazing angles (albedo-coloured, not plastic)\n"
         "  }\n";
-    ReplaceAll(s, "  diffuseColour *= light;\n", sblk);
+    std::string sb = sblk;
+    if (g_dbgWater & 1) ReplaceAll(sb, "* tyPbr.y * tyOn;", "* tyPbr.y * tyOn * 0.0;");   // fade gates spec, Fresnel and sheen
+    ReplaceAll(s, "  diffuseColour *= light;\n", sb);
     if (g_pbrDebug == 1) s.insert(s.rfind("FINAL_COLOR = diffuseColour;"), "diffuseColour.rgb = tyN * 0.5 + 0.5;\n  ");   // normals view
     return true;
 }
