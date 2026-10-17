@@ -295,6 +295,18 @@ static void FogDiagDraw() {
     GLboolean dm = 0; gx.GetBooleanv(0x0B72, &dm);
     g_fdCnt[g_atRanFrame == g_frame ? 1 : 0][dm ? 1 : 0][gx.IsEnabled(0x0BE2) ? 1 : 0]++;
 }
+// Draws that come after the fog pass (transparent-tagged: water, glass, particles, distant foliage cards; ~15% of them in the fogdiag log) never see the
+// volumetric fog, only the engine's own per-vertex fog. [fog] LateBoost (default 2.0, 1 = off) multiplies that engine fog strength for just those draws.
+static GLfloat g_lateSaved[4]; static GLuint g_lateProg;
+static bool LateFogBegin() {
+    if (g_lateFog <= 1.0f || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
+    uint8_t f = TexFlags(g_bound2D[g_progDiffUnit[g_curProg] & 31]);
+    if (!(f & TF_KNOWN) || !(f & TF_TRANSPARENT) || (f & TF_CHARACTER)) return false;
+    memcpy(g_lateSaved, g_progFog[g_curProg], sizeof g_lateSaved); g_lateProg = g_curProg;
+    GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * g_lateFog, 1.0f - b[0]);
+    o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, b); return true;
+}
+static void LateFogEnd() { if (g_lateProg == g_curProg) o_glUniform4fv(g_progFogLoc1[g_curProg] - 1, 1, g_lateSaved); }
 static void RunAtmos(GLuint depthTex, int w, int h) {
     if (g_frame - g_fdLast >= 600) { g_fdLast = g_frame; logf("[fogdiag] transparent-tagged draws (sampled): before-fog depthW0/blend0=%u d0/b1=%u d1/b0=%u d1/b1=%u | after-fog d0/b0=%u d0/b1=%u d1/b0=%u d1/b1=%u",
         g_fdCnt[0][0][0], g_fdCnt[0][0][1], g_fdCnt[0][1][0], g_fdCnt[0][1][1], g_fdCnt[1][0][0], g_fdCnt[1][0][1], g_fdCnt[1][1][0], g_fdCnt[1][1][1]); memset(g_fdCnt, 0, sizeof g_fdCnt); }
