@@ -391,7 +391,7 @@ void main() {
 static const char* kComposite = R"(
 in vec2 uv; out vec4 o;
 uniform sampler2D u_ao; uniform sampler2D u_color; uniform vec2 u_halfSize; uniform float u_strength; uniform float u_power; uniform int u_debug; uniform float u_mbScale;
-uniform vec3 u_cam; uniform vec4 u_fogC; uniform float u_atmD; uniform float u_atmF; uniform float u_fogFade; uniform float u_fadeS; uniform float u_fadeE;
+uniform vec3 u_cam; uniform vec4 u_fogC; uniform float u_atmD; uniform float u_atmF; uniform float u_fogFade; uniform float u_fogPow; uniform float u_fadeS; uniform float u_fadeE;
 void main() {
   if (u_debug == 2) { o = texture(u_ao, uv); return; }          // normals were written straight to the AO target
   if (u_debug == 3) { o = vec4(vec3(texture(u_ao, uv).r), 1); return; }
@@ -417,7 +417,7 @@ void main() {
       float fe = u_fogC.x + clamp((-z - u_fogC.z) * u_fogC.w, 0.0, 1.0) * u_fogC.y;
       float kd = normalize(Wp - u_cam).y * u_atmF, tau = u_atmD * ((abs(kd) < 1e-6) ? dist : (1.0 - exp(-kd * dist)) / kd);
       float k = clamp(1.0 - fe, 0.0, 1.0) * exp(-clamp(tau, 0.0, 20.0));
-      ao = mix(1.0, ao, mix(1.0, k, u_fogFade));
+      ao = mix(1.0, ao, mix(1.0, pow(k, u_fogPow), u_fogFade));   // FogFadePower > 1: AO fades out faster than the fog thickens (dark blobs on fogged trees)
     }
   }
   // multi-bounce (Jimenez 2016) with the lit colour as albedo proxy, so bright surfaces don't go grey
@@ -462,7 +462,7 @@ static struct {
 } ao;
 static float g_aoRadius2 = 400.0f, g_aoWide = 1.0f; static float g_aoRadius = 60.0f, g_aoStrength = 0.85f, g_aoPower = 1.0f, g_aoBlend = 0.92f, g_aoMB = 0.6f, g_aoThin = 0.5f;
 static int g_aoSlices = 3, g_aoSteps = 6, g_aoZMode = 0, g_aoEnable = 1, g_aoTemporal = 1;
-static int g_aoWSlices = 0, g_aoNoiseFrames = 64, g_aoBlurR = 2; static float g_aoBlurK = 0.15f; static int g_aoTMode = 1; static float g_aoFogFade = 1.0f; static bool g_aoOffFile; static int g_aoDebugIni; static float g_aoMipOff = 3.15f; static int g_aoLegacy = 0;
+static int g_aoWSlices = 0, g_aoNoiseFrames = 64, g_aoBlurR = 2; static float g_aoBlurK = 0.15f; static int g_aoTMode = 1; static float g_aoFogFade = 1.0f, g_aoFogPow = 2.0f; static bool g_aoOffFile; static int g_aoDebugIni; static float g_aoMipOff = 3.15f; static int g_aoLegacy = 0;
 static float g_aoFadeS = 0.0f, g_aoFadeE = 0.0f;   // [ao] FadeStart / FadeEnd: view distance where AO fades out (FadeEnd 0 = off)
 static float g_aoCharR = 40.0f, g_aoCharH = 120.0f; // [ao] CharRadius / CharHeight: character capsule for the AO occluder mask (CharRadius 0 = off)
 
@@ -492,7 +492,7 @@ static void LoadAOConfig() {
     g_aoWSlices = GetPrivateProfileIntA("ao", "WideSlices", 0, ini);   // 0 = same as Slices
     g_aoNoiseFrames = GetPrivateProfileIntA("ao", "NoiseFrames", 64, ini); g_aoBlurR = GetPrivateProfileIntA("ao", "BlurRadius", 2, ini); if (g_aoBlurR < 1) g_aoBlurR = 1; if (g_aoBlurR > 5) g_aoBlurR = 5; GetPrivateProfileStringA("ao", "BlurFalloff", "0.15", b, sizeof b, ini); g_aoBlurK = (float)atof(b);
     g_aoTMode = GetPrivateProfileIntA("ao", "TemporalMode", 1, ini);   // 0 = v0.3.1 nearest-history accumulation, 1 = bilinear + history length + variance clamp
-    GetPrivateProfileStringA("ao", "FogFade", "1.0", b, sizeof b, ini); g_aoFogFade = (float)atof(b);   // 0 = AO ignores fog (old behaviour), 1 = AO fades with fog transmittance
+    GetPrivateProfileStringA("ao", "FogFade", "1.0", b, sizeof b, ini); g_aoFogFade = (float)atof(b); GetPrivateProfileStringA("ao", "FogFadePower", "2.0", b, sizeof b, ini); g_aoFogPow = fmaxf((float)atof(b), 0.1f);   // 0 = AO ignores fog (old behaviour), 1 = AO fades with fog transmittance
     g_aoDebugIni = GetPrivateProfileIntA("ao", "DebugView", 0, ini);   // test aid: 1 = AO-only view (live via ini reload)
     logf("[ao] config: debugview=%d tmode=%d blend=%.2f fogfade=%.2f wide=%.2f", g_aoDebugIni, g_aoTMode, g_aoBlend, g_aoFogFade, g_aoWide);
 }
@@ -678,7 +678,7 @@ static void RunAO(GLuint depthTex, int w, int h) {
       u3c(o_glGetUniformLocation(ao.progComp, "u_cam"), cam[0], cam[1], cam[2]);
       gx.Uniform4f(o_glGetUniformLocation(ao.progComp, "u_fogC"), g_fogC[0], g_fogC[1], g_fogC[2], g_fogC[3]);
       float ad, af; AtmosFogParams(&ad, &af); U1f(ao.progComp, "u_atmD", ad); U1f(ao.progComp, "u_atmF", af);
-      U1f(ao.progComp, "u_fogFade", g_haveFogC ? g_aoFogFade : (ad > 0 ? g_aoFogFade : 0.0f)); }
+      U1f(ao.progComp, "u_fogPow", g_aoFogPow); U1f(ao.progComp, "u_fogFade", g_haveFogC ? g_aoFogFade : (ad > 0 ? g_aoFogFade : 0.0f)); }
     U1f(ao.progComp, "u_fadeS", g_aoFadeS); U1f(ao.progComp, "u_fadeE", g_aoFadeE);
     U1f(ao.progComp, "u_strength", g_aoStrength); U1f(ao.progComp, "u_power", g_aoPower); U1i(ao.progComp, "u_debug", g_aoDebug); U1f(ao.progComp, "u_mbScale", g_aoMB);
     o_glActiveTexture(0x84C0); o_glBindTexture(0x0DE1, depthTex);
