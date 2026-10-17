@@ -97,7 +97,7 @@ static bool TessRewriteVS(GLuint shader, std::string& src); static void TessOnAt
 static void LoadLightConfig(); static bool LightRewriteFS(std::string& s); static void LightOnLink(GLuint p); static void LightApply(GLuint p); static void EnsureLtDecl(std::string& s); static bool DebugCamApply(float* m); static void PollDebugCam(); static void MotionPoll(); static void MotionFrame(HDC dc);
 static void LoadPbrConfig(); static bool PbrRewriteVS(std::string& s); static bool PbrRewriteFS(std::string& s); static void PbrOnLink(GLuint p); static void PbrApply(GLuint p); static void PbrUpdate();
 static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const void* px, int bytes); static void LoadTexTags(); static void TexReport(); static void TexDrawPrep(); static void SpillLogDraw(); static int g_progDiffUnit[8192];
-static bool DecalRewriteFS(std::string& s); static void TexOnLink(GLuint p);
+static bool DecalRewriteFS(std::string& s); static void TexOnLink(GLuint p); static bool EmitRewriteFS(std::string& s); static void EmitOnLink(GLuint p);
 static bool g_curProgTess; static unsigned g_tessBadDrawsExt; static bool IsTessProg(GLuint p); static void TessPatchMode();
 
 // ---------------------------------------------------------------- IAT patching
@@ -374,8 +374,8 @@ HOOK(void, glShaderSource, (GLuint s, GLsizei count, const GLchar* const* str, c
     }
     if (!useOv && type == GL_FRAGMENT_SHADER) {   // order: PBR (normals/spec) -> shadow patch (PCF, strength) -> light model; each stage is optional
         std::string p = src;
-        bool pb = PbrRewriteFS(p), sh = g_shPatch && PatchShadowShader(p), lt = LightRewriteFS(p), dc = DecalRewriteFS(p);   // decal last: it rewrites the stock output line
-        if (pb || sh || lt || dc) {
+        bool pb = PbrRewriteFS(p), sh = g_shPatch && PatchShadowShader(p), lt = LightRewriteFS(p), dc = DecalRewriteFS(p), em = EmitRewriteFS(p);   // decal, then emit: both rewrite the stock output line
+        if (pb || sh || lt || dc || em) {
             if (TestCompile(type, p)) { ov = p; useOv = true; logf("glShaderSource shader=%u hash=%08x [FS:%s%s%s%s]", s, h, pb ? " PBR" : "", sh ? " SHADOW" : "", lt ? " LIGHT" : "", dc ? " DECAL" : ""); }
             else {
                 logf("[fs] %08x combined rewrite failed to compile (pbr=%d shadow=%d light=%d) -> trying shadow patch alone", h, pb, sh, lt);
@@ -546,7 +546,7 @@ static void ApplyShadowStrength(GLuint p) {
 static void AfterLink(GLuint p) {
     GLint loc = o_glGetUniformLocation ? o_glGetUniformLocation(p, "tyShadowStrength") : -1;
     if (loc >= 0) { g_shadowStrengthLoc[p] = loc; ApplyShadowStrength(p); }
-    PbrOnLink(p); LightOnLink(p); TexOnLink(p);
+    PbrOnLink(p); LightOnLink(p); TexOnLink(p); EmitOnLink(p);
 }
 static bool TessRewriteVS(GLuint shader, std::string& src) {
     std::vector<TessVar> vars; std::string orig = src;
