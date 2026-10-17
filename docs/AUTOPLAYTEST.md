@@ -69,14 +69,13 @@ Each boot takes about a minute, so the default five variants take roughly 6 to 1
 
 ## Spots
 
-| `-Spot` | save slot | status |
+| `-Spot` / variant `Spot` | save slot | status |
 |---|---|---|
-| `rainbow` (default) | 1 (level 1, Rainbow Cliffs) | wired, used by the default run |
-| `billabong` | 2 (level 2, Billabong: water and trees) | wired from the harness notes (`TY_SLOT=2`). Not verified on the PC yet. The water and trees variants depend on it. |
-| red rock / skybox | none | needs a view: `-Cam "dx dy dz yaw pitch"` (written to `tyrender\cam.txt`, relative to the spot's start camera) or a save |
-| portal | none | needs a view (`-Cam`) or a save |
+| `rainbow` (default) | 1 | Slot 1 is the Red Mountain start, per the owner. The harness notes call it Rainbow Cliffs. The red rock and skybox views are found with the free camera (below). |
+| `billabong` | 2 (level 2) | Slot 2 plays a real-time cutscene with a scripted camera on every load. It is reliable, so it is the water and trees start. `autoplaytest` waits 45 s here, not 12 s. Not yet verified on the PC. |
+| portal | none yet | Derive it from slot 1 with the free camera once the red rock view is known. |
 
-Owner input needed: confirm the Billabong start is the right view for the water and trees, and provide either a save for the red rock and portal views or the camera offsets. Until then, those variants run at the default spot and do not test what they name.
+Free camera: `tyrender\cam.txt` holds `dx dy dz yawDeg pitchDeg`, read every frame by `debugcam.inl`. It moves the camera relative to the spot's start. Variant `sky_yaw000/090/180/270` sweeps yaw on slot 1 to find the red rock and skybox view. Pick the frame that shows it, then give that offset to a named variant. The original `cam.txt`, if any, is restored after the run.
 
 ## What it does not cover
 
