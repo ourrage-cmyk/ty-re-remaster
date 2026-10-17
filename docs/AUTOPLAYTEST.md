@@ -67,6 +67,17 @@ Each boot takes about a minute, so the default five variants take roughly 6 to 1
 - Overlay open and close: the closed frame must match the baseline.
 - Game alive at the end, and error, failed or assert lines in `tyrender.log`.
 
+## Spots
+
+| `-Spot` | save slot | status |
+|---|---|---|
+| `rainbow` (default) | 1 (level 1, Rainbow Cliffs) | wired, used by the default run |
+| `billabong` | 2 (level 2, Billabong: water and trees) | wired from the harness notes (`TY_SLOT=2`). Not verified on the PC yet. The water and trees variants depend on it. |
+| red rock / skybox | none | needs a view: `-Cam "dx dy dz yaw pitch"` (written to `tyrender\cam.txt`, relative to the spot's start camera) or a save |
+| portal | none | needs a view (`-Cam`) or a save |
+
+Owner input needed: confirm the Billabong start is the right view for the water and trees, and provide either a save for the red rock and portal views or the camera offsets. Until then, those variants run at the default spot and do not test what they name.
+
 ## What it does not cover
 
 - Looks: fog colour, shadow quality, portal light, water appearance. The script produces frames and numbers. A person or a session has to look at `contact_sheet.png`.
