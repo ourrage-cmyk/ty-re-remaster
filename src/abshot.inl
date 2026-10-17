@@ -98,11 +98,13 @@ static void ShotCapture(HDC dc, const char* label) {
 }
 // Push the current relief/PBR values straight to every known program. The pushes otherwise run only from glUseProgram, so a
 // program that stays bound across the flip would keep the old values.
+static void ApplyShadowStrength(GLuint p);   // tyrender.cpp
 static void ABRepush() {
     std::vector<GLuint> progs;
     for (auto& kv : g_pbrLocs) progs.push_back(kv.first);
     for (auto& kv : g_tessLoc) if (!g_pbrLocs.count(kv.first)) progs.push_back(kv.first);
     for (GLuint p : progs) { g_pbrStamp.erase(p); g_tessStamp.erase(p); PbrApply(p); }
+    for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);   // the shadow factor also flips with the off frame
 }
 // Once per frame, after the frame is drawn and before SwapBuffers.
 static void ABShotFrame(HDC dc) {

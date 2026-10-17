@@ -545,11 +545,12 @@ static void Snapshot(HDC dc) {
 #include "gpuprof.inl"
 #include "abshot.inl"
 #include "overlay.inl"
+static const float kShStockStrength = 0.5f;   // the stock shader multiplies shadowAmount by this literal
 static void ApplyShadowStrength(GLuint p) {
     typedef void(WINAPI* pu1f_t)(GLuint, GLint, GLfloat); static pu1f_t pu = (pu1f_t)o_wglGetProcAddress("glProgramUniform1f");
     auto it = g_shadowStrengthLoc.find(p); if (it == g_shadowStrengthLoc.end() || it->second < 0 || !pu) return;
     bool grass = false; for (GLuint s : g_progShaders[p]) if (g_grassVS.count(s)) grass = true;
-    pu(p, it->second, grass ? g_shGrassStrength : g_shStrength);
+    pu(p, it->second, g_abOff ? kShStockStrength : grass ? g_shGrassStrength : g_shStrength);   // A/B off frame: the stock literal (shadowAmount * 0.5), no per-program tuning
     auto lt = g_shadowLodLoc.find(p); if (lt != g_shadowLodLoc.end() && lt->second >= 0) pu(p, lt->second, (float)g_shLod);
 }
 static void AfterLink(GLuint p) {
