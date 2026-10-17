@@ -59,6 +59,41 @@ public static class PlaytestImg {
 }
 '@
 
+# Game-slot lock and phase gate. Only one game may run, and only in the TEST phase (after every session has finished editing and merged).
+# Phase: C:\CLAUDE\LOCK\phase.txt, one word (EDIT, FREEZE or TEST), written by the Fix plan thread. Anything but TEST refuses to launch.
+# Lock: C:\CLAUDE\LOCK\game.lock with owner, pid, token and time. A lock whose pid is gone is stale and is replaced.
+# A run that already holds the lock passes its token to child scripts in TY_LOCK_TOKEN, so boot_spot.ps1 does not take the lock twice.
+$LockDir = 'C:\CLAUDE\LOCK'
+
+function Assert-TestPhase {
+    $f = Join-Path $LockDir 'phase.txt'
+    $p = if (Test-Path $f) { (Get-Content $f -Raw).Trim() } else { '(missing)' }
+    if ($p -ne 'TEST') { throw "phase is '$p', not TEST. The Fix plan thread controls the phases; not launching the game." }
+}
+
+function Enter-GameLock([string]$Owner) {
+    New-Item -ItemType Directory -Force $LockDir | Out-Null
+    $f = Join-Path $LockDir 'game.lock'
+    if ($env:TY_LOCK_TOKEN -and (Test-Path $f) -and ((Get-Content $f -Raw) -match ('token=' + [regex]::Escape($env:TY_LOCK_TOKEN)))) { return $env:TY_LOCK_TOKEN }
+    if (Test-Path $f) {
+        $txt = Get-Content $f -Raw
+        $m = [regex]::Match($txt, 'pid=(\d+)')
+        $holder = if ($m.Success) { [int]$m.Groups[1].Value } else { 0 }
+        if ($holder -and (Get-Process -Id $holder -ErrorAction SilentlyContinue)) { throw "game.lock is held by pid $holder. $($txt.Trim() -replace "`r?`n", '; ')" }
+        Remove-Item $f -Force   # stale: the holder is gone
+    }
+    $token = [guid]::NewGuid().ToString()
+    Set-Content -Path $f -Value "owner=$Owner`npid=$PID`ntoken=$token`ntime=$(Get-Date -Format s)" -Encoding ascii
+    $env:TY_LOCK_TOKEN = $token
+    return $token
+}
+
+function Exit-GameLock([string]$Token) {
+    $f = Join-Path $LockDir 'game.lock'
+    if ((Test-Path $f) -and ((Get-Content $f -Raw) -match ('token=' + [regex]::Escape($Token)))) { Remove-Item $f -Force }
+    if ($env:TY_LOCK_TOKEN -eq $Token) { Remove-Item Env:TY_LOCK_TOKEN -ErrorAction SilentlyContinue }
+}
+
 # Set one key in one ini section, creating the section or key when missing. Only touches the text lines; comments are kept.
 function Set-IniKey([string]$Path, [string]$Section, [string]$Key, [string]$Value) {
     $lines = New-Object System.Collections.Generic.List[string]

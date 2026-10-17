@@ -81,3 +81,13 @@ Each boot takes about a minute, so the default five variants take roughly 6 to 1
 - One game at a time. Announce the slot in the Fix plan thread before you start and after you stop.
 - Read-only on the install: a run never writes `tyrender.dll`, `TYLauncher.exe` or the live `tyrender.ini`.
 - Do not bypass any permission prompt. If a step is blocked, report which step and why.
+
+## Phase gate and game lock
+
+Only one game may run, and playtesting starts only after every session has finished editing and merged.
+
+- **Phase**: `C:\CLAUDE\LOCK\phase.txt` holds one word: `EDIT`, `FREEZE` or `TEST`. The Fix plan thread writes it. `autoplaytest.ps1` and `boot_spot.ps1` refuse to run unless it says `TEST` (a missing file counts as not TEST).
+- **Lock**: `C:\CLAUDE\LOCK\game.lock` holds owner, pid, token and time. A run takes it before any launch and releases it in a `finally`. If the lock's pid is no longer running, the lock is stale and gets replaced. If a live pid holds it, the run refuses to start.
+- A run that holds the lock passes its token to child scripts in `TY_LOCK_TOKEN`, so `boot_spot.ps1` runs inside the parent's lock and does not take it twice.
+
+Procedure: the Fix plan thread sets `phase.txt` to `TEST` once all merges are done, then starts the run. It sets the phase back to `EDIT` or `FREEZE` after the run.

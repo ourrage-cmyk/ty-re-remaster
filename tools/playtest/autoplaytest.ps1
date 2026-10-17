@@ -14,6 +14,9 @@ param(
     [switch]$Copy              # test a copy of the game folder instead of the live one (for a run that must not touch the live folder)
 )
 . "$PSScriptRoot\common.ps1"
+# Phase gate and game lock: nothing launches unless the phase is TEST, and this run holds the one game slot until it ends.
+Assert-TestPhase
+$lockToken = Enter-GameLock 'autoplaytest'
 
 if (-not $Out) { $Out = Join-Path 'C:\CLAUDE\RESEARCH\autoplaytest' (Get-Date -Format 'yyyyMMdd_HHmmss') }
 New-Item -ItemType Directory -Force $Out | Out-Null
@@ -113,6 +116,7 @@ try {
 } finally {
     Stop-Game
     if ($hadIni) { Copy-Item $iniBackup $ini -Force }
+    Exit-GameLock $lockToken
 }
 
 # Report
