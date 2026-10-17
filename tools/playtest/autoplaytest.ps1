@@ -11,13 +11,13 @@ param(
     [double]$FlickerRatioMax = 1.5,
     [double]$OverlayClosedMax = 3.0,
     [string]$Out = '',
-    [switch]$LiveGame          # test the live install folder directly. Off by default: the run uses a copy so the live folder is never written or killed.
+    [switch]$Copy              # test a copy of the game folder instead of the live one (for a run that must not touch the live folder)
 )
 . "$PSScriptRoot\common.ps1"
 
 if (-not $Out) { $Out = Join-Path 'C:\CLAUDE\RESEARCH\autoplaytest' (Get-Date -Format 'yyyyMMdd_HHmmss') }
 New-Item -ItemType Directory -Force $Out | Out-Null
-if (-not $LiveGame) {
+if ($Copy) {
     $copy = Join-Path $Out 'game'
     & robocopy $Game $copy /E /XD Screenshots /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { throw "robocopy of the game folder failed (exit $LASTEXITCODE)" }
@@ -119,7 +119,7 @@ try {
 $stock = $results | Where-Object { $_.Name -eq 'stock' -and $_.FlickerLower -ge 0 } | Select-Object -First 1
 $iniOk = (-not $hadIni) -or ((Get-FileHash $ini -Algorithm SHA1).Hash -eq (Get-FileHash $iniBackup -Algorithm SHA1).Hash)
 $md = @(
-    '# Autoplaytest', '', "Game folder: $Game $(if ($LiveGame) { '(LIVE folder)' } else { '(copy, live folder untouched)' })", "Spot: $Spot", "Run: $(Get-Date -Format s)", "tyrender.ini restored: $(if ($iniOk) { 'yes' } else { 'NO, check it' })", '',
+    '# Autoplaytest', '', "Game folder: $Game $(if ($Copy) { '(copy of the live folder)' } else { '(LIVE folder: the newest build)' })", "Spot: $Spot", "Run: $(Get-Date -Format s)", "tyrender.ini restored: $(if ($iniOk) { 'yes' } else { 'NO, check it' })", '',
     '| variant | boot | game alive | shots | flicker (temporal std of luma) | overlay | tyrender.log error/failed/assert |',
     '|---|---|---|---|---|---|---|'
 )

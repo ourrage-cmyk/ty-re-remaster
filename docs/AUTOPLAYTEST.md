@@ -19,6 +19,7 @@ On the PC, from the repo's `tools` folder or wherever the repo is checked out:
 ```
 powershell -NoProfile -File tools\playtest\autoplaytest.ps1
 powershell -NoProfile -File tools\playtest\autoplaytest.ps1 -Variants stock,mod
+powershell -NoProfile -File tools\playtest\autoplaytest.ps1 -Copy
 powershell -NoProfile -File tools\playtest\boot_spot.ps1 -Game "C:\CLAUDE\TY the Tasmanian Tiger"
 ```
 
@@ -26,10 +27,10 @@ Default game folder: `C:\CLAUDE\TY the Tasmanian Tiger`. Default output: `C:\CLA
 
 Each run:
 
-1. Copies the game folder (without `Screenshots`) to `<out>\game` and tests the copy. The live install is never written, killed or focused. `-LiveGame` tests the live folder instead, and should not be used unless the owner asks for it.
-2. Refuses to start if a game process is already running from that folder. Announce game slots in the Fix plan thread first.
-3. For each variant, backs up `tyrender.ini`, sets the variant's keys, boots, runs the checks, and stops the game it started.
-4. Restores `tyrender.ini` and leaves the game closed.
+1. Tests the live game folder by default: the live folder always holds the newest main build, and that is the build to test. `-Copy` tests a copy of the folder (without `Screenshots`) in `<out>\game` instead, for a run that must not touch the live folder.
+2. Refuses to start if a game process is already running from that folder. Only the game-slot holder runs, and the slot is announced in the Fix plan thread first. So the processes it stops are always the ones it started.
+3. For each variant, backs up `tyrender.ini`, sets the variant's keys, boots, runs the checks, and stops the game it started. The restore runs in a `finally`, so it happens even when a boot fails.
+4. Restores `tyrender.ini` and leaves the game closed. Only the Fix plan thread installs builds, so the live folder is never replaced during a run.
 
 Variants (edit `$defs` in `autoplaytest.ps1` to add more):
 
@@ -73,7 +74,7 @@ Each boot takes about a minute, so the default five variants take roughly 6 to 1
 - Other spots: Billabong water, level two trees, red rock and the portal are not wired. They need save files or scripted walking. This is the next step.
 - Frame times: per-frame GPU timings are not parsed from `tyrender.log`. Read them from the log copy in each variant folder.
 - Focus: the game window must be foreground. `key.ps1` fails visibly when it is not, so a run can end with missing shots, which the checklist reports.
-- Live-DLL edits: the copy holds whatever tyrender.dll and tyrender.ini were in the live folder at the start of the run.
+- Copy runs (`-Copy`) use whatever was in the live folder when the run started, not later edits.
 
 ## Rules
 
