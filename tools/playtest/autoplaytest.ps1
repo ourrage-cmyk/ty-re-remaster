@@ -92,7 +92,7 @@ function Save-GameLog($r) {
 function Run-Variant([string]$Name, [hashtable]$Def) {
     $dir = Join-Path $Out $Name; New-Item -ItemType Directory -Force $dir | Out-Null
     Write-RunLog "variant $Name start (spot=$(if ($Def.ContainsKey('Spot')) { $Def.Spot } else { $Spot }))"
-    $r = @{ Name = $Name; Dir = $dir; Boot = ''; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a'; OverlayLog = @(); TyBlue = -1 }
+    $r = @{ Name = $Name; Dir = $dir; Boot = ''; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a'; OverlayLog = @(); TyBlue = -1; FgMiss = 0 }
     if (Get-GameProcs $Game) { $r.Boot = 'FAIL a game process is already running from this folder (slot busy; announce in the Fix plan thread)'; return $r }
     $proc = [IO.Path]::GetFileNameWithoutExtension($Def.Exe)
 
@@ -114,8 +114,10 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
     Write-RunLog "variant $Name booted to gameplay, taking shots"
 
     # Two A/B pairs at the start spot (the first is the baseline for the overlay check).
+    $script:FgMiss = 0
     $r.Base = @(Take-Pair $Game $proc $dir 'base01') + @(Take-Pair $Game $proc $dir 'base02')
     $r.ShotCount = $r.Base.Count
+    $r.FgMiss = $script:FgMiss
 
     if ($Def.Flicker) {
         # Static camera, N presses, first frame of each pair. Std-dev over time is the flicker measure; the stock variant is the baseline for animated grass and clouds.
@@ -153,7 +155,8 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
     $r.Alive = if (Get-GameProcs $Game -Names @($proc)) { 'yes' } else { 'NO (exited before the end)' }
     Stop-Game
     Save-GameLog $r
-    Write-RunLog "variant $Name done: shots=$($r.ShotCount) flicker=[$($r.Flicker)] overlay=[$($r.Overlay)] alive=$($r.Alive)"
+    $r.FgMiss = $script:FgMiss
+    Write-RunLog "variant $Name done: shots=$($r.ShotCount) notForeground=$($r.FgMiss) flicker=[$($r.Flicker)] overlay=[$($r.Overlay)] alive=$($r.Alive)"
     return $r
 }
 
@@ -221,6 +224,9 @@ function Get-CheckResult($c, $results) {
 $checkResults = @()
 foreach ($c in $planChecks) {
     $res = Get-CheckResult $c $results
+    # A shot taken while the game was not foreground is not a valid measurement: the check cannot PASS or FAIL on it.
+    $fgBad = @($results | Where-Object { @($c.variants) -contains $_.Name -and $_.FgMiss -gt 0 })
+    if ($fgBad.Count -gt 0 -and $c.kind -in @('flicker', 'tyflicker', 'overlay')) { $res = @{ Status = 'INCONCLUSIVE'; Evidence = "game not foreground for shots in: $(($fgBad | ForEach-Object { $_.Name }) -join ', '); shots invalid" } }
     $checkResults += [pscustomobject]@{ id = $c.id; status = $res.Status; evidence = $res.Evidence; issue = $c.issue; pass = $c.pass; next = $c.next; decides = $c.decides; requests = @($c.requests) }
     Write-RunLog ("check [{0}] {1}: {2}" -f $res.Status, $c.id, $res.Evidence)
 }

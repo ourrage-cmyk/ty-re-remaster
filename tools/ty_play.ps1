@@ -26,7 +26,7 @@ public class MM { [StructLayout(LayoutKind.Sequential)] public struct PT { publi
  public static void MoveFrac(IntPtr h, double fx, double fy) { RECT r; GetClientRect(h, out r); PT p; p.X = (int)((r.R - r.L) * fx); p.Y = (int)((r.B - r.T) * fy); ClientToScreen(h, ref p); SetCursorPos(p.X, p.Y); } }
 '@
 # Press ENTER in the game window. Fails clearly when no game window is up (an empty -TargetPid used to leave key.ps1 with a missing argument).
-function KeyEnter([int]$DelayMs) { $gp = GameProc; if (-not $gp) { throw "no $proc window to press ENTER in" }; & powershell -NoProfile -File $key -Keys 'ENTER' -DelayMs $DelayMs -TargetPid $gp.Id | Out-Null }
+function KeyEnter([int]$DelayMs) { $gp = GameProc; if (-not $gp) { throw "no $proc window to press ENTER in" }; & powershell -NoProfile -File (Join-Path $PSScriptRoot 'focus_game.ps1') -TargetPid $gp.Id | Out-Null; & powershell -NoProfile -File $key -Keys 'ENTER' -DelayMs $DelayMs -TargetPid $gp.Id | Out-Null }
 function Pointer($fx, $fy) { $gp = GameProc; if ($gp) { [MM]::MoveFrac($gp.MainWindowHandle, $fx, $fy); Start-Sleep -Milliseconds 500 } }
 Pointer 0.01 0.01
 KeyEnter 2500

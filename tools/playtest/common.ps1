@@ -199,6 +199,15 @@ function Get-GameProcs([string]$Game, [string[]]$Names = @('TY_tyrender', 'TY'))
     return @(Get-Process -Name $Names -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) })
 }
 
+# Foreground check before a shot. focus_game.ps1 raises the game window; returns $false when it cannot, and the run marks those shots invalid.
+if ($null -eq $script:FgMiss) { $script:FgMiss = 0 }
+function Ensure-GameFg([string]$Game, [string]$Proc) {
+    $p = Get-GameProcs $Game -Names @($Proc) | Select-Object -First 1
+    if (-not $p) { return $false }
+    & powershell -NoProfile -File (Join-Path $ToolsDir 'focus_game.ps1') -TargetPid $p.Id | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
 # Press one key in the game window. Targets the game process under $Game by PID, and key.ps1 fails visibly if focus is lost.
 function Send-GameKey([string]$Game, [string]$Proc, [string]$Key, [int]$DelayMs = 800) {
     $p = Get-GameProcs $Game -Names @($Proc) | Select-Object -First 1
@@ -209,6 +218,7 @@ function Send-GameKey([string]$Game, [string]$Proc, [string]$Key, [int]$DelayMs 
 # Press the A/B screenshot key once (F11 by default, which writes 2 PNGs into <game>\Screenshots) and copy the new pair to $Dest as <Prefix>_a.png / <Prefix>_b.png.
 # Returns the copied paths (empty when the game wrote nothing).
 function Take-Pair([string]$Game, [string]$Proc, [string]$Dest, [string]$Prefix, [string]$ShotKey = 'F11') {
+    if (-not (Ensure-GameFg $Game $Proc)) { $script:FgMiss++; Write-RunLog "shot $Prefix: game NOT foreground, shot marked invalid" }
     $before = @(Get-GameShots $Game)
     Send-GameKey $Game $Proc $ShotKey 300
     $new = @()
