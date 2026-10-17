@@ -8,7 +8,7 @@
 //   4) composite onto FB0: depth-aware 2x2 upsample, shade-weighted desaturated albedo proxy (same look as the legacy path)
 // Config [gi]: Mode=1 (0 = legacy path) Atrous=3 HiZIter=0 (0 -> Steps*4 traversal iterations) Prof=0 (log per-pass GPU ms); the old keys keep their meaning.
 
-static int g_giMode = 1, g_giAtrous = 3, g_giHizIter = 0, g_giProf = 0;
+static int g_giMode = 1, g_giAtrous = 3, g_giHizIter = 0, g_giProf = 0, g_giChecker = 0;   // g_giChecker: [gi] Checker (default 0 = trace every pixel)
 static int g_giCharOn = 1; static float g_giCharKeep = 0.0f, g_giCharGI = 0.3f, g_giCharH = 160.0f, g_giCharR = 70.0f;   // [gi] Characters/CharacterColour/CharacterGI/CharacterHeight/CharacterRadius
 static float g_giSigmaL = 4.0f, g_giBlur = 0.0f; static int g_giNoiseCycle = 0;   // [gi] SourceBlur (cone footprint px per px of ray length, 0 = off), NoiseCycle (0 = noise changes every frame, N = repeats every N frames, 1 = static)
  static int g_giSweep = 0; static const char* g_giVarName = "";
@@ -135,6 +135,7 @@ static const char* kGITrace2 = GI_CHAR_GLSL R"(
 in vec2 uv; layout(location = 0) out vec4 o0; layout(location = 1) out vec4 o1;
 uniform sampler2D u_hz; uniform sampler2D u_color; uniform sampler2D u_mask; uniform int u_useMask;
 uniform float u_radius; uniform float u_thick; uniform int u_rays; uniform int u_iters; uniform int u_levels; uniform float u_frame; uniform float u_blur;
+uniform int u_checker; uniform int u_par;   // [gi] Checker: only half the (half-res) pixels are traced each frame; the rest keep last frame's texRaw/texGB
 uniform float u_lodS; uniform float u_lodE; uniform float u_lodMin;   // [lod] ramp in view depth (world units); lodMin = share of rays kept at the far end
 float IGN(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
 float H0(ivec2 p) { return texelFetch(u_hz, clamp(p, ivec2(0), ivec2(u_full) - 1), 0).r; }
@@ -195,6 +196,7 @@ vec3 Trace(vec3 Ps, vec3 dir) {
   return hc;
 }
 void main() {
+  if (u_checker != 0 && ((int(gl_FragCoord.x) + int(gl_FragCoord.y) + u_par) & 1) != 0) discard;   // skipped pixels keep the previous frame's output (no clears in the GI pass)
   ivec2 ip = ivec2(gl_FragCoord.xy) * 2;
   float h = H0(ip);
   if (h <= 0.0) { o0 = vec4(0.0); o1 = vec4(0.0, 0.0, 0.0, -1.0); return; }
@@ -448,7 +450,8 @@ static bool GIHiz(GLuint depthTex, int w, int h, const float* invVP, const float
     gx.Uniform1i(UL(g2.progTrace, "u_hz"), 1); gx.Uniform1i(UL(g2.progTrace, "u_color"), 2); gx.Uniform1i(UL(g2.progTrace, "u_mask"), 3); gx.Uniform1i(UL(g2.progTrace, "u_useMask"), useMask ? 1 : 0);
     gx.Uniform1f(UL(g2.progTrace, "u_radius"), g_giRadius); gx.Uniform1f(UL(g2.progTrace, "u_thick"), g_giThick);
     gx.Uniform1i(UL(g2.progTrace, "u_rays"), g_giRays < 1 ? 1 : g_giRays); gx.Uniform1i(UL(g2.progTrace, "u_iters"), g_giHizIter > 0 ? g_giHizIter : (g_giSteps < 2 ? 8 : g_giSteps * 4));
-    gx.Uniform1i(UL(g2.progTrace, "u_levels"), g2.levels); gx.Uniform1f(UL(g2.progTrace, "u_frame"), (float)(g_giNoiseCycle > 0 ? (g_frame % g_giNoiseCycle) : (g_frame & 4095))); gx.Uniform1f(UL(g2.progTrace, "u_blur"), g_giBlur);
+    gx.Uniform1i(UL(g2.progTrace, "u_checker"), g_giChecker); gx.Uniform1i(UL(g2.progTrace, "u_par"), (int)(g_frame & 1));
+    gx.Uniform1i(UL(g2.progTrace, "u_levels"), g2.levels);gx.Uniform1f(UL(g2.progTrace, "u_frame"), (float)(g_giNoiseCycle > 0 ? (g_frame % g_giNoiseCycle) : (g_frame & 4095))); gx.Uniform1f(UL(g2.progTrace, "u_blur"), g_giBlur);
     LodUniforms(UL(g2.progTrace, "u_lodS"), UL(g2.progTrace, "u_lodE"), UL(g2.progTrace, "u_lodMin"), g_lodEnable && g_lodGI);
     o_glActiveTexture(0x84C1); o_glBindTexture(0x0DE1, g2.texHz);
     o_glActiveTexture(0x84C2); o_glBindTexture(0x0DE1, g_colorCopyTex);
