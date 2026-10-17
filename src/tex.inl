@@ -9,11 +9,11 @@
 #include <mutex>
 #include <algorithm>
 #include "tex_tags.inc"
-enum { TF_KNOWN = 1, TF_EMISSIVE = 2, TF_TRANSPARENT = 4, TF_CHARACTER = 8, TF_DECAL = 16 };   // TF_DECAL: named in ini [decal] Names (not a CSV tag)
-static int g_texEnable = 1, g_texDebug = 0, g_texSkinTags = 1;
+enum { TF_KNOWN = 1, TF_EMISSIVE = 2, TF_TRANSPARENT = 4, TF_CHARACTER = 8, TF_DECAL = 16, TF_WATER = 32 };   // TF_DECAL: named in ini [decal] Names (not a CSV tag). TF_WATER: file name contains "water" (ini [fog] WaterBoost)
+static int g_texEnable = 1, g_texDebug = 0, g_texSkinTags = 1, g_texLogUnknown = 0;   // g_texLogUnknown: ini [tex] LogUnknown (default 0): draws per untagged texture, by name, every 600 frames
 static const GLuint kTexProgs = 8192;
 static GLint g_progTyTexLoc[kTexProgs]; static float g_progTyTexLast[kTexProgs];   // per program: tyTex uniform location, last value (g_progDiffUnit = albedo sampler unit, in tyrender.cpp)
-static GLint g_progTyWaterLoc[kTexProgs]; static float g_progTyWaterLast[kTexProgs]; static int g_texWaterNoFresnel;   // ini [pbr] SkyFresnelSkipWater (default 0 = off): per-draw tyWater uniform, 1 = water-tagged draw
+static GLint g_progTyWaterLoc[kTexProgs]; static float g_progTyWaterLast[kTexProgs]; static int g_texWaterNoFresnel; static int g_dbgWater = 0;   // [pbr] DebugWater bitmask (issue #5 bisect), see LoadPbrConfig   // ini [pbr] SkyFresnelSkipWater (default 0 = off): per-draw tyWater uniform, 1 = water-tagged draw
 static std::unordered_map<std::string, uint8_t> g_tagByName;      // lowercase file name -> flags
 static int g_spillLog = 0; static std::unordered_map<GLuint, unsigned> g_spillCnt; static std::unordered_map<GLuint, std::string> g_texNameById;   // #9 step 1 (SpillLogDraw)
 // ini [decal] (#8 footprint glow): Clamp=0 (default off) caps the luminance of decal draws at Max; Names = file names that count as decals.
@@ -64,6 +64,7 @@ static std::string TexBase(const std::string& p) {
 static void LoadTexTags() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     g_texEnable = GetPrivateProfileIntA("tex", "Enable", 1, ini); g_texDebug = GetPrivateProfileIntA("tex", "Debug", 0, ini);
+    g_texLogUnknown = g_texEnable && GetPrivateProfileIntA("tex", "LogUnknown", 0, ini);
     g_spillLog = g_texEnable && GetPrivateProfileIntA("spill", "LogEmitters", 0, ini);   // #9 step 1: log additive draws per texture (every 600 frames)
     g_texSkinTags = g_texEnable && GetPrivateProfileIntA("tex", "SkinnedByTag", 1, ini);   // skinned shaders get the detail code too; tags switch it per draw
     for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = g_progTyWaterLoc[i] = g_progTyDecalLoc[i] = -1;
@@ -180,9 +181,11 @@ static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const voi
         logf("[tex] MISS id=%u px=%p nearest=%p+%u %s ringW=%u", id, px, best ? best->b : nullptr, best ? (unsigned)best->n : 0, best ? best->name : "-", g_texRingW);
     }
     if (nm) { g_texNamed++; auto it = g_tagByName.find(nm); if (it != g_tagByName.end()) { fl = it->second; if (fl & TF_KNOWN) g_texTagged++; }
-        if (g_decalClamp && std::find(g_decalNames.begin(), g_decalNames.end(), std::string(nm)) != g_decalNames.end()) fl |= TF_DECAL; }
+        if (g_decalClamp && std::find(g_decalNames.begin(), g_decalNames.end(), std::string(nm)) != g_decalNames.end()) fl |= TF_DECAL;
+        std::string low = nm; for (auto& c : low) c = (char)tolower((unsigned char)c);
+        if (low.find("water") != std::string::npos) fl |= TF_WATER; }
     g_texFlagArr[id] = fl; g_texClassArr[id] = MatClassOfFlags(fl);
-    if (g_spillLog && nm) g_texNameById[id] = nm;
+    if ((g_spillLog || g_texLogUnknown) && nm) g_texNameById[id] = nm;
     if (g_texDebug) { char b[160]; snprintf(b, sizeof b, "%s %dx%d ifmt=%#x", nm ? nm : "?", w, h, ifmt); g_texInfo[id] = b; }
     if (g_texDebug && g_texUploads < 500) logf("[tex] upload id=%u %dx%d ifmt=%#x bytes=%d px=%p name=%s flags=%u", id, w, h, ifmt, bytes, px, nm ? nm : "?", fl);
 }
@@ -221,7 +224,7 @@ static void TexDrawPrep() {
     if (!g_progKind[p]) g_progKind[p] = g_skinProgs.count(p) ? 1 : 2;
     uint8_t cls = MatClass(tex); const MatRow& row = kMatPolicy[cls]; float v;
     if (row.noRelief) v = 1.0f; else if (g_progKind[p] == 1) v = (cls == MC_UNKNOWN) ? 1.0f : 0.0f; else v = 0.0f;
-    if (g_texDebug && cls == MC_UNKNOWN && tex < kTexArr) g_texUntagCnt[tex]++;
+    if ((g_texDebug || g_texLogUnknown) && cls == MC_UNKNOWN && tex < kTexArr) g_texUntagCnt[tex]++;
     g_texDraws++; if (row.character) g_texDrawChar++; else if (cls != MC_UNKNOWN) g_texDrawKnown++; else g_texDrawUnknown++;
     TexSetWater(p, tex);
     if (g_progTyTexLast[p] == v) return;
@@ -259,10 +262,13 @@ static void TexReport() {
     }
     g_spillCnt.clear();
     logf("[tex] stats frame=%u reads=%u uploads(with data)=%u named=%u tagged=%u | relief-program draws since last: %u (character %u, tagged non-character %u, untagged %u) uniform sets %u", g_frame, g_texReads, g_texUploads, g_texNamed, g_texTagged, g_texDraws, g_texDrawChar, g_texDrawKnown, g_texDrawUnknown, g_texDrawSet);
-    if (g_texDebug) {
+    if (g_texDebug || g_texLogUnknown) {
         std::vector<std::pair<unsigned, GLuint>> v; for (GLuint i = 0; i < kTexArr; i++) if (g_texUntagCnt[i]) v.push_back({g_texUntagCnt[i], i});
         std::sort(v.begin(), v.end(), [](auto& a, auto& b) { return a.first > b.first; });
-        for (size_t i = 0; i < v.size() && i < 25; i++) { auto it = g_texInfo.find(v[i].second); logf("[tex] untagged draws=%u id=%u %s", v[i].first, v[i].second, it == g_texInfo.end() ? "(no upload seen)" : it->second.c_str()); }
+        for (size_t i = 0; i < v.size() && i < 25; i++) {
+            auto it = g_texInfo.find(v[i].second); auto nt = g_texNameById.find(v[i].second);
+            logf("[tex] untagged draws=%u id=%u name=%s %s", v[i].first, v[i].second, nt != g_texNameById.end() ? nt->second.c_str() : "?", it == g_texInfo.end() ? "(no upload seen)" : it->second.c_str());
+        }
         memset(g_texUntagCnt, 0, sizeof g_texUntagCnt);
     }
     g_texDraws = g_texDrawChar = g_texDrawKnown = g_texDrawUnknown = g_texDrawSet = 0;

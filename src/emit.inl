@@ -5,12 +5,13 @@
 // captured before lighting, through the tyEmit uniform), not the lit colour. Once per frame, after GI and before atmos, the buffer is blurred and
 // added to FB0 scaled by [emit] Strength.
 // ini [emit]: Enable=0 (default: none of this runs), Strength=1.0 (composite gain), Radius=12 (blur step in half-res texels, all emitters share it),
+//             Spread=1.0 (scales the blur step; 1 = unchanged), Compensate=0 (1: composite gain x Spread^2, restores the peak a wider blur dilutes)
 //             MaxEmitters=16 (cap on splatted emitter draws per frame; the first N in draw order, NOT ranked by screen area or distance yet).
 // Known limits: an emitter whose shader could not be rewritten (no tyEmit uniform) is not splatted. Lit emitters output their albedo captured before
 // the light multiply, which is only the albedo when the stock light line is present.
 #include <cstdio>
 
-static int g_emitEnable = 0, g_emitMax = 16; static float g_emitStrength = 1.0f, g_emitRadius = 12.0f;
+static int g_emitEnable = 0, g_emitMax = 16, g_emitComp = 0; static float g_emitStrength = 1.0f, g_emitRadius = 12.0f, g_emitSpread = 1.0f;
 static GLuint g_emitFbo, g_emitVao, g_emitTex[2], g_emitProgBlur, g_emitProgComp, g_emitProgDepth; static int g_emitW, g_emitH; static bool g_emitInitFail;
 static GLuint g_emitDepthFull, g_emitDepthHalf; static int g_emitFullW, g_emitFullH;   // full-res copy of the scene depth; half-res depth of the emission buffer
 static unsigned g_emitFrame, g_emitCount, g_emitComposed; static bool g_emitCleared, g_emitActive;
@@ -33,10 +34,12 @@ static void LoadEmitConfig() {
     g_emitEnable = GetPrivateProfileIntA("emit", "Enable", 0, ini); g_emitMax = GetPrivateProfileIntA("emit", "MaxEmitters", 16, ini);
     char b[32]; GetPrivateProfileStringA("emit", "Strength", "1.0", b, sizeof b, ini); g_emitStrength = (float)atof(b);
     GetPrivateProfileStringA("emit", "Radius", "12", b, sizeof b, ini); g_emitRadius = (float)atof(b);
+    GetPrivateProfileStringA("emit", "Spread", "1.0", b, sizeof b, ini); g_emitSpread = (float)atof(b); if (!(g_emitSpread >= 0.25f)) g_emitSpread = 0.25f; if (g_emitSpread > 4.0f) g_emitSpread = 4.0f;
+    g_emitComp = GetPrivateProfileIntA("emit", "Compensate", 0, ini);
     if (g_emitMax < 0) g_emitMax = 0;
     for (int i = 0; i < 8192; i++) g_progTyEmitLoc[i] = -1;
     for (int k = 0; k < kEmitOrdMax; k++) g_emitKeep[k] = true;
-    if (g_emitEnable) logf("[emit] enabled: strength %.2f radius %.1f max %d", g_emitStrength, g_emitRadius, g_emitMax);
+    if (g_emitEnable) logf("[emit] enabled: strength %.2f radius %.1f spread %.2f compensate %d max %d", g_emitStrength, g_emitRadius, g_emitSpread, g_emitComp, g_emitMax);
 }
 
 // Shader rewrite (only when Enable=1): the stock output line emits the albedo (captured before the light multiply) when tyEmit = 1.
@@ -235,7 +238,7 @@ static void RunEmit(int w, int h) {
     gx.Uniform1i(locSrc, 0);
     for (int pass = 0; pass < 4; pass++) {
         int horiz = (pass % 2) == 0;
-        float step = g_emitRadius * 0.5f;
+        float step = g_emitRadius * 0.5f * g_emitSpread;
         o_glBindFramebuffer(0x8D40, g_emitFbo); o_glFramebufferTexture2D(0x8D40, 0x8CE0, 0x0DE1, dst, 0);
         o_glViewport(0, 0, g_emitW, g_emitH);
         gx.Uniform2f(locDir, horiz ? step / g_emitW : 0.0f, horiz ? 0.0f : step / g_emitH);
@@ -246,7 +249,7 @@ static void RunEmit(int w, int h) {
     // composite: additive onto FB0, RGB only (alpha is the GI source mask, must not change)
     o_glBindFramebuffer(0x8D40, 0); o_glViewport(0, 0, w, h);
     o_glColorMask(1, 1, 1, 0); o_glEnable(0x0BE2); o_glBlendFunc(1, 1);
-    o_glUseProgram(g_emitProgComp); gx.Uniform1i(o_glGetUniformLocation(g_emitProgComp, "u_em"), 0); gx.Uniform1f(o_glGetUniformLocation(g_emitProgComp, "u_strength"), g_emitStrength);
+    o_glUseProgram(g_emitProgComp); gx.Uniform1i(o_glGetUniformLocation(g_emitProgComp, "u_em"), 0); gx.Uniform1f(o_glGetUniformLocation(g_emitProgComp, "u_strength"), g_emitStrength * (g_emitComp ? g_emitSpread * g_emitSpread : 1.0f));
     o_glActiveTexture(0x84C0); o_glBindTexture(0x0DE1, g_emitTex[0]);
     o_glDrawArrays(4, 0, 3);
     g_sceneModified = true;   // bloom reads the engine's colour copy: it must include the emitted light

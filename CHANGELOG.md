@@ -2,7 +2,7 @@
 
 Builds are identified by the git commit in the launcher title bar. "Untested" means not yet played by the owner.
 
-## Unreleased (main after v0.3.5, up to 9388945)
+## Unreleased (main after v0.3.5, up to 4b922a8)
 
 Added
 - **F10 settings overlay** (#12): in game, F10 opens a small panel with live brightness, saturation, sharpen, vignette, fog intensity, AO on/off, tess level and shadow taps. `[overlay] Key=F10`, `0` = off. Untested.
@@ -12,6 +12,9 @@ Added
 - **Emitter light injection** (#9, phase 2): `[emit] Enable=0` (off by default); ranks emitter draws by screen area for the `MaxEmitters` cap. Untested.
 - **Material classes** (#44, #48): one class lookup replaces the separate texture-flag tests. No intended visual change. Untested.
 - **Settings clash guard** (#13): warns in the log when the game's own SSAO/MSAA is on (`[clash] Check=1`).
+- **Water debug** (#5): `[pbr] DebugWater` bitmask to bisect the blue flicker on Ty (#62). **Emitter blur** `[emit]` wider portal blur, default off (#61).
+- **Overlay fixes** (#12): F10 overlay now defaults off (`Key=0`); explicit draw state and focus-free toggle (#54, #59, #63). Untested in level.
+- **Automated playtest** (`tools/playtest`, #64, #65): boots variants, takes screenshots, checks flicker and overlay. Runs only in phase TEST and takes `C:\CLAUDE\LOCK\game.lock` (#66).
 
 Changed
 - Fog hue stays fixed as the camera turns (#3). Untested after the latest change.
