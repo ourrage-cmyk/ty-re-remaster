@@ -18,7 +18,7 @@ uniform sampler2D u_color;
 uniform vec3 u_cam; uniform vec3 u_sunDir; uniform vec3 u_sunCol; uniform vec3 u_ambCol;
 uniform float u_density; uniform float u_falloff; uniform int u_steps; uniform float u_maxDist; uniform float u_g; uniform float u_frameNoise; uniform int u_debug;
 uniform int u_mode; uniform sampler2D u_low; uniform vec2 u_halfSize;   // u_mode: 0 full-res, 1 half-res march (scat,T), 2 full-res composite
-uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH; uniform float u_fogSat; uniform sampler2D u_wmask; uniform float u_waterFog; uniform float u_hueLock;
+uniform sampler3D u_vol; uniform float u_volA; uniform float u_volN; uniform float u_desat; uniform float u_lift; uniform vec3 u_haze; uniform float u_skyHaze; uniform float u_skyH; uniform float u_fogSat; uniform sampler2D u_wmask; uniform float u_waterFog; uniform float u_hueLock; uniform float u_skyFog;
 uniform sampler2D u_skyTex; uniform float u_hazeSky, u_ambScale; uniform float u_blurStart, u_blurRange, u_blurPx; uniform vec2 u_rcp;
 const vec3 LW = vec3(0.2126, 0.7152, 0.0722);
 // haze colour: the CPU level-fog hue, pulled toward the colour of the actual sky near the horizon (measured on the GPU, smoothed over time)
@@ -77,7 +77,7 @@ void main() {
       }
     }
     bool skyp = d >= 0.99999;
-    if (skyp) dd = 0.12 * u_maxDist;
+    if (skyp) dd = u_skyFog * u_maxDist;   // SkyFogDist: how deep the sky/painted rock sits in the fog (was a fixed 0.12, which left the red rock almost clear)
     dd = min(dd, u_maxDist);
     float s = log(1.0 + dd * (exp(u_volA) - 1.0) / u_maxDist) / u_volA;
     vec4 v = texture(u_vol, vec3(uv, max(s - 0.5 / u_volN, 0.5 / u_volN)));
@@ -126,7 +126,7 @@ void main() {
   vec3 ray = P - u_cam; float dist = length(ray); vec3 V = ray / max(dist, 1e-3);
   bool sky = d >= 0.99999;
   if (sky || dist > u_maxDist) dist = u_maxDist;
-  if (sky) dist = min(dist, 0.12 * u_maxDist);       // keep the painted sky: only a short slab of haze/shaft glow in front of it
+  if (sky) dist = min(dist, u_skyFog * u_maxDist);       // keep the painted sky: only a short slab of haze/shaft glow in front of it
   float cosT = dot(V, u_sunDir);
   float g = u_g, phase = (1.0 - g * g) / (12.566 * pow(max(1.0 + g * g - 2.0 * g * cosT, 1e-4), 1.5));
   float iso = 1.0 / 12.566;
@@ -240,6 +240,7 @@ typedef GLenum(WINAPI* glGetError_t)();
 static struct { bool tried, ok, failed; GLuint prog, tex; int fw, fh; glDispatchCompute_t Dispatch; glBindImageTexture_t BindImage; glMemoryBarrier_t Barrier; glTexImage3D_t TexImage3D; glDeleteTextures_t DelTex; glGetError_t GetErr; } vol;
 static int g_atFroxel = 1, g_atFroxelPx = 12;
 static float g_atSkyH = 0.45f, g_atHazeHue = 0.15f, g_atFogSat = 0.5f, g_atIntensity = 2.5f, g_atDesat = 0.7f, g_atLift = 0.35f, g_atSkyHaze = 0.8f, g_atWaterFog = 1.0f;
+static float g_atSkyFog = 0.45f;   // [atmos] SkyFogDist (fraction of MaxDist, default 0.45; 0.12 = the old fixed sky slab, restore with the key)
 static float g_atHueLock = 1.0f;   // [atmos] HueLock (#3): 1 = froxel in-scatter keeps its brightness but takes the haze hue, so the sun-facing glow no longer tints the fog as the camera turns
 
 static bool InitVolume() {
@@ -285,7 +286,7 @@ static void LoadAtmosConfig() {
     F("Density", "0.000015", g_atDensity) F("HeightFalloff", "0.0015", g_atFalloff) F("MaxDist", "40000", g_atMaxDist)
     F("SunIntensity", "1.4", g_atSunInt) F("Anisotropy", "0.6", g_atG) F("AmbientScale", "1.0", g_atAmb)
     F("ContactShadows", "0.35", g_atContact) F("ContactLength", "25", g_atContactLen) F("ContactThickness", "6", g_atContactThick) F("FogAmount", "0.8", g_atFogMul)
-    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.8", g_atSkyHaze) F("SkyHazeHeight", "0.45", g_atSkyH) F("FogSaturation", "0.5", g_atFogSat) F("WaterFog", "1.0", g_atWaterFog) F("HueLock", "1.0", g_atHueLock) F("HazeHue", "0.15", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
+    F("ShaftContrast", "0.5", g_atShaftContrast) F("Intensity", "2.5", g_atIntensity) F("Desaturation", "0.7", g_atDesat) F("HazeLift", "0.35", g_atLift) F("SkyHaze", "0.8", g_atSkyHaze) F("SkyHazeHeight", "0.45", g_atSkyH) F("FogSaturation", "0.5", g_atFogSat) F("WaterFog", "1.0", g_atWaterFog) F("HueLock", "1.0", g_atHueLock) F("SkyFogDist", "0.45", g_atSkyFog) F("HazeHue", "0.15", g_atHazeHue) F("HazeSky", "0.0", g_atHazeSky) F("DepthBlur", "0", g_atBlurPx) F("BlurStart", "4000", g_atBlurStart) F("BlurRange", "12000", g_atBlurRange)
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
     g_fogSeeThruDepth = GetPrivateProfileIntA("fog", "SeeThruDepth", 0, ini); g_fogLateEmit = GetPrivateProfileIntA("fog", "LateEmitters", 0, ini);
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
@@ -424,7 +425,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
     u3(o_glGetUniformLocation(p, "u_ambCol"), amb[0] * g_atAmb * 12.566f, amb[1] * g_atAmb * 12.566f, amb[2] * g_atAmb * 12.566f);   // * 4pi cancels the iso phase
     F("u_density", g_atEnable ? g_atDensity * g_atIntensity * g_atFogMul * g_fogAmount / fmaxf(g_fogDistance, 0.05f) : 0.0f);
     o_glUniformMatrix4fv(o_glGetUniformLocation(p, "u_VP"), 1, 0, g_sceneVP); F("u_contact", g_atContact); F("u_contactLen", g_atContactLen); F("u_contactThick", g_atContactThick); F("u_shaftContrast", g_atShaftContrast); F("u_falloff", g_atFalloff); I("u_steps", g_atEnable ? g_atSteps : 0); F("u_maxDist", g_atMaxDist); F("u_g", g_atG);
-    F("u_frameNoise", g_atContactStable ? 0.0f : fmodf(g_frame * 0.6180339f, 1.0f));
+    F("u_frameNoise", g_atContactStable ? 0.0f : fmodf(g_frame * 0.6180339f, 1.0f)); F("u_skyFog", g_atSkyFog);   // also set for the ray-march fallback (line 129)
     I("u_skyTex", 6); F("u_hazeSky", useSky ? g_atHazeSky : 0.0f); F("u_ambScale", g_atAmb); F("u_blurStart", g_atBlurStart); F("u_blurRange", fmaxf(g_atBlurRange, 1.0f)); F("u_blurPx", g_atBlurPx * h / 1440.0f); gx.Uniform2f(o_glGetUniformLocation(p, "u_rcp"), 1.0f / w, 1.0f / h); I("u_debug", g_atDebug);
     o_glActiveTexture(0x84C0); o_glBindTexture(0x0DE1, depthTex);
     o_glActiveTexture(0x84C2); o_glBindTexture(0x0DE1, haveSh ? g_shadowTex[0] : 0);
@@ -451,7 +452,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         o_glActiveTexture(0x84C5); o_glBindTexture(0x806F, vol.tex);
         o_glActiveTexture(0x84C0);
         o_glUseProgram(p);
-        I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH); F("u_fogSat", g_atFogSat); F("u_hueLock", g_atHueLock);
+        I("u_vol", 5); F("u_volA", volA); F("u_volN", 64.0f); F("u_desat", g_atDesat); F("u_lift", g_atLift); F("u_skyHaze", g_atSkyHaze); F("u_skyH", g_atSkyH); F("u_fogSat", g_atFogSat); F("u_hueLock", g_atHueLock); F("u_skyFog", g_atSkyFog);
         { bool wm = g_atWaterFog > 0.0f && g_giMask && g_giMaskRan == g_frame && g_giMaskFrame == g_frame && g_giMaskFrameDraws > 0 && g2.texMask;   // best guess, untested: fog water harder via the GI source mask
           I("u_wmask", 7); F("u_waterFog", wm ? g_atWaterFog : 0.0f); if (wm) { o_glActiveTexture(0x84C7); o_glBindTexture(0x0DE1, g2.texMask); o_glActiveTexture(0x84C0); } }
         u3(o_glGetUniformLocation(p, "u_haze"), amb[0] * g_atAmb, amb[1] * g_atAmb, amb[2] * g_atAmb);
