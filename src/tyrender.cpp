@@ -71,7 +71,7 @@ static void PollAOFlags();
 static void LoadAOConfig();
 static void LoadFXConfig();
 static void RunFX(int w, int h);
-static unsigned g_sceneDepthFrame = ~0u, g_fxDoneFrame = ~0u; static bool g_fxOffFile;
+static unsigned g_sceneDepthFrame = ~0u, g_fxDoneFrame = ~0u; static bool g_fxOffFile; static bool g_abOff;   // A/B hotkey: this frame is the vanilla "off" frame of a pair (abshot.inl); AO, GI, atmos, fx and TAA skip while set
 static int g_screenW, g_screenH; static GLuint g_sceneDepthTex; static bool g_sceneModified;
 static std::unordered_map<uint64_t, int> g_namedLocs;   // (prog<<32|loc) -> 1 shadowVPMatrix1, 2 shadowVPMatrix2, 3 shadowDir, 4 fogColour, 5 shadowTexture1, 6 shadowTexture2
 static int g_aoDebug, g_giDebug;   // debug view selectors (set by flag files, see ao.inl / gi.inl)

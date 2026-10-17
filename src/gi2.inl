@@ -36,7 +36,7 @@ static int g_giMask = 7; static unsigned g_giMaskRan, g_giMaskFrame, g_giMaskDra
 typedef void(WINAPI* gm_bfs_t)(GLenum, GLenum, GLenum, GLenum);
 static struct { GLint bs, bd, bsa, bda, fbo; GLboolean cm[4], dm, blend; } gmS; static gm_bfs_t gmBFS; static bool gmTried;
 static bool GIMaskBegin() {
-    if (!g_giMask || !g_giEnable || g_giOffFile || g_giStrength <= 0 || g_giMaskRan == g_frame || !g_curProg || !gx.GetIntegerv || !gx.GetBooleanv || !gx.IsEnabled || !g_texFlagArr) return false;
+    if (!g_giMask || !g_giEnable || g_giOffFile || g_abOff || g_giStrength <= 0 || g_giMaskRan == g_frame || !g_curProg || !gx.GetIntegerv || !gx.GetBooleanv || !gx.IsEnabled || !g_texFlagArr) return false;
     unsigned unit = g_progDiffUnit[g_curProg < 8192 ? g_curProg : 0] & 31;
     if (!(MatPolicy(g_bound2D[unit]).giBits & g_giMask)) return false;
     if (!gmTried) { gmTried = true; gmBFS = (gm_bfs_t)GLProc("glBlendFuncSeparate"); }

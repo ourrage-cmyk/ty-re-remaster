@@ -102,7 +102,7 @@ static void PollGIFlags() {
 }
 
 static void RunGI(GLuint depthTex, int w, int h) {
-    if (!g_giEnable || g_giOffFile || (gi.failed && g2.failed) || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex || g_giStrength <= 0) return;
+    if (!g_giEnable || g_giOffFile || g_abOff || (gi.failed && g2.failed) || !g_haveVP || g_vpFrame != g_frame || !g_colorCopyTex || g_giStrength <= 0) return;
     if (!LoadGX()) { gi.failed = true; return; }
     if (g_giSweep) GISweepApply();
     float invVP[16]; if (!Invert4(g_sceneVP, invVP)) return;

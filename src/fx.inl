@@ -159,7 +159,7 @@ static void LoadFXConfig() {
 // called once per presented frame: choose next frame's sub-pixel jitter (Halton 2,3; 8-sample cycle)
 static float Halton(int i, int b) { float f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i /= b; } return r; }
 static void UpdateJitter() {
-    g_jitterOn = g_fxEnable && !g_fxOffFile && !fx.failed && (g_fxAA == 2 || g_fxAA == 3) && g_screenW > 0;
+    g_jitterOn = g_fxEnable && !g_fxOffFile && !g_abOff && !fx.failed && (g_fxAA == 2 || g_fxAA == 3) && g_screenW > 0;
     if (!g_jitterOn) { g_jitterX = g_jitterY = 0; return; }
     int i = (g_frame % 8) + 1;
     g_jitterX = (Halton(i, 2) - 0.5f) * 2.0f / g_screenW;   // NDC units (one pixel = 2/W)
@@ -175,7 +175,7 @@ static GLuint MakeTex8(int w, int h) {
 }
 
 static void RunFX(int w, int h) {
-    if (!g_fxEnable || g_fxOffFile || fx.failed) return;
+    if (!g_fxEnable || g_fxOffFile || g_abOff || fx.failed) return;
     if (!LoadGX()) { fx.failed = true; return; }
     if (!fx.init) {
         fx.progFXAA = CompileProg("fxaa", kVS, kFXAA, nullptr, nullptr);
