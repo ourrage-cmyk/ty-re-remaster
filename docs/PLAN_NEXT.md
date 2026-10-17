@@ -1,28 +1,40 @@
-# Plan going forward (updated 2026-10-13 19:23, after playtest 4 and the v0.3.3 test build)
-Status: v0.3.2 shipped as preview (G1 passed). v0.3.3 test build packaged and installed in the game folder (G1 not run). Playtest 4: Medium stable, High and Ultra flicker, water flicker, shadow bright lines, footprints, portal light, fire haze. The user has not yet played v0.3.3. Current state: `RESUME.md`.
+# Plan for the next build
 
-## Batch 1 - stability + the visible bugs (progress)
-1. **T78 High/Ultra flicker** - PARTLY DONE in v0.3.3: GI source mask (`[gi] ExcludeSources=3`), GI blur/noise (`SourceBlur 0.15`, `NoiseCycle 8`, `TemporalBlend 0.85`). Contact shadows only +0.035 flicker in the static test. Static tests cannot reproduce the flicker. **Remaining:** user playtest of High and Ultra on v0.3.3; if still flickering, bisect with a low-fps emulated walk (`motion.req sleepMs`) per setting (GI rays, contact shadows, Scope=all relief, AO wide pass). If a setting cannot be made stable, change the Ultra preset (not the code) and say so.
-2. **T73 AO** - NOT STARTED. AO distance-fade slider (strength 1 at Ty, 0 far away, long smooth gradient); character not an AO occluder (capsule mask like GI, fixes the halo behind Ty); white rim on fern shadows.
-3. **T74 + T75/T82 shadows and water** - PARTLY DONE. T82 (light) added debug keys and reported done, but the bright lines on the face and bag are NOT fixed (root cause not found). T74 water brightness pulse on Ty (W1): not started; the water blue flicker (GI sampling water) is addressed by the v0.3.3 GI mask, to be confirmed by playtest.
+Updated 2026-10-17, after the playtest of build cda9364.
 
-## Batch 2 - speed and polish
-4. **T76 distance LOD** - NOT STARTED. Smooth distance falloff for tess/relief, AO, shadow taps, fog steps, GI rays; measure savings on Medium (target 10 ms or less) without popping. Also optimise High GI cost (+2.5 ms in v0.3.3).
-5. **T77 emissive from texture tags** - MOSTLY DONE (T80: texture-name hook works, 206 of 342 uploads tagged, emissive API and per-draw flags). **Remaining:** footprints still glow (cause unknown; hypothesis: decals blended after the depth copy), portal light spill (T56 / T65, design in `SRC\agents\light\REPORT.md`).
-6. **Atmosphere and Billabong** - NOT STARTED. Fire is not hazed (G3, playtest 4), Billabong pink-purple haze (G8), distance trees.
+## Status
 
-## Batch 3 - release
-7. User playtest of v0.3.3 first. Then merge fixes (`merge_agent.ps1`), G1 gate (`g1_gate.ps1`: soak + 4 cameras + forced fallback), re-measure the full preset ladder (High and Ultra were not re-measured on v0.3.2), update docs and zip (v0.3.3 final), new A/B shots (`abshots.ps1` + `match_ab.ps1`) for the community post. Check the `dist` ini of the test zip first (see `RESUME.md`, known inconsistencies).
-8. Portability: README asks for NVIDIA/Intel/Proton logs; vendor-guard audit of GL calls (T50); optional GL 3.3/4.0 context test.
+- Last full release: v0.3.5 (c255ae8).
+- Merged since v0.3.5: #36, #38, #40, #42, #43, #45, #46, #47, #48, #49, #50, #51, #52, #54.
+- Playtest of cda9364:
+  - Fog colour looked steady (#3), awaiting a yaw sweep.
+  - Fog: level-two trees poke through, sky and red rock not fogged, water and lilies wrong (#4).
+  - Ty still flickers blue in water (#5).
+  - Footprints are just bright white, not a light (#8, closed).
+  - Portal light did not light the ground; unclear whether [emit] Enable=1 was set (#9).
+  - LOD options showed no difference (#10).
+  - F10 overlay regression: opening it breaks all geometry until restart and cannot be closed (#12). Now off by default ([overlay] Key=0).
+  - Launcher guard (#13) untested; GPU portability (#15, #16) awaits other GPUs.
 
-## How we keep it safe (usage limits)
-- Max 3 agents at once, short task files (`agents\tasks\*.md`), every step in step logs and `REPORT.md`; `todo.json` is the board; `RESUME.md` is the state; OpenViking synced after each step (`ovsync_all.ps1 -Quick`, plus single-file sync for `recording\`, `archive\`, `agents\tasks\`).
-- Usage limit lesson: 3 agents were cut off mid-work at 17:49 (resets 17:30). Resume by SendMessage to the agent id, or relaunch with a `*4.md` task file, which reads its own step log first.
-- Harness runs are single-game; do not touch mouse or keyboard during a game test. Close the launcher in the game folder before a new build is installed.
+## Open work by owner thread (priority order)
 
-## Decisions the user still needs to answer (no written answer recorded in these docs)
-A. Ultra: until T78 is fixed, use the stable High-style settings plus extras that are not suspects (default proposal: yes, keep the old Ultra as 'Ultra (experimental)' in the ini only). Not applied yet; the v0.3.3 game-folder ini is still Ultra.
-B. Priority: batch 1 first (followed in v0.3.3 work) or distance-LOD speedups first?
-C. Footprints and emissive: texture names (done, T80) plus a clamp for bright decals from the tagged list, or more work on the decal path?
-D. Another GPU: any chance to test on NVIDIA or Intel (even one launch and the `tyrender.log`)?
-E. Release cadence: ship v0.3.3 after batch 1 + 2 with one playtest in between, or ship batch 1 alone quickly?
+1. Unblock desktop permissions and install the newest main.
+2. F10 overlay regression fix (#12). Verify in game before re-enabling the key.
+3. Fog (#4):
+   - Sky: add the [atmos] SkyFogDist key (atmos.inl caps sky fog at 0.12*maxDist, lines ~80 and ~129).
+   - Trees: A/B test [fog] SeeThruDepth=1 against the default 0.
+   - Water and lilies: material-class fog for water and transparent surfaces.
+4. Water blue flicker (#5): bisect with in-game measurement, no more guesses.
+5. Portal light (#9): test via [emit] Enable=1 (forward-render light cap is 16).
+6. LOD follow-ups (#10): tessellation and shadow.
+7. Low priority:
+   - Character/grass shadow checkerboard (#11).
+   - Tessellation tuning: ReliefCurve and Knee seem to help low-res textures.
+8. Next release v0.3.6, only after the next playtest.
+
+## Rules
+
+- One game launch at a time, and announce it first.
+- Issues close only after the owner's playtest.
+- Merge small PRs to main.
+- The release artifact is TYLauncher.exe.
