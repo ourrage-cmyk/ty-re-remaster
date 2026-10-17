@@ -91,12 +91,13 @@ static int g_pendingShadowUnit[2] = {-1, -1}; static GLuint g_shadowTex[2];   //
 static void GProf(int m); static void GProfNextFrame();
 static void FogDiagDraw(); static bool LateFogBegin(); static void LateFogEnd(); static bool SeeThruDepthBegin(); static void SeeThruDepthEnd();
 static void RunAtmos(GLuint depthTex, int w, int h); static void LoadAtmosConfig(); static void PollAtmosFlags();
+static bool EmitBegin(); static void EmitEnd(); static void EmitQBegin(); static void EmitQEnd(); static void RunEmit(int w, int h); static void LoadEmitConfig();   // emit.inl (phase 2)
 static void OnNamedUniformMat(int id, const GLfloat* v, GLboolean t); static void OnNamedUniform4(int id, const GLfloat* v);
 static bool TessRewriteVS(GLuint shader, std::string& src); static void TessOnAttach(GLuint p, GLuint s); static void TessLink(GLuint p); static void LoadTessConfig();
 static void LoadLightConfig(); static bool LightRewriteFS(std::string& s); static void LightOnLink(GLuint p); static void LightApply(GLuint p); static void EnsureLtDecl(std::string& s); static bool DebugCamApply(float* m); static void PollDebugCam(); static void MotionPoll(); static void MotionFrame(HDC dc);
 static void LoadPbrConfig(); static bool PbrRewriteVS(std::string& s); static bool PbrRewriteFS(std::string& s); static void PbrOnLink(GLuint p); static void PbrApply(GLuint p); static void PbrUpdate();
 static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const void* px, int bytes); static void LoadTexTags(); static void TexReport(); static void TexDrawPrep(); static void SpillLogDraw(); static int g_progDiffUnit[8192];
-static bool DecalRewriteFS(std::string& s); static void TexOnLink(GLuint p);
+static bool DecalRewriteFS(std::string& s); static void TexOnLink(GLuint p); static bool EmitRewriteFS(std::string& s); static void EmitOnLink(GLuint p);
 static bool g_curProgTess; static unsigned g_tessBadDrawsExt; static bool IsTessProg(GLuint p); static void TessPatchMode();
 
 // ---------------------------------------------------------------- IAT patching
@@ -254,9 +255,9 @@ HOOK(void, glDepthMask, (GLboolean f)) { CAP("glDepthMask %d", f); o_glDepthMask
 HOOK(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) { CAP("glColorMask %d%d%d%d", r, g, b, a); o_glColorMask(r, g, b, a); }
 HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) { g_draws++; TexDrawPrep(); SpillLogDraw(); FogDiagDraw(); bool lateFog = LateFogBegin();
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; }   // tessellated programs only accept GL_PATCHES
-    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } bool zFix = SeeThruDepthBegin(); CAP("glDrawElements %#x n=%d", m, n); o_glDrawElements(m, n, t, idx); if (zFix) SeeThruDepthEnd(); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } }
+    for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } bool zFix = SeeThruDepthBegin(); CAP("glDrawElements %#x n=%d", m, n); EmitQBegin(); o_glDrawElements(m, n, t, idx); EmitQEnd(); if (zFix) SeeThruDepthEnd(); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } if (EmitBegin()) { o_glDrawElements(m, n, t, idx); EmitEnd(); } }
 HOOK(void, glDrawArrays, (GLenum m, GLint f, GLsizei n)) { g_draws++; TexDrawPrep();
-    if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; } CAP("glDrawArrays %#x first=%d n=%d", m, f, n); o_glDrawArrays(m, f, n); if (GIMaskBegin()) { o_glDrawArrays(m, f, n); GIMaskEnd(); } }
+    if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; } CAP("glDrawArrays %#x first=%d n=%d", m, f, n); EmitQBegin(); o_glDrawArrays(m, f, n); EmitQEnd(); if (GIMaskBegin()) { o_glDrawArrays(m, f, n); GIMaskEnd(); } if (EmitBegin()) { o_glDrawArrays(m, f, n); EmitEnd(); } }
 HOOK(void, glTexImage2D, (GLenum t, GLint lvl, GLint ifmt, GLsizei w, GLsizei h, GLint b, GLenum fmt, GLenum ty, const GLvoid* px)) {
     // enlarge the 2048^2 cascade shadow maps (texel size is read from textureSize() in patched shaders)
     if (g_shPatch && g_shMapScale > 1 && !px && ifmt == 0x81A7 && w == 2048 && h == 2048) { w *= g_shMapScale; h *= g_shMapScale; logf("[shadows] shadow map enlarged to %dx%d", w, h); }
@@ -277,6 +278,7 @@ HOOK(void, glCopyTexImage2D, (GLenum t, GLint lvl, GLenum ifmt, GLint x, GLint y
             PbrUpdate();
             GProf(1); RunAO(g_bound2D[g_activeUnit], w, h); GProf(2);
             GProf(3); if (!g_aoDebug) RunGI(g_bound2D[g_activeUnit], w, h); GProf(4);            // debug views are exclusive: nothing layered on top
+            if (!g_aoDebug && !g_giDebug) RunEmit(w, h);
             GProf(5); if (!g_aoDebug && !g_giDebug) RunAtmos(g_bound2D[g_activeUnit], w, h); GProf(6);
             if (g_sceneModified && g_colorCopyTex && !(g_aoExp & 1)) {   // engine capture texture must include our changes (bloom reads it)
                 GLuint keep = g_bound2D[g_activeUnit];
@@ -372,8 +374,8 @@ HOOK(void, glShaderSource, (GLuint s, GLsizei count, const GLchar* const* str, c
     }
     if (!useOv && type == GL_FRAGMENT_SHADER) {   // order: PBR (normals/spec) -> shadow patch (PCF, strength) -> light model; each stage is optional
         std::string p = src;
-        bool pb = PbrRewriteFS(p), sh = g_shPatch && PatchShadowShader(p), lt = LightRewriteFS(p), dc = DecalRewriteFS(p);   // decal last: it rewrites the stock output line
-        if (pb || sh || lt || dc) {
+        bool pb = PbrRewriteFS(p), sh = g_shPatch && PatchShadowShader(p), lt = LightRewriteFS(p), dc = DecalRewriteFS(p), em = EmitRewriteFS(p);   // decal, then emit: both rewrite the stock output line
+        if (pb || sh || lt || dc || em) {
             if (TestCompile(type, p)) { ov = p; useOv = true; logf("glShaderSource shader=%u hash=%08x [FS:%s%s%s%s]", s, h, pb ? " PBR" : "", sh ? " SHADOW" : "", lt ? " LIGHT" : "", dc ? " DECAL" : ""); }
             else {
                 logf("[fs] %08x combined rewrite failed to compile (pbr=%d shadow=%d light=%d) -> trying shadow patch alone", h, pb, sh, lt);
@@ -528,6 +530,7 @@ static void Snapshot(HDC dc) {
 #include "fx.inl"
 #include "gi.inl"
 #include "atmos.inl"
+#include "emit.inl"
 #include "tess.inl"
 #include "pbr.inl"
 #include "light.inl"
@@ -544,7 +547,7 @@ static void ApplyShadowStrength(GLuint p) {
 static void AfterLink(GLuint p) {
     GLint loc = o_glGetUniformLocation ? o_glGetUniformLocation(p, "tyShadowStrength") : -1;
     if (loc >= 0) { g_shadowStrengthLoc[p] = loc; ApplyShadowStrength(p); }
-    PbrOnLink(p); LightOnLink(p); TexOnLink(p);
+    PbrOnLink(p); LightOnLink(p); TexOnLink(p); EmitOnLink(p);
 }
 static bool TessRewriteVS(GLuint shader, std::string& src) {
     std::vector<TessVar> vars; std::string orig = src;
@@ -578,7 +581,7 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
         Snapshot(dc); PollDebugCam(); MotionPoll(); PollAOFlags(); PollAtmosFlags(); PollGIFlags();
         char p[MAX_PATH]; snprintf(p, sizeof p, "%styrender\\post_off", g_dir); g_fxOffFile = GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES;
         snprintf(p, sizeof p, "%styrender\\reload", g_dir);
-        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); LoadShotConfig(); LoadOverlayConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
+        if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) { DeleteFileA(p); LoadAOConfig(); LoadFXConfig(); LoadAtmosConfig(); LoadGIConfig(); LoadEmitConfig(); LoadShadowConfig(); LoadPbrConfig(); LoadTessConfig(); LoadLightConfig(); LoadShotConfig(); LoadOverlayConfig(); g_pbrStamp.clear(); g_tessStamp.clear();
             for (auto& kv : g_shadowStrengthLoc) ApplyShadowStrength(kv.first);
             { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
               GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
@@ -702,7 +705,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
       GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
       GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "1.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
     LoadTessConfig();
-    LoadPbrConfig(); LoadLightConfig(); LoadShotConfig(); LoadOverlayConfig(); LoadTexTags();
+    LoadPbrConfig(); LoadLightConfig(); LoadShotConfig(); LoadOverlayConfig(); LoadTexTags(); LoadEmitConfig();
     logf("tyrender stage1 loaded. game dir %s  capture=%d,%d dump=%d override=%d", g_dir, g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
     Install();
     CheckOrig("SwapBuffers", (void*)o_SwapBuffers);
