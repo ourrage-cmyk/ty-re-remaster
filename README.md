@@ -8,7 +8,7 @@
 
 A modern rendering layer for **TY the Tasmanian Tiger** on PC.
 
-**Status: preview / community beta, version 0.3.2.** Tested on one graphics card only: AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet. Reports are very welcome.
+**Status: preview / community beta, version 0.3.5.** Tested on one graphics card only: AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet. Reports are very welcome.
 
 ## Why this exists
 
@@ -52,11 +52,13 @@ This is a hobby project, made with Claude for the community. It is for people wh
 | Bounce light (High and Ultra) | Light bounces between nearby surfaces. | `[gi]` |
 | Natural light | Cool, sky-tinted shade, sky and ground bounce, and translucent grass. | `[light]` |
 
-## What is new in v0.3.2
+## What is new in v0.3.5
 
-- Less flicker. The AO and shadow filters were steadied, and shadow edges no longer strobe.
-- Haze takes its colour from the real sky, so far trees and rocks follow it.
-- AO fades with fog, so it no longer fights the fog in the distance.
+- Fog colour no longer changes as the camera turns, and the painted sky is fogged.
+- AO flicker and grain are gone. AO fades out in thick fog.
+- Less TAA ghosting, and the half-resolution GI mask saves GPU time.
+- The surface relief slider works again.
+- `TYLauncher.exe` is a single file. It embeds the renderer and the default settings, and the title bar shows the version and build id.
 - The launcher has a simple view with four presets (Low, Medium, High, Ultra), an overall performance impact and the Play button. **More options >>** shows every effect, the sliders and a description for each.
 
 ## Before and after
