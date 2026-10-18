@@ -14,7 +14,7 @@ G'day! TY HD Renderer gives the bush a bit more depth: shadows that look like sh
 
 ## What it changes
 
-TY's art is bold and flat, and the lighting underneath it is old. Shadows are hard and capped at 50%. Distant rocks fade into a flat colour. Surfaces have no depth beyond their paint. Light never bounces off anything.
+Ty's world is bold, flat and sunny, but its lighting is stuck in the early 2000s. Shadows are hard and capped at 50%. Distant rocks fade into a flat colour. Surfaces have no depth beyond their paint. Light never bounces off anything.
 
 The mod fixes those four things and keeps the paint job:
 
@@ -109,6 +109,8 @@ These are approximate, because effects interact. They come from the v0.3 measure
 
 ## Install
 
+Two ways in. The first is the easy one. The second is for people who like poking at config files.
+
 **Easiest:** download `TY HD Renderer Setup.exe` from the release and run it. It finds the game (Steam libraries first, otherwise you pick the folder with `TY.exe`), installs the renderer, and adds "TY HD Renderer (mod)" to Apps and Features.
 Files it replaces are backed up in `tyrender\backup`. Your existing `tyrender.ini` is kept, and only missing settings are added. The overlay key is F10.
 
@@ -136,7 +138,7 @@ By hand: delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.i
 
 ## Known issues
 
-Still rough around the edges, from playtests. Where a fix is on `main`, it is marked untested.
+Ty's still got a few rough edges. Here they are, straight from playtests. Where a fix is on `main`, it is marked untested.
 
 - **Water:** in build `4a2ef95`, the light on Ty ramps up and down slowly in water instead of flickering (#5). Lily pads and rocks look brighter than the water under them, and fog is heavier looking down than across (#4). A water outline shows when viewed from above (#104).
 - **Fog:** sky and red rock now fade smoothly, and fog on trees is slight. Fire is not fogged (#4).
@@ -155,7 +157,7 @@ Still rough around the edges, from playtests. Where a fix is on `main`, it is ma
 
 ## Reporting problems
 
-Found a glitch? Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
+Hit a glitch? Ta for reporting it. Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
 
 ## Compatibility and credits
 
