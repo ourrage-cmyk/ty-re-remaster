@@ -26,15 +26,11 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 ## Side by side
 
-Each pair is an F11 capture on the **Ultra** preset. Left is F11 off, right is shaders on. There are four newer pairs from build `4a2ef95` first, then eight older pairs from build `cda9364`.
+Each pair is an F11 capture from build `4a2ef95` on the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
 
-Treat the older eight as a sample rather than a full test. Ultra is the slowest preset, so Medium will show less difference. **Read this first:** the F11 "shaders off" frame is not stock. The hotkey only switches off surface relief and the material extras (PBR). Ambient occlusion, bounce light, fog, shadows and anti-aliasing stay on in both frames. So these pairs show the relief and material part of the mod only. They are not a full before and after, and they should not be read as proof of shadow, AO, bounce light or fog differences. A true before and after set will replace them after the F11 fix and the next playtest.
+The F11 off frame skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is close to the plain game. It is not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game. Captions describe what is visible in the two images, and the sky is unchanged in all of them.
 
 All images are in [`docs/ab/`](docs/ab/).
-
-### Newer pairs (build 4a2ef95)
-
-These four pairs are F11 captures on build `4a2ef95` and the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. In this build the F11 off frame also skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is much closer to the plain game. It is still not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game.
 
 <table>
 <tr>
@@ -46,126 +42,25 @@ These four pairs are F11 captures on build `4a2ef95` and the **Ultra** preset, t
 <td><img src="docs/ab/09_launch_pad_fence_on.jpg" alt="Ty on a red launch pad with a fence and rope bridge, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>09 Launch pad.</b> Red rock canyon with a fence and rope bridge. With shaders on, the distance is hazier and the rock is more shaded.</sub></td>
-</tr>
-<tr>
-<td><img src="docs/ab/10_launch_pad_sky_off.jpg" alt="The launch pad from a lower angle with a wide sky and mesas, F11 off" width="100%"></td>
-<td><img src="docs/ab/10_launch_pad_sky_on.jpg" alt="The launch pad from a lower angle with a wide sky and mesas, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>10 Sky and mesas.</b> Same spot from a lower angle. With shaders on, the horizon haze and fog show, and the mesas are softer.</sub></td>
+<td colspan="2"><sub><b>09 Launch pad.</b> Left: crisp and saturated all the way to the back. Right: the canyon behind the fence sits in a pale haze, the far rock loses colour and the wooden posts and ground pick up softer shading. The sky and Ty are unchanged.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/11_bli_bli_gate_off.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, F11 off" width="100%"></td>
 <td><img src="docs/ab/11_bli_bli_gate_on.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>11 Bli Bli Station gate.</b> The wooden arch, a gum tree and two kangaroos. With shaders on, the contrast is deeper, shadows are darker and the ground relief is stronger.</sub></td>
+<td colspan="2"><sub><b>11 Bli Bli Station gate.</b> Left: flat, even light. Right: the red rock walls are darker with deeper shadow in the creases, the gum trunk has more grain and contrast, and the trees seen through the arch fade into a cooler haze. The sign and the characters look the same.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/12_canyon_path_off.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, F11 off" width="100%"></td>
 <td><img src="docs/ab/12_canyon_path_on.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>12 Canyon path.</b> A dirt path between red canyon walls. With shaders on, the grading is darker, shadows are stronger and the far end of the path has a red haze.</sub></td>
+<td colspan="2"><sub><b>12 Canyon path.</b> The biggest difference. Left: bright, sunlit grass and path. Right: the whole scene is darker and moodier, the trunks, grass and path sit in shade under the canopy, and the far end of the path glows through a warm red haze. Ty stays readable.</sub></td>
 </tr>
 </table>
 
-The eight older pairs below are from build `cda9364`. They are kept as a sample, and the caveat about them still applies.
-
-### Ground and props
-
-<table>
-<tr>
-<th align="left">Shaders off</th>
-<th align="left">Shaders on</th>
-</tr>
-<tr>
-<td><img src="docs/ab/04_forest_arch_tunnel_off.jpg" alt="Ty under the wooden arch at the forest tunnel exit, shaders off" width="100%"></td>
-<td><img src="docs/ab/04_forest_arch_tunnel_on.jpg" alt="Ty under the wooden arch at the forest tunnel exit, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>04 Forest arch.</b> Under the wooden arch at the forest tunnel exit.</sub></td>
-</tr>
-<tr>
-<td><img src="docs/ab/01_beach_cliffs_fort_off.jpg" alt="Beach, red cliffs, palms and a ruined fort, shaders off" width="100%"></td>
-<td><img src="docs/ab/01_beach_cliffs_fort_on.jpg" alt="Beach, red cliffs, palms and a ruined fort, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>01 Beach and fort.</b> Beach, red cliffs, palms and the ruined fort.</sub></td>
-</tr>
-</table>
-
-### Close-ups
-
-<table>
-<tr>
-<th align="left">Shaders off</th>
-<th align="left">Shaders on</th>
-</tr>
-<tr>
-<td><img src="docs/ab/06_canopy_path_closeup_off.jpg" alt="Close-up of Ty under the canopy, shaders off" width="100%"></td>
-<td><img src="docs/ab/06_canopy_path_closeup_on.jpg" alt="Close-up of Ty under the canopy, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>06 Canopy close-up.</b> Close-up of Ty under the canopy.</sub></td>
-</tr>
-<tr>
-<td><img src="docs/ab/05_canopy_path_dusk_off.jpg" alt="Ty on the canopy path at dusk, shaders off" width="100%"></td>
-<td><img src="docs/ab/05_canopy_path_dusk_on.jpg" alt="Ty on the canopy path at dusk, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>05 Canopy path at dusk.</b> Ty on the canopy path at dusk.</sub></td>
-</tr>
-</table>
-
-### Grass and fences
-
-<table>
-<tr>
-<th align="left">Shaders off</th>
-<th align="left">Shaders on</th>
-</tr>
-<tr>
-<td><img src="docs/ab/07_tall_grass_off.jpg" alt="Ty in tall grass, shaders off" width="100%"></td>
-<td><img src="docs/ab/07_tall_grass_on.jpg" alt="Ty in tall grass, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>07 Tall grass.</b> Ty in tall grass.</sub></td>
-</tr>
-<tr>
-<td><img src="docs/ab/08_fence_counter_17_off.jpg" alt="Fence, a counter showing 17, a sign and a machine, shaders off" width="100%"></td>
-<td><img src="docs/ab/08_fence_counter_17_on.jpg" alt="Fence, a counter showing 17, a sign and a machine, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>08 Fence and counter.</b> The fence, the counter showing 17, a sign and a machine.</sub></td>
-</tr>
-</table>
-
-### Water and the portal (known gaps)
-
-<table>
-<tr>
-<th align="left">Shaders off</th>
-<th align="left">Shaders on</th>
-</tr>
-<tr>
-<td><img src="docs/ab/02_palm_grove_water_off.jpg" alt="Ty in a palm grove by the water, shaders off" width="100%"></td>
-<td><img src="docs/ab/02_palm_grove_water_on.jpg" alt="Ty in a palm grove by the water, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>02 Palm grove by the water.</b> The water is not changed by this comparison. The blue flicker on Ty in water is a known issue.</sub></td>
-</tr>
-<tr>
-<td><img src="docs/ab/03_portal_two_up_prompt_off.jpg" alt="Ty with the Two Up text and the Press R prompt beside the rainbow portal, shaders off" width="100%"></td>
-<td><img src="docs/ab/03_portal_two_up_prompt_on.jpg" alt="Ty with the Two Up text and the Press R prompt beside the rainbow portal, shaders on" width="100%"></td>
-</tr>
-<tr>
-<td colspan="2"><sub><b>03 Rainbow portal.</b> Ty next to the rainbow portal. The portal does not light the ground yet (known issue).</sub></td>
-</tr>
-</table>
-
-**Fog and haze are not in these pairs.** F11 does not switch them off, so no pair shows them. Far trees and the sky on the second level are not fully fogged, which is a known issue. See [Known issues](#known-issues).
+Water and the portal are not shown here. The blue flicker on Ty in water and the portal light are known issues. See [Known issues](#known-issues).
 
 ## Presets
 
