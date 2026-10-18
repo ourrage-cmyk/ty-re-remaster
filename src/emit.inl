@@ -37,7 +37,9 @@ static void LoadEmitConfig() {
     GetPrivateProfileStringA("emit", "Spread", "1.0", b, sizeof b, ini); g_emitSpread = (float)atof(b); if (!(g_emitSpread >= 0.25f)) g_emitSpread = 0.25f; if (g_emitSpread > 4.0f) g_emitSpread = 4.0f;
     g_emitComp = GetPrivateProfileIntA("emit", "Compensate", 0, ini);
     if (g_emitMax < 0) g_emitMax = 0;
-    for (int i = 0; i < 8192; i++) g_progTyEmitLoc[i] = -1;
+    // The location table is filled at link time (EmitOnLink) and must survive a live reload: programs linked before the reload never link again.
+    static bool locInit = false;
+    if (!locInit) { for (int i = 0; i < 8192; i++) g_progTyEmitLoc[i] = -1; locInit = true; }
     for (int k = 0; k < kEmitOrdMax; k++) g_emitKeep[k] = true;
     if (g_emitEnable) logf("[emit] enabled: strength %.2f radius %.1f spread %.2f compensate %d max %d", g_emitStrength, g_emitRadius, g_emitSpread, g_emitComp, g_emitMax);
 }
