@@ -352,7 +352,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"8192 (razor sharp, big memory)"); c = Tag(TG_SHADOW, 490, y + 3);
         { const wchar_t* tt = L"Shadow sharpness - how crisp the shade is"; const wchar_t* tx = L"2048 is the original blocky look, 4096 is crisp, 8192 is razor sharp but memory hungry. Takes effect the next time the game starts.";
           AddDesc(l, tt, tx); AddDesc(h_shadow, tt, tx); AddDesc(c, tt, tx); }
-        Ctl(L"STATIC", L"Impact tags:  Free = no real cost.  Low = barely noticeable.  Medium = noticeable on weaker cards.  High = the big spenders: switch these off first if the game stutters.", SS_LEFT, 30, 392, 540, 30, 0);
+        Ctl(L"STATIC", L"Tags: Free = no cost, Low = barely noticeable, Medium = noticeable on weaker cards, High = switch off first if it stutters.", SS_LEFT, 30, 394, 540, 18, 0);
         // ---- tabs 1-3: look sliders. Each slider lands on the tab in kSlTab (1 Light & shadow, 2 Air & fog, 3 Picture).
         static const int kSlTab[NSL] = { 3, 3, 3, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 3, 3 };
         int sy[5] = { 172, 172, 172, 172, 172 };
