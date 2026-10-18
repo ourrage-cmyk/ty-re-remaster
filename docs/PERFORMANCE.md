@@ -1,4 +1,4 @@
-# TY HD Renderer v0.3.2 - performance costs and settings reference
+# TY HD Renderer - performance costs and settings reference (measured on v0.3.2)
 
 All numbers are **GPU milliseconds per frame** (total frame time from the renderer's GPU timers, `[gpu]` / PERF lines in `tyrender.log`), at **2560x1440, windowed, vsync off**, on an **AMD Radeon RX 7600 XT** (the only GPU tested so far). 16.7 ms = 60 fps. The stock game frame there is about **5.7 ms** (v0.3 measurement).
 
@@ -9,7 +9,7 @@ Other GPUs: scale by their speed relative to a 7600 XT. Heavier views cost more 
 | Preset | Frame | ~fps | What it contains |
 |---|---|---|---|
 | Stock game | 5.7 ms | 175 | |
-| Low | about 6.0 ms | about 166 | No AO, no fog, FXAA, 2048 shadow maps |
+| Low | about 6.0 ms | about 166 | FXAA, 2048 shadow maps. No soft corner shadows, no haze |
 | **Medium** (recommended, default) | **about 12 ms** | **about 80** | AO 3x6, fog 24 steps, relief on the ground and props, 4096 shadow maps x16 taps, TAA, no bounce light |
 | High | about 18 ms | about 55 | Medium + bounce light (Hi-Z, 1 ray) + contact shadows |
 | Ultra | about 31 ms | about 32 | AO 4x8, bounce light (2 rays), fog 32 steps, environment relief, 8192 shadow maps x32 taps |
@@ -66,7 +66,7 @@ If a GPU or driver cannot run an effect (no GL 4.3 compute for the fog, a shader
 
 ## Settings reference (`tyrender.ini`, next to the game)
 
-The full key list with defaults is in `README.md` (section "Settings file"). Summary of what costs time:
+The full key list with defaults is in `README.md` (section "Settings reference (tyrender.ini)"). Summary of what costs time:
 
 | Setting | Cost |
 |---|---|
