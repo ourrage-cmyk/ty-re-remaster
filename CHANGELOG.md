@@ -23,6 +23,7 @@ Added
 - **Water fog mask** (#5, #92): `[fog] WaterMaskSoft` softens the water-fog mask edge. Off by default. Untested.
 - **GI far ring** (#7, #93): `[gi] AtrousFar` uses a 3x3 ring beyond `[lod] Start`. Off by default. Untested.
 - **Water names** (#4, #106): `[fog] WaterNames` lists extra texture names (lily pads) that WaterBoost also fogs. Default empty. Untested.
+- **Launcher** (#111, #112): simpler default window (presets, one performance readout, Play, Customise), expanded view with tabs (Effects, Light & shadow, Air & fog, Picture, Advanced), gamepad (XInput) navigation for Big Picture and Steam Deck. Untested.
 - **README** (#107, #108, #109): old A/B pairs removed, three build `4a2ef95` pairs with technical captions.
 - **Playtest harness** (#91): progress log, status.json, plan files, request queue, focus fix, visual review step.
 
