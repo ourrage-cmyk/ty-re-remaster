@@ -283,7 +283,7 @@ static void ApplyLayout(void) {
     MoveWindow(h_stock, exp ? 224 : 250, exp ? 512 : 144, exp ? 170 : 214, exp ? 36 : 46, TRUE);
     MoveWindow(h_more, exp ? 402 : 16, exp ? 512 : 204, exp ? 190 : 200, exp ? 36 : 28, TRUE);
     SetWindowTextW(h_more, exp ? L"<<  Simpler view" : L"Customise settings  >>");
-    MoveWindow(h_status, 16, exp ? 554 : 250, exp ? 568 : 448, exp ? 28 : 36, TRUE);
+    MoveWindow(h_status, 16, exp ? 552 : 250, exp ? 568 : 448, exp ? 40 : 36, TRUE);
     for (int p = 0; p < PG_N; p++) for (int k = 0; k < g_np[p]; k++)
         ShowWindow(g_page[p][k], (p == PG_EXP ? exp : exp && p == g_tab) ? SW_SHOW : SW_HIDE);
     ShowWindow(h_tab, exp ? SW_SHOW : SW_HIDE);
@@ -316,7 +316,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         h_status = Ctl(L"STATIC", L"", 0, 16, 250, 448, 36, 0);   // 2 lines: the clash warning can be long
         // ---- expanded view only: impact detail, tabs and the help panel
         g_pg = PG_EXP;
-        h_total = Ctl(L"STATIC", L"", SS_NOTIFY, 16, 98, 568, 30, 0);
+        h_total = Ctl(L"STATIC", L"", SS_NOTIFY, 16, 96, 568, 36, 0);
         AddDesc(h_total, L"Overall performance impact", L"A quick summary of everything that is switched on: LOW, MEDIUM, HIGH or EXTREME. It is based on measured frame-time costs, so it is a guide: your graphics card and screen resolution decide the real result.\n\nIf the game feels slow, switch off the effects tagged High first.");
         h_tab = CreateWindowW(WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 10, 136, 580, 290, g_hw, (HMENU)(INT_PTR)ID_TAB, NULL, NULL);
         SendMessageW(h_tab, WM_SETFONT, (WPARAM)g_font, TRUE);
@@ -352,7 +352,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"8192 (razor sharp, big memory)"); c = Tag(TG_SHADOW, 490, y + 3);
         { const wchar_t* tt = L"Shadow sharpness - how crisp the shade is"; const wchar_t* tx = L"2048 is the original blocky look, 4096 is crisp, 8192 is razor sharp but memory hungry. Takes effect the next time the game starts.";
           AddDesc(l, tt, tx); AddDesc(h_shadow, tt, tx); AddDesc(c, tt, tx); }
-        Ctl(L"STATIC", L"Tags: Free = no cost, Low = barely noticeable, Medium = noticeable on weaker cards, High = switch off first if it stutters.", SS_LEFT, 30, 394, 540, 18, 0);
+        Ctl(L"STATIC", L"Tags: Free = no cost, Low = barely noticeable, Medium = noticeable on weaker cards, High = switch off first if it stutters.", SS_LEFT, 30, 388, 540, 34, 0);
         // ---- tabs 1-3: look sliders. Each slider lands on the tab in kSlTab (1 Light & shadow, 2 Air & fog, 3 Picture).
         static const int kSlTab[NSL] = { 3, 3, 3, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 3, 3 };
         int sy[5] = { 172, 172, 172, 172, 172 };
