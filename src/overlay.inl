@@ -5,6 +5,7 @@
 // Discard writes each touched key back to its value from when the panel opened (a key that was absent is removed again).
 // The launcher stays the main settings UI. The panel only reads keys while the game window is in front, like the A/B hotkey.
 // Known v1 limits: arrow keys also reach the game while the panel is open; the panel is drawn with GDI into a DIB and uploaded with glDrawPixels.
+// Size: the panel grows with the game window (about 1x at 900 px high, 1.6x at 1440p, up to 3x) and shrinks so it never runs past the window edge.
 #include "build_id.h"
 
 static int g_ovVk = 0;                          // off until [overlay] Key= is set (see default_tyrender.ini)
@@ -15,8 +16,8 @@ static HDC g_ovDc;
 static HBITMAP g_ovBmp;
 static HFONT g_ovFont;
 static unsigned char* g_ovPix;                  // BGRA, bottom-up (the order glDrawPixels wants)
-static const int OV_W = 470, OV_LINES = 9, OV_LH = 20, OV_PAD = 10;
-static const int OV_H = OV_LINES * OV_LH + OV_PAD * 2;
+static int g_ovW, g_ovH;                        // bitmap size at the current scale
+static const int OV_W = 470, OV_LINES = 11, OV_LH = 20, OV_PAD = 10;   // rows: title, 8 settings, 2 hint lines
 
 struct OvItem { const char* sec; const char* key; float lo, hi, step; bool isInt; const char* label; };
 static const OvItem g_ovItems[] = {
@@ -94,37 +95,57 @@ static void OvRevertAndClose() {
 }
 static void OvKeep() { g_ovOpen = false; logf("[overlay] kept (written to tyrender.ini)"); }
 
-// Draws the panel into g_ovPix: GDI text on black, then alpha from luminance (text) or a dark panel background.
-static void OvRender() {
-    if (!g_ovDc) {
-        g_ovDc = CreateCompatibleDC(NULL);
-        BITMAPINFO bi = {}; bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER); bi.bmiHeader.biWidth = OV_W; bi.bmiHeader.biHeight = OV_H;
+// Scale for a game window of this client height: 1 at 900 px, larger on bigger screens (1.6 at 1440p, 2.4 at 4K), capped at 3,
+// and never so large that the panel is taller than the window.
+static float OvScaleFor(int clientH) {
+    float s = clientH / 900.0f;
+    if (s < 1.0f) s = 1.0f;
+    if (s > 3.0f) s = 3.0f;
+    float fit = (clientH - 2 * OV_PAD) / (float)(OV_LINES * OV_LH + 2 * OV_PAD);
+    if (fit < 0.3f) fit = 0.3f;
+    return s < fit ? s : fit;
+}
+
+// Draws the panel into g_ovPix at scale s: GDI text on black, then alpha from luminance (text) or a dark panel background.
+static void OvRender(float s) {
+    int W = (int)(OV_W * s + 0.5f), H = (int)((OV_LINES * OV_LH + 2 * OV_PAD) * s + 0.5f);
+    if (!g_ovDc) g_ovDc = CreateCompatibleDC(NULL);
+    if (!g_ovBmp || W != g_ovW || H != g_ovH) {
+        BITMAPINFO bi = {}; bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER); bi.bmiHeader.biWidth = W; bi.bmiHeader.biHeight = H;
         bi.bmiHeader.biPlanes = 1; bi.bmiHeader.biBitCount = 32; bi.bmiHeader.biCompression = BI_RGB;
-        g_ovBmp = CreateDIBSection(g_ovDc, &bi, DIB_RGB_COLORS, (void**)&g_ovPix, NULL, 0);
-        SelectObject(g_ovDc, g_ovBmp);
-        g_ovFont = CreateFontA(-15, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
-        SelectObject(g_ovDc, g_ovFont);
+        unsigned char* pix = NULL;
+        HBITMAP nb = CreateDIBSection(g_ovDc, &bi, DIB_RGB_COLORS, (void**)&pix, NULL, 0);
+        if (!nb) return;
+        SelectObject(g_ovDc, nb);                  // the old bitmap is deselected before it is deleted
+        if (g_ovBmp) DeleteObject(g_ovBmp);
+        g_ovBmp = nb; g_ovPix = pix; g_ovW = W; g_ovH = H;
+        HFONT nf = CreateFontA(-(int)(15 * s + 0.5f), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
+        SelectObject(g_ovDc, nf);
+        if (g_ovFont) DeleteObject(g_ovFont);
+        g_ovFont = nf;
         SetBkMode(g_ovDc, TRANSPARENT);
     }
     if (!g_ovPix) return;
-    RECT all = {0, 0, OV_W, OV_H}; FillRect(g_ovDc, &all, (HBRUSH)GetStockObject(BLACK_BRUSH));
+    auto X = [&]() { return (int)(OV_PAD * s + 0.5f); };
+    auto Y = [&](int row) { return (int)((OV_PAD + row * OV_LH) * s + 0.5f); };   // row 0 = title, rows 1..8 = settings, 9-10 = hints
+    RECT all = {0, 0, g_ovW, g_ovH}; FillRect(g_ovDc, &all, (HBRUSH)GetStockObject(BLACK_BRUSH));
     char line[160];
     snprintf(line, sizeof line, "TY overlay  build %s", TY_BUILD_ID_A);
-    SetTextColor(g_ovDc, RGB(200, 200, 210)); TextOutA(g_ovDc, OV_PAD, OV_PAD, line, (int)strlen(line));
+    SetTextColor(g_ovDc, RGB(200, 200, 210)); TextOutA(g_ovDc, X(), Y(0), line, (int)strlen(line));
     for (int i = 0; i < OV_NITEMS; i++) {
         const OvItem& it = g_ovItems[i];
         if (it.isInt) snprintf(line, sizeof line, "%s %-18s %d", i == g_ovSel ? ">" : " ", it.label, (int)g_ovVal[i]);
         else snprintf(line, sizeof line, "%s %-18s %.2f", i == g_ovSel ? ">" : " ", it.label, g_ovVal[i]);
         SetTextColor(g_ovDc, i == g_ovSel ? RGB(255, 220, 80) : RGB(235, 235, 235));
-        TextOutA(g_ovDc, OV_PAD, OV_PAD + (i + 1) * OV_LH, line, (int)strlen(line));
+        TextOutA(g_ovDc, X(), Y(i + 1), line, (int)strlen(line));
     }
     snprintf(line, sizeof line, "Up/Down select  Left/Right change");
-    SetTextColor(g_ovDc, RGB(160, 160, 170)); TextOutA(g_ovDc, OV_PAD, OV_PAD + (OV_NITEMS + 1) * OV_LH, line, (int)strlen(line));
+    SetTextColor(g_ovDc, RGB(160, 160, 170)); TextOutA(g_ovDc, X(), Y(OV_NITEMS + 1), line, (int)strlen(line));
     snprintf(line, sizeof line, "Enter keep   Esc / F10 discard");
-    TextOutA(g_ovDc, OV_PAD, OV_PAD + (OV_NITEMS + 2) * OV_LH, line, (int)strlen(line));
+    TextOutA(g_ovDc, X(), Y(OV_NITEMS + 2), line, (int)strlen(line));
     GdiFlush();
     // GDI wrote BGRA with black background. Luminance gives text alpha; un-premultiply so the text keeps full colour.
-    for (int p = 0; p < OV_W * OV_H; p++) {
+    for (int p = 0; p < g_ovW * g_ovH; p++) {
         unsigned char* px = g_ovPix + p * 4;
         int lum = px[0] > px[1] ? (px[0] > px[2] ? px[0] : px[2]) : (px[1] > px[2] ? px[1] : px[2]);
         if (lum > 0) {
@@ -161,7 +182,8 @@ static void OvDumpState(const char* tag) {
 static void OvDraw(HDC dc) {
     HWND wnd = WindowFromDC(dc); RECT rc;
     if (!wnd || !GetClientRect(wnd, &rc)) return;
-    OvRender(); if (!g_ovPix) return;
+    float s = OvScaleFor(rc.bottom);
+    OvRender(s); if (!g_ovPix) return;
     typedef void(WINAPI* wp_t)(GLint, GLint); typedef void(WINAPI* pd_t)(GLsizei, GLsizei, GLenum, GLenum, const void*);
     typedef void(WINAPI* up_t)(GLenum); typedef void(WINAPI* pa_t)(GLbitfield); typedef void(WINAPI* pca_t)(GLbitfield); typedef void(WINAPI* v_t)(void);
     typedef void(WINAPI* gi_t)(GLenum, GLint*); typedef void(WINAPI* fb_t)(GLenum, GLuint); typedef void(WINAPI* en_t)(GLenum);
@@ -217,8 +239,8 @@ static void OvDraw(HDC dc) {
     if (blendFunc) blendFunc(0x0302 /*SRC_ALPHA*/, 0x0303 /*ONE_MINUS_SRC_ALPHA*/);
     if (ps) { ps(0x0CF5 /*UNPACK_ALIGNMENT*/, 4); ps(0x0CF2 /*UNPACK_ROW_LENGTH*/, 0); ps(0x0CF3 /*UNPACK_SKIP_ROWS*/, 0); ps(0x0CF4 /*UNPACK_SKIP_PIXELS*/, 0); }
     if (up) up(0);                                 // program 0 for the fixed-function path; restored from prog below
-    wp(12, rc.bottom - OV_PAD - OV_H);
-    pd(OV_W, OV_H, 0x80E1 /*GL_BGRA*/, 0x1401 /*GL_UNSIGNED_BYTE*/, g_ovPix);
+    wp(12, rc.bottom - (int)(OV_PAD * s + 0.5f) - g_ovH);
+    pd(g_ovW, g_ovH, 0x80E1 /*GL_BGRA*/, 0x1401 /*GL_UNSIGNED_BYTE*/, g_ovPix);
     // restore: hand-saved bindings first, then the attribute stacks
     if (up) up((GLuint)prog);
     if (bindFb) { bindFb(0x8CA9, (GLuint)drawFb); bindFb(0x8CAA, (GLuint)readFb); }
