@@ -69,7 +69,7 @@ static void LoadTexTags() {
     g_spillLog = g_texEnable && GetPrivateProfileIntA("spill", "LogEmitters", 0, ini);   // #9 step 1: log additive draws per texture (every 600 frames)
     g_texSkinTags = g_texEnable && GetPrivateProfileIntA("tex", "SkinnedByTag", 1, ini);   // skinned shaders get the detail code too; tags switch it per draw
     for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = g_progTyWaterLoc[i] = g_progTyDecalLoc[i] = -1;
-    g_decalClamp = GetPrivateProfileIntA("decal", "Clamp", 0, ini);
+    g_decalClamp = GetPrivateProfileIntA("decal", "Clamp", 1, ini);   // #8: footprint glow capped by default
     char dv[32]; GetPrivateProfileStringA("decal", "Max", "0.9", dv, sizeof dv, ini); g_decalMax = (float)atof(dv);
     char dn[512]; GetPrivateProfileStringA("decal", "Names", "ty_footprint.dds,ty_footprint2.dds", dn, sizeof dn, ini);
     g_decalNames.clear(); for (char* t = strtok(dn, ","); t; t = strtok(nullptr, ",")) { std::string x = TexBase(t); while (!x.empty() && x.back() == ' ') x.pop_back(); if (!x.empty()) g_decalNames.push_back(x); }
