@@ -227,7 +227,7 @@ Ty's still got a few rough edges. Here they are, straight from playtests. Where 
 
 ## Reporting problems
 
-Hit a glitch? Ta for reporting it. Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
+Hit a glitch? Ta for reporting it. Send the newest `TYHD_report_` file from `tyrender\logs` (one is written on every Play, see [Reporting a bug](#reporting-a-bug)), a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. Only send `tyrender.log` if the author asks for it: its paths are relative to the game folder and your Windows user name is replaced, so it is safe to share. NVIDIA and Intel owners: a session report from one run is especially welcome, since those GPUs are untested.
 
 ## Reporting a bug
 
@@ -243,7 +243,7 @@ To report a problem, send:
 
 **What it does not contain:** usernames, the computer name, serial numbers, IP or MAC addresses, installed programs, running processes, file listings or personal folder paths. Paths are relative to the game folder.
 
-**Privacy:** the file is only written to your disk. Nothing is sent anywhere. You decide whether to send it.
+**Privacy:** the file is only written to your disk. Nothing is sent anywhere. You decide whether to send it. The mod's own `tyrender.log` follows the same rule: paths are relative to the game folder and the Windows user name is replaced by `<user>`.
 
 **Settings:** `[report]` in `tyrender.ini`. `Enable=0` turns it off. `CaptureSeconds` sets how long the frame-time part runs (default 300), `MaxBytes` caps the file size (default 1 MB), and `KeepFiles` keeps only the newest reports (default 10).
 

@@ -91,8 +91,8 @@ static void ShotCapture(HDC dc, const char* label) {
     if (!preset[0]) strcpy(preset, "custom");
     char dir[MAX_PATH]; snprintf(dir, sizeof dir, "%sScreenshots", g_dir); CreateDirectoryA(dir, nullptr);
     char out[MAX_PATH]; snprintf(out, sizeof out, "%s\\ty_%s_%s_%s_%s.png", dir, TY_BUILD_ID_A, preset, label, g_shotStamp);
-    if (ShotWritePng(out, w, h, px)) { logf("[shot] %s %dx%d frame=%u", out, w, h, g_frame); SessEvent("screenshot %s", strrchr(out, '\\') ? strrchr(out, '\\') + 1 : out); }
-    else logf("[shot] could not write %s", out);
+    if (ShotWritePng(out, w, h, px)) { logf("[shot] %s %dx%d frame=%u", LogPath(out).c_str(), w, h, g_frame); SessEvent("screenshot %s", strrchr(out, '\\') ? strrchr(out, '\\') + 1 : out); }
+    else logf("[shot] could not write %s", LogPath(out).c_str());
     // on-screen confirmation: flash the window title for ~2.5 s
     if (g_shotWnd) { char t[320]; snprintf(t, sizeof t, "%s  |  A/B %s saved", g_shotTitle, label); SetWindowTextA(g_shotWnd, t); g_shotTitleUntil = GetTickCount64() + 2500; }
 }
