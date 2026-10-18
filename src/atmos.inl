@@ -236,7 +236,7 @@ void main() {
 )";
 static struct { GLuint prog, tex[2]; int idx; bool failed, init; } skyE;
 static int g_atHazeFromSky = 1; static float g_atHazeSky = 0.0f, g_atBlurPx = 0.0f, g_atBlurStart = 4000.0f, g_atBlurRange = 12000.0f; static int g_atContactStable = 1;
-static int g_fogSeeThruDepth = 0, g_fogLateEmit = 0; static float g_fogWaterBoost = 1.0f;   // [fog] SeeThruDepth / LateEmitters / WaterBoost (issue #4), read in LoadAtmosConfig; see LateFogBegin and SeeThruDepthBegin
+static int g_fogSeeThruDepth = 0, g_fogLateEmit = 0; static float g_fogWaterBoost = 1.0f, g_fogFoliageBoost = 1.0f;   // [fog] SeeThruDepth / LateEmitters / WaterBoost (issue #4), read in LoadAtmosConfig; see LateFogBegin and SeeThruDepthBegin
 
 typedef void(WINAPI* glDispatchCompute_t)(GLuint, GLuint, GLuint);
 typedef void(WINAPI* glBindImageTexture_t)(GLuint, GLuint, GLint, GLboolean, GLint, GLenum, GLenum);
@@ -298,6 +298,7 @@ static void LoadAtmosConfig() {
     g_atContactStable = GetPrivateProfileIntA("atmos", "ContactStable", 1, ini);
     g_fogSeeThruDepth = GetPrivateProfileIntA("fog", "SeeThruDepth", 0, ini); g_fogLateEmit = GetPrivateProfileIntA("fog", "LateEmitters", 0, ini);
     { char wb[32]; GetPrivateProfileStringA("fog", "WaterBoost", "1.0", wb, sizeof wb, ini); g_fogWaterBoost = (float)atof(wb); }   // 1 = off (water keeps LateBoost)
+    { char fb[32]; GetPrivateProfileStringA("fog", "FoliageBoost", "1.0", fb, sizeof fb, ini); g_fogFoliageBoost = (float)atof(fb); }   // 1 = off (other see-through draws keep LateBoost)
     g_fogWaterSoft = GetPrivateProfileIntA("fog", "WaterMaskSoft", 0, ini) ? 1.0f : 0.0f;   // 0 = hard GI-mask cut (default)
     g_atFroxel = GetPrivateProfileIntA("atmos", "Froxel", 1, ini); g_atFroxelPx = GetPrivateProfileIntA("atmos", "FroxelPixels", 12, ini); if (g_atFroxelPx < 4) g_atFroxelPx = 4; if (g_atFroxelPx > 64) g_atFroxelPx = 64;
 #undef F
@@ -325,12 +326,14 @@ static void FogDiagDraw() {
 static GLfloat g_lateSaved[4]; static GLuint g_lateProg;
 // [fog] LateEmitters (issue #4, default 0): the same late boost also covers emissive draws after the fog pass (cave fire, particles), which were never hazed.
 static bool LateFogBegin() {
-    if ((g_lateFog <= 1.0f && g_fogWaterBoost <= 1.0f) || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
+    if ((g_lateFog <= 1.0f && g_fogWaterBoost <= 1.0f && g_fogFoliageBoost <= 1.0f) || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
     GLuint tex = g_bound2D[g_progDiffUnit[g_curProg] & 31];
     const MatRow& row = MatPolicy(tex);
     if (!row.seeThru && !(g_fogLateEmit && row.emissive)) return false;
     // [fog] WaterBoost (issue #3/#4 water): water-named see-through draws use their own multiplier; their vertex fog is already at the water's own distance
-    float mult = (g_fogWaterBoost > 1.0f && row.seeThru && (TexFlags(tex) & TF_WATER)) ? g_fogWaterBoost : g_lateFog;
+    // [fog] FoliageBoost (issue #4, default 1 = off): see-through non-water draws after the fog pass (tree cards) get their own multiplier instead of LateBoost
+    float mult = g_lateFog;
+    if (row.seeThru) { if (TexFlags(tex) & TF_WATER) { if (g_fogWaterBoost > 1.0f) mult = g_fogWaterBoost; } else if (g_fogFoliageBoost > 1.0f) mult = g_fogFoliageBoost; }
     if (mult <= 1.0f) return false;
     memcpy(g_lateSaved, g_progFog[g_curProg], sizeof g_lateSaved); g_lateProg = g_curProg;
     GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * mult, 1.0f - b[0]);
