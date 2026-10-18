@@ -4,6 +4,8 @@ Builds are identified by the git commit in the launcher title bar. "Untested" me
 
 ## Unreleased (main after v0.3.5, up to 4a2ef95)
 
+- Launcher: simpler default window (quality presets, one performance readout, Play, and a Customise button). The controls moved into tabs (Effects, Light & shadow, Air & fog, Picture, Advanced); every setting is still there.
+
 Added
 - **F10 settings overlay** (#12): in game, F10 opens a small panel with live brightness, saturation, sharpen, vignette, fog intensity, AO on/off, tess level and shadow taps. `[overlay] Key=F10`, `0` = off. Untested.
 - **Water flicker fix** (#5): `[pbr] WaterStable=1` (default on) drops bump, relief, specular and sky Fresnel from water-tagged draws, aimed at the blue flicker on Ty. Untested.
