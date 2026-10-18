@@ -26,11 +26,52 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 ## Side by side
 
-Each pair is an F11 capture from one playtest, on build `cda9364` and the **Ultra** preset. Left is shaders off, right is shaders on.
+Each pair is an F11 capture on the **Ultra** preset. Left is F11 off, right is shaders on. There are four newer pairs from build `4a2ef95` first, then eight older pairs from build `cda9364`.
 
-There are eight pairs, so treat them as a sample rather than a full test. Ultra is the slowest preset, so Medium will show less difference. **Read this first:** the F11 "shaders off" frame is not stock. The hotkey only switches off surface relief and the material extras (PBR). Ambient occlusion, bounce light, fog, shadows and anti-aliasing stay on in both frames. So these pairs show the relief and material part of the mod only. They are not a full before and after, and they should not be read as proof of shadow, AO, bounce light or fog differences. A true before and after set will replace them after the F11 fix and the next playtest.
+Treat the older eight as a sample rather than a full test. Ultra is the slowest preset, so Medium will show less difference. **Read this first:** the F11 "shaders off" frame is not stock. The hotkey only switches off surface relief and the material extras (PBR). Ambient occlusion, bounce light, fog, shadows and anti-aliasing stay on in both frames. So these pairs show the relief and material part of the mod only. They are not a full before and after, and they should not be read as proof of shadow, AO, bounce light or fog differences. A true before and after set will replace them after the F11 fix and the next playtest.
 
 All images are in [`docs/ab/`](docs/ab/).
+
+### Newer pairs (build 4a2ef95)
+
+These four pairs are F11 captures on build `4a2ef95` and the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. In this build the F11 off frame also skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is much closer to the plain game. It is still not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game.
+
+<table>
+<tr>
+<th align="left">F11 off</th>
+<th align="left">Shaders on</th>
+</tr>
+<tr>
+<td><img src="docs/ab/09_launch_pad_fence_off.jpg" alt="Ty on a red launch pad with a fence and rope bridge, F11 off" width="100%"></td>
+<td><img src="docs/ab/09_launch_pad_fence_on.jpg" alt="Ty on a red launch pad with a fence and rope bridge, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>09 Launch pad.</b> Red rock canyon with a fence and rope bridge. With shaders on, the distance is hazier and the rock is more shaded.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/10_launch_pad_sky_off.jpg" alt="The launch pad from a lower angle with a wide sky and mesas, F11 off" width="100%"></td>
+<td><img src="docs/ab/10_launch_pad_sky_on.jpg" alt="The launch pad from a lower angle with a wide sky and mesas, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>10 Sky and mesas.</b> Same spot from a lower angle. With shaders on, the horizon haze and fog show, and the mesas are softer.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/11_bli_bli_gate_off.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, F11 off" width="100%"></td>
+<td><img src="docs/ab/11_bli_bli_gate_on.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>11 Bli Bli Station gate.</b> The wooden arch, a gum tree and two kangaroos. With shaders on, the contrast is deeper, shadows are darker and the ground relief is stronger.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/12_canyon_path_off.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, F11 off" width="100%"></td>
+<td><img src="docs/ab/12_canyon_path_on.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>12 Canyon path.</b> A dirt path between red canyon walls. With shaders on, the grading is darker, shadows are stronger and the far end of the path has a red haze.</sub></td>
+</tr>
+</table>
+
+The eight older pairs below are from build `cda9364`. They are kept as a sample, and the caveat about them still applies.
 
 ### Ground and props
 
