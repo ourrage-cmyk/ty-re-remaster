@@ -6,7 +6,7 @@ G'day! TY HD Renderer gives the bush a bit more depth: shadows that look like sh
 
 > **Fan project.** This is an unofficial, community-made mod. It is not made by or connected to the game's developers or publishers. It includes no game files, so you need your own copy of TY the Tasmanian Tiger for PC.
 
-**Status:** community beta. The latest release is v0.3.5. Changes on `main` since then are listed in [CHANGELOG.md](CHANGELOG.md). Build `4a2ef95` was partly playtested on Ultra on 2026-10-18; later changes are not.
+**Status:** community beta. Release notes and unreleased changes are in [CHANGELOG.md](CHANGELOG.md). Each build shows its id in the launcher title bar, and playtest results are noted per build in the reference pages.
 
 **Tested on:** one graphics card, AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet, so reports from those are very welcome.
 
@@ -30,7 +30,7 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 ## Side by side
 
-Ty's world, before and after. Each pair is an F11 capture from build `3ee6ea7` on the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
+Ty's world, before and after. Each pair is an F11 capture on the **Ultra** preset. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
 
 The F11 off frame skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is close to the plain game. It is not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game. Each caption names the effect and where to look, and describes only what is visible in the frames.
 
@@ -160,7 +160,7 @@ Frame times are GPU milliseconds per frame, measured by the author at 2560x1440 
 | High | about 18 ms | 55 | Medium plus bounce light (1 ray) and contact shadows |
 | Ultra | about 31 ms | 32 | More AO samples, bounce light (2 rays), higher-quality haze, environment relief, 8192 shadow maps |
 
-Start with Medium. It is the preset that has held up best in playtests, and it is the default. High and Ultra flickered in playtest 4 (v0.3.2, see `docs/FINDINGS_ROUND4.md`). The AO flicker has since been fixed and Ultra on build `4a2ef95` played without it, but use Medium if you see flicker.
+Start with Medium. It is the default, and it is the preset that has held up best in playtests. High and Ultra have flickered in past playtests; the AO flicker has since been fixed, but use Medium if you see flicker. The history is in [docs/reference/decisions/history-and-timeline.md](docs/reference/decisions/history-and-timeline.md).
 
 ### What each option costs
 
@@ -175,7 +175,7 @@ Measured against Medium, on one GPU:
 | Shadow maps | 8192, 32 taps | about +5.1 ms |
 | Environment relief | `[tess] Scope=env` | about +6.2 ms |
 
-These are approximate, because effects interact. They come from the v0.3 measurements in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md). The v0.3.2 changes have not been timed one by one.
+These are approximate, because effects interact. They come from the v0.3 measurements in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md). Later changes have not been timed one by one.
 
 ## Install
 
@@ -210,7 +210,7 @@ By hand: delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.i
 
 Ty's still got a few rough edges. Here they are, straight from playtests. Where a fix is on `main`, it is marked untested.
 
-- **Water:** in build `4a2ef95`, the light on Ty ramps up and down slowly in water instead of flickering (#5). Lily pads and rocks look brighter than the water under them, and fog is heavier looking down than across (#4). A water outline shows when viewed from above (#104).
+- **Water:** the light on Ty ramps up and down slowly in water instead of flickering (#5). Lily pads and rocks look brighter than the water under them, and fog is heavier looking down than across (#4). A water outline shows when viewed from above (#104).
 - **Fog:** sky and red rock now fade smoothly, and fog on trees is slight. Fire is not fogged (#4).
 - **Shadows:** a sharp shadow line crosses the bridge near the fire (#103).
 - **Portal light:** the rainbow portal does not light the ground (#9). `[emit] Enable` is off by default because it draws a white band when on.
@@ -222,8 +222,9 @@ Ty's still got a few rough edges. Here they are, straight from playtests. Where 
 - **Trails:** TAA can leave a faint trail on fast animation.
 - **Low-resolution textures:** relief comes from the texture's own colour, so it is weaker on low-resolution textures.
 - **Shimmer:** shimmer during fast camera moves has not been measured formally.
-- **F10 overlay:** the in-game settings overlay broke geometry in an earlier playtest. `main` now defaults to `[overlay] Key=F10`, but in build `4a2ef95` F10 did nothing, because an existing `tyrender.ini` keeps its old `Key=0`. Set `Key=F10` yourself. It is still untested in a level (#79).
-- **Game version:** built against the 2020-04-04 `TY.exe`. Other builds are untested.
+- **F10 overlay:** the in-game settings overlay broke geometry in an earlier playtest. `main` now defaults to `[overlay] Key=F10`, but on some builds F10 did nothing, because an existing `tyrender.ini` keeps its old `Key=0`. Set `Key=F10` yourself. It is still untested in a level (#79).
+- **Game version:** built against the 2020-04-04 `TY.exe`. Other game versions are untested.
+- **Reference:** the full settings, shader, pass-order and troubleshooting reference is in [docs/reference/](docs/reference/README.md).
 
 ## Reporting problems
 
@@ -276,7 +277,7 @@ Live means the change applies while the game runs (through the launcher or the `
 | `[ao]` | Radius / Strength / Power | 60 / 0.85 / 1.0 | Crevice AO look |
 | `[ao]` | WideRadius / WideStrength / WideSlices | 400 / 1.0 / 0 (= Slices) | Corner darkening over a larger area |
 | `[ao]` | Thin / MultiBounce | 0.5 / 0.6 | Thin objects (grass, fence) and bounce darkening |
-| `[ao]` | Temporal / TemporalMode / TemporalBlend | 1 / 1 / 0.85 | Temporal smoothing (mode 1 = bilinear history with variance clamp; 0 = the v0.3.1 method) |
+| `[ao]` | Temporal / TemporalMode / TemporalBlend | 1 / 1 / 0.92 | Temporal smoothing (mode 1 = bilinear history with variance clamp; 0 = the older method) |
 | `[ao]` | NoiseFrames / BlurRadius / BlurFalloff | 64 / 2 / 0.15 | Noise pattern and denoise filter |
 | `[ao]` | FogFade | 1.0 | AO fades with fog (0 = AO ignores fog, the old behaviour) |
 | `[ao]` | Legacy | 0 | 1 = the older, slower AO (not recommended) |
@@ -291,10 +292,10 @@ Live means the change applies while the game runs (through the launcher or the `
 | `[atmos]` | Enable / Froxel / Steps | 1 / 1 / 24 | Volumetric fog on or off, compute method, quality |
 | `[atmos]` | Intensity | 2.5 in code (presets write 2.2) | Overall haze amount (live) |
 | `[atmos]` | Desaturation / HazeLift | 0.7 / 0.35 | Far rocks lose colour and get lighter |
-| `[atmos]` | HazeSky | 0.6 | Haze colour follows the real sky (0 = old look) |
-| `[atmos]` | SkyHaze / SkyHazeHeight | 0.5 / 0.25 | Haze on the sky and horizon |
-| `[atmos]` | HazeHue | 0.25 | How much haze takes the sky's hue |
-| `[atmos]` | ShaftContrast / ContactShadows / ContactLength | 0.5 / 0 / 25 | Light shafts and contact shadows toward the sun (ContactShadows > 0 costs time) |
+| `[atmos]` | HazeSky | 0 | Haze colour follows the real sky (0 = old look) |
+| `[atmos]` | SkyHaze / SkyHazeHeight | 0.8 / 0.45 | Haze on the sky and horizon |
+| `[atmos]` | HazeHue | 0.15 | How much haze takes the sky's hue |
+| `[atmos]` | ShaftContrast / ContactShadows / ContactLength | 0.5 / 0 / 25 | Light shafts and contact shadows toward the sun. The shipped ini sets ContactShadows to 0 (code default 0.35); above 0 it costs time |
 | `[atmos]` | DepthBlur / BlurStart / BlurRange | 0 / 4000 / 12000 | Optional blur of distant scenery (try 2 to 3; off by default) |
 | `[shadows]` | Patch | 1 | Use the new shadow filter |
 | `[shadows]` | MapScale | 2 | 1 = 2048, 2 = 4096, 4 = 8192 (restart) |
