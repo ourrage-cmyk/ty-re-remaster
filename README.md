@@ -26,9 +26,9 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 ## Side by side
 
-Each pair is an F11 capture from one playtest, on build `cda9364` and the **Ultra** preset. Left is shaders off, right is shaders on.
+Each pair is an F11 capture on the **Ultra** preset. Left is F11 off, right is shaders on. There are four newer pairs from build `4a2ef95` first, then eight older pairs from build `cda9364`.
 
-There are eight pairs, so treat them as a sample rather than a full test. Ultra is the slowest preset, so Medium will show less difference. **Read this first:** the F11 "shaders off" frame is not stock. The hotkey only switches off surface relief and the material extras (PBR). Ambient occlusion, bounce light, fog, shadows and anti-aliasing stay on in both frames. So these pairs show the relief and material part of the mod only. They are not a full before and after, and they should not be read as proof of shadow, AO, bounce light or fog differences. A true before and after set will replace them after the F11 fix and the next playtest.
+Treat the older eight as a sample rather than a full test. Ultra is the slowest preset, so Medium will show less difference. **Read this first:** the F11 "shaders off" frame is not stock. The hotkey only switches off surface relief and the material extras (PBR). Ambient occlusion, bounce light, fog, shadows and anti-aliasing stay on in both frames. So these pairs show the relief and material part of the mod only. They are not a full before and after, and they should not be read as proof of shadow, AO, bounce light or fog differences. A true before and after set will replace them after the F11 fix and the next playtest.
 
 All images are in [`docs/ab/`](docs/ab/).
 
