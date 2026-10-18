@@ -40,7 +40,7 @@ static int OvParseVk(const char* s) {
 }
 static void LoadOverlayConfig() {
     char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
-    GetPrivateProfileStringA("overlay", "Key", "0", b, sizeof b, ini);
+    GetPrivateProfileStringA("overlay", "Key", "F10", b, sizeof b, ini);   // F10 when the key is missing (older inis); 0 in the file turns it off
     g_ovVk = OvParseVk(b);
 }
 static std::string OvIniRaw(const OvItem& it) {
