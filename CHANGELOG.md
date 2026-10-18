@@ -25,6 +25,10 @@ Added
 Fixed
 - F11 A/B: the "off" frame skips AO, GI, atmosphere, FX, shadow strength, tess LOD, light amounts and emit, so it is closer to vanilla (#96). Untested.
 
+Playtest of 4a2ef95 (owner, Ultra, 2026-10-18)
+- Good: sky and red rock fade smoothly with no hard steps, fog looks good, trees look fine, no crashes, F11 screenshots work, tessellation floor lift is on.
+- Open: F10 overlay does nothing; water brightness ramps slowly on the character (GI off the blue texture, not a frame flicker, #5); lilies and rocks look brighter than the water under them and the fog is heavier from the top down (#4); sharp shadow line on the bridge near the fire; fire is not fogged; tree frog still broken (not noticeable); water outline from above looks off; textures not emissive (known).
+
 Known
 - `[emit] Enable=1` renders a flat white upper band and stripes in the autoplaytest view (portal variants, 4a2ef95 era); keep it off.
 
