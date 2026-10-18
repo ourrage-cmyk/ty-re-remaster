@@ -110,7 +110,7 @@ Data: `docs/playtest_frames/data/` (CSV).
 
 ### 2. Is the stall at 2:10 and 2:15 in the recording or the game?
 - Both steps are duplicate frames in the recording file itself. Blue ratio and luminance are constant across the stall (`lumAll` 385.6–385.7).
-- **Clock test could not be run.** The "separate game capture" starting at 57 s is not on disk. The only 17 October recording in `C:\CLAUDE` and `C:\Users\yanni\Videos` is `094656.mp4`. Without the capture file there is nothing to compare hypothesis (a), capture = rec − 57 s (2:10 → 1:13), with hypothesis (b), capture = rec + 57 s (2:10 → 3:07).
+- **Clock test could not be run.** The "separate game capture" starting at 57 s is not on disk. The only 17 October recording in `C:\CLAUDE` and the Videos folder is `094656.mp4`. Without the capture file there is nothing to compare hypothesis (a), capture = rec − 57 s (2:10 → 1:13), with hypothesis (b), capture = rec + 57 s (2:10 → 3:07).
 - **Answer:** the stall is present in the recording file. Whether the game froze or the capture duplicated frames cannot be told apart from this file. Not confirmed.
 
 ### 3. Water entry
