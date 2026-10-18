@@ -150,5 +150,32 @@ Data: `docs/playtest_frames/data/` (CSV).
 - The 2:16 break needs a clip, not stills, to tell a real geometry break from a scene change.
 - Whether the 2:10–2:15 stall is in the game or the capture needs the separate 57 s capture file. It is not on disk.
 - Tree crown fog needs a proper segmentation (or a clip), not the green-vs-red split used here.
-- Footprints moment: still not located.
+- Footprints moment: still not located (round 3 blob scan is not a usable detector, see below).
 - Run the `DebugWater` bisect on the 2:05 spot, one bit per playtest.
+
+## Round 3 measurements
+
+Data: `docs/playtest_frames/data/r3_*.csv`. Frames at 960 px, quality 70, in `docs/playtest_frames/`.
+
+### 1. Change classification, 1:50–2:20 at 0.25 s (measured, heuristic)
+- Per 3×3 cell, mean absolute gray difference > 8 counts as changed. Edge structure uses Canny (100/200) on a 480×270 frame, with Jaccard distance of edge maps.
+- Full-frame (≥7 cells changed, edges moved): **1:52.75, 1:57.25, 2:15.50, 2:18.25, 2:18.75**.
+- Mixed: 1:50.75, 1:53.25, 2:15.75.
+- Regional (1–4 cells changed, edges stable elsewhere): 1:52.00, 1:53.75, 1:54.00, 1:56.00, **2:03.25**, 2:06.25, **2:16.00** (one cell, centre-left).
+- **The 2:16 step:** 2:15.50 full-frame, 2:15.75 mixed, 2:16.00 regional (one cell), 2:16.25 and 2:16.50 no change. It is a half-second event, not a sustained geometry break.
+- Caveat: a camera pan also changes the whole frame, so "full-frame" means "whole image moved", not "scene cut". 1:57.25 is the water entry seen earlier.
+- Frames: `event_full_frame_0152.jpg` (1:52.75), `event_regional_0203.jpg` (2:03.25), `event_full_frame_0218.jpg` (2:18.25), plus `water_entry_0157.jpg` and `overlay_step_0216.jpg`.
+
+### 2. Lily-pad green-mask test, 0:10–0:25 (measured, inconclusive)
+- Thresholds: OpenCV HSV, hue 35–85° (17–42 in OpenCV units), S > 0.25 (64 of 255). Water box x 35–80%, y 30–45%. Rock box x 0–25%, y 0–30%.
+- Far-water box at 0:15 (`fog_water_0015.jpg`): **0% pad pixels.** The hue is 8–18° across the whole box, so the fog tint puts the pads outside the green range.
+- Medians over 61 frames: water mean V 0.755, mean S 0.379. Rock mean V 0.341, mean S 0.379, green share 19%.
+- Pad-mask V and S are **not reported** because the mask is empty. **Not confirmed.** The measure needs a fog-compensated colour space or a manual pad mask.
+- Table: `data/r3_item2_lily_0010-0025.csv`.
+
+### 3. Footprint blob scan, full recording (measured, not usable as a detector)
+- 1168 samples at 0.5 s. Cutscenes skipped (letterbox or subtitle band): 187. Outdoor samples: 981.
+- Blob rule: V ≥ 0.9, S < 0.15, 200–3000 px at 960 px width, centroid stable within 8 px of the previous sample.
+- 3454 candidate blobs, 1397 stable with the previous sample, **381 timestamps** flagged.
+- Stable runs cover long spans: 0:44.5–0:47.0, 1:39.0–1:46.5, 1:50.5–2:16.0, 2:32.5–3:37.5, and more. Long static runs of this kind come from bright static surfaces (sky, white walls), not decals.
+- **Not confirmed:** no footprint is identified. The blob rule cannot tell a decal from a static bright surface. Table: `data/r3_item3_blobs_outdoor_0.5s.csv`.
