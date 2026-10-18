@@ -130,12 +130,16 @@ static void GameClashText(wchar_t* out, int n) {
 }
 
 // ------------------------------------------------------------ window
-enum { ID_P0 = 100, ID_AO = 110, ID_ATMOS, ID_TESS, ID_TESSALL, ID_POST, ID_GI, ID_AA, ID_SHADOW, ID_DETAIL, ID_PLAY = 130, ID_STOCK, ID_STEAM, ID_ADV, ID_RESET, ID_MORE, ID_SL0 = 300 };
+enum { ID_P0 = 100, ID_AO = 110, ID_ATMOS, ID_TESS, ID_TESSALL, ID_POST, ID_GI, ID_AA, ID_SHADOW, ID_DETAIL, ID_PLAY = 130, ID_STOCK, ID_STEAM, ID_ADV, ID_RESET, ID_MORE, ID_TAB = 136, ID_SL0 = 300 };
 enum { TG_AO, TG_GI, TG_ATM, TG_TESS, TG_TESSALL, TG_POST, TG_AA, TG_SHADOW, TG_DETAIL, TG_N };
 static HWND g_hw, h_preset[NPRESET], h_presetNote, h_ao, h_atmos, h_tess, h_tessAll, h_post, h_gi, h_aa, h_shadow, h_detail, h_status, h_total, h_overall, h_dTitle, h_dText;
 static Settings g_s; static int g_updating, g_presetSel = -1, g_expanded;
 static HWND h_aaLab, h_shLab; static HWND g_tagH[TG_N]; static int g_tagLv[TG_N], g_slLv[64], g_overallLv;
 static HFONT g_font, g_fontB, g_fontT, g_fontBig;
+// Controls are grouped into pages: five tabs (shown in the expanded view, one at a time), the expanded-only extras, and PG_ANY = always shown.
+enum { PG_T0, PG_T1, PG_T2, PG_T3, PG_T4, PG_EXP, PG_N, PG_ANY = -1 };
+static HWND g_page[PG_N][64]; static int g_np[PG_N], g_pg = PG_ANY, g_tab;
+static HWND h_play, h_stock, h_more, h_tab;
 typedef struct { HWND h; const wchar_t* title; const wchar_t* text; const int* lv; } Desc;
 static Desc g_desc[160]; static int g_nd, g_descCur = -1;
 static const wchar_t* kLvName[4] = { L"Free", L"Low", L"Medium", L"High" };
@@ -242,7 +246,9 @@ static void RefreshCosts(void) {
 static void SaveAll(void) { FromUI(); RefreshCosts(); SaveSettings(&g_s); for (int i = 0; i < NSL; i++) SliderToIni(i); if (GameRunning()) LiveReload(); }
 static HWND Ctl(const wchar_t* cls, const wchar_t* txt, DWORD style, int x, int y, int w, int h, int id) {
     HWND c = CreateWindowW(cls, txt, WS_CHILD | WS_VISIBLE | style, x, y, w, h, g_hw, (HMENU)(INT_PTR)id, NULL, NULL);
-    SendMessageW(c, WM_SETFONT, (WPARAM)g_font, TRUE); return c;
+    SendMessageW(c, WM_SETFONT, (WPARAM)g_font, TRUE);
+    if (g_pg >= 0 && g_np[g_pg] < 64) g_page[g_pg][g_np[g_pg]++] = c;
+    return c;
 }
 static HWND Label(const wchar_t* txt, int x, int y, int w, int h) { return Ctl(L"STATIC", txt, SS_NOTIFY, x, y, w, h, 0); }
 static HWND Tag(int idx, int x, int y) { g_tagH[idx] = Ctl(L"STATIC", L"", SS_CENTER | SS_NOTIFY, x, y, 66, 18, 0); SendMessageW(g_tagH[idx], WM_SETFONT, (WPARAM)g_fontB, TRUE); return g_tagH[idx]; }
@@ -266,6 +272,25 @@ static const wchar_t* kPresetText[NPRESET] = {
     L"The outback as it was meant to be seen: crevice shadows, dusty volumetric haze with sun beams, carved cracks and grain on the ground, soft sharp shadows and smooth edges.\n\nThe one we recommend. Performance impact: MEDIUM.",
     L"Everything in Medium plus bounce light (red rocks tint the sand beside them) and tiny contact shadows under Ty's feet. Pretty, hungry and not for shy graphics cards.\n\nPerformance impact: HIGH.",
     L"Maximum everything: razor-sharp shadows, thick haze, extra occlusion and bounce rays, real bumpy geometry on the ground. Bring a strong graphics card and a fan that believes in you.\n\nPerformance impact: EXTREME." };
+static void AddDesc2(HWND a, HWND b, const wchar_t* title, const wchar_t* text) { AddDesc(a, title, text); AddDesc(b, title, text); }
+// Simple view: presets, impact, Play and the Customise button. Expanded view: compact presets, tabs and the help panel.
+static void ApplyLayout(void) {
+    int exp = g_expanded;
+    for (int i = 0; i < NPRESET; i++) MoveWindow(h_preset[i], exp ? 10 + i * 148 : 16 + i * 114, exp ? 10 : 16, exp ? 140 : 108, exp ? 30 : 40, TRUE);
+    MoveWindow(h_presetNote, 16, exp ? 46 : 62, exp ? 568 : 448, exp ? 20 : 34, TRUE);
+    MoveWindow(h_overall, 16, exp ? 70 : 106, exp ? 568 : 448, 26, TRUE);
+    MoveWindow(h_play, 16, exp ? 512 : 144, exp ? 200 : 226, exp ? 36 : 46, TRUE);
+    MoveWindow(h_stock, exp ? 224 : 250, exp ? 512 : 144, exp ? 170 : 214, exp ? 36 : 46, TRUE);
+    MoveWindow(h_more, exp ? 402 : 16, exp ? 512 : 204, exp ? 190 : 200, exp ? 36 : 28, TRUE);
+    SetWindowTextW(h_more, exp ? L"<<  Simpler view" : L"Customise settings  >>");
+    MoveWindow(h_status, 16, exp ? 552 : 250, exp ? 568 : 448, exp ? 40 : 36, TRUE);
+    for (int p = 0; p < PG_N; p++) for (int k = 0; k < g_np[p]; k++)
+        ShowWindow(g_page[p][k], (p == PG_EXP ? exp : exp && p == g_tab) ? SW_SHOW : SW_HIDE);
+    ShowWindow(h_tab, exp ? SW_SHOW : SW_HIDE);
+    RECT r = { 0, 0, exp ? 600 : 480, exp ? 596 : 300 };
+    AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
+    SetWindowPos(g_hw, NULL, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER);
+}
 static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE: {
@@ -274,76 +299,85 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         g_fontB = CreateFontW(-13, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
         g_fontT = CreateFontW(-18, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
         g_fontBig = CreateFontW(-15, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
-        const int LX = 16, TX = 392, MX = 484, PX = 880;
-        // ---- left column: presets
-        Ctl(L"BUTTON", L"Quality preset", BS_GROUPBOX, 8, 4, 456, 104, 0);
+        HWND c, l; int y;
+        // ---- always shown: presets, impact and the main actions. ApplyLayout places them for the simple or the expanded view.
+        g_pg = PG_ANY;
         for (int i = 0; i < NPRESET; i++) {
-            h_preset[i] = Ctl(L"BUTTON", kPresets[i], BS_OWNERDRAW | (i == 0 ? WS_GROUP : 0) | WS_TABSTOP, LX + i * 111, 24, 106, 38, ID_P0 + i);
+            h_preset[i] = Ctl(L"BUTTON", kPresets[i], BS_OWNERDRAW | (i == 0 ? WS_GROUP : 0) | WS_TABSTOP, 16 + i * 114, 16, 108, 40, ID_P0 + i);
             SendMessageW(h_preset[i], WM_SETFONT, (WPARAM)g_fontBig, TRUE); AddDesc(h_preset[i], kPresetTitle[i], kPresetText[i]);
         }
-        h_presetNote = Label(L"", LX, 68, 440, 36);
-        // ---- left column: effects
-        Ctl(L"BUTTON", L"Effects  (tag = performance impact if switched on)", BS_GROUPBOX, 8, 318, 456, 254, 0);
-        int y = 340; HWND c, l;
-        h_ao = Ctl(L"BUTTON", L"Ambient occlusion (soft crevice shadows)", BS_AUTOCHECKBOX | WS_TABSTOP, LX, y, 370, 22, ID_AO); c = Tag(TG_AO, TX, y + 2);
-        AddDesc(h_ao, L"Ambient occlusion - crevice shadows", L"Adds the soft darkness where things almost touch: under rocks, between fence boards, beside Ty's feet. Without it the world looks like it is floating a millimetre above itself."); AddDesc(c, L"Ambient occlusion - crevice shadows", L"Adds the soft darkness where things almost touch: under rocks, between fence boards, beside Ty's feet. Without it the world looks like it is floating a millimetre above itself."); y += 24;
-        h_gi = Ctl(L"BUTTON", L"Global illumination (bounce light, colour bleeding)", BS_AUTOCHECKBOX | WS_TABSTOP, LX, y, 370, 22, ID_GI); c = Tag(TG_GI, TX, y + 2);
-        AddDesc(h_gi, L"Global illumination - colour gossip", L"Light bounces around: a red rock tints the sand next to it, a green bush glows onto Ty. Lovely, but one of the hungriest effects and quite subtle in this game.\n\nThe first thing to switch off if you need frames."); AddDesc(c, L"Global illumination - colour gossip", L"Light bounces around: a red rock tints the sand next to it, a green bush glows onto Ty. Lovely, but one of the hungriest effects and quite subtle in this game.\n\nThe first thing to switch off if you need frames."); y += 24;
-        h_atmos = Ctl(L"BUTTON", L"Volumetric fog + light shafts", BS_AUTOCHECKBOX | WS_TABSTOP, LX, y, 370, 22, ID_ATMOS); c = Tag(TG_ATM, TX, y + 2);
-        AddDesc(h_atmos, L"Volumetric fog - outback atmosphere", L"Dusty haze that fades far-away rocks into the distance (and the mountains painted on the horizon), plus sun beams through the air. It is what stops everything looking crisp from here to Uluru."); AddDesc(c, L"Volumetric fog - outback atmosphere", L"Dusty haze that fades far-away rocks into the distance (and the mountains painted on the horizon), plus sun beams through the air. It is what stops everything looking crisp from here to Uluru."); y += 24;
-        h_tess = Ctl(L"BUTTON", L"Surface detail (cracks, grain, rope strands)", BS_AUTOCHECKBOX | WS_TABSTOP, LX, y, 370, 22, ID_TESS); c = Tag(TG_TESS, TX, y + 2);
-        AddDesc(h_tess, L"Surface detail - texture you can almost touch", L"Uses each texture's own paint to carve cracks, wood grain and rope strands into the surface, so the ground has relief instead of being a flat painting. Characters are left alone, so Ty never grows wrinkles."); AddDesc(c, L"Surface detail - texture you can almost touch", L"Uses each texture's own paint to carve cracks, wood grain and rope strands into the surface, so the ground has relief instead of being a flat painting. Characters are left alone, so Ty never grows wrinkles."); y += 24;
-        h_tessAll = Ctl(L"BUTTON", L"   ...plus real bumpy geometry on the ground (heavy)", BS_AUTOCHECKBOX | WS_TABSTOP, LX, y, 370, 22, ID_TESSALL); c = Tag(TG_TESSALL, TX, y + 2);
-        AddDesc(h_tessAll, L"Real bumpy geometry - for show-offs", L"Cuts the ground and props into thousands of tiny triangles so the relief is real geometry, not just clever shading. Most visible when the camera skims low over the sand.\n\nMost of the effect is already in Surface detail."); AddDesc(c, L"Real bumpy geometry - for show-offs", L"Cuts the ground and props into thousands of tiny triangles so the relief is real geometry, not just clever shading. Most visible when the camera skims low over the sand.\n\nMost of the effect is already in Surface detail."); y += 24;
-        h_post = Ctl(L"BUTTON", L"Finishing touches (colour grade, sharpening, smoothing)", BS_AUTOCHECKBOX | WS_TABSTOP, LX, y, 370, 22, ID_POST); c = Tag(TG_POST, TX, y + 2);
-        AddDesc(h_post, L"Finishing touches - the final polish", L"Edge smoothing, a gentle film-like colour curve and sharpening applied to the finished picture. Cheap and makes a surprising difference."); AddDesc(c, L"Finishing touches - the final polish", L"Edge smoothing, a gentle film-like colour curve and sharpening applied to the finished picture. Cheap and makes a surprising difference."); y += 28;
-        l = h_aaLab = Label(L"Edge smoothing:", LX, y + 3, 120, 18);
-        h_aa = Ctl(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_TABSTOP, 144, y, 226, 120, ID_AA);
-        SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"Off (game MSAA only)"); SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"FXAA (fast blur)");
-        SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"TAA (smoothest, recommended)"); SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"TAA + FXAA"); c = Tag(TG_AA, TX, y + 3);
-        { const wchar_t* tt = L"Edge smoothing - jaggy remover"; const wchar_t* tx = L"Off = just the game's own smoothing. FXAA = a quick soften of edges. TAA = borrows detail from previous frames for the smoothest edges and calmest shimmer (recommended). TAA + FXAA = belt and braces.\n\nImpact: LOW.";
-          AddDesc(l, tt, tx); AddDesc(h_aa, tt, tx); AddDesc(c, tt, tx); } y += 28;
-        l = h_shLab = Label(L"Shadow sharpness:", LX, y + 3, 124, 18);
-        h_shadow = Ctl(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_TABSTOP, 144, y, 226, 120, ID_SHADOW);
-        SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"2048 (original, blocky)"); SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"4096 (crisp)");
-        SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"8192 (razor sharp, big memory)"); c = Tag(TG_SHADOW, TX, y + 3);
-        { const wchar_t* tt = L"Shadow sharpness - how crisp the shade is"; const wchar_t* tx = L"2048 is the original blocky look, 4096 is crisp, 8192 is razor sharp but memory hungry. Takes effect the next time the game starts.";
-          AddDesc(l, tt, tx); AddDesc(h_shadow, tt, tx); AddDesc(c, tt, tx); } y += 28;
-        h_detail = Ctl(L"BUTTON", L"Game detail settings: high (props, grass, reflections)", BS_AUTOCHECKBOX | WS_TABSTOP, LX, y, 370, 22, ID_DETAIL); c = Tag(TG_DETAIL, TX, y + 2);
-        AddDesc(h_detail, L"Game detail settings - the game's own dials", L"Flips the original game's detail options (props, grass, reflections, anisotropic filtering) to their highest setting. Your own settings.ini is backed up once before the first change.\n\nHow much it costs depends on your graphics card, usually not much."); AddDesc(c, L"Game detail settings - the game's own dials", L"Flips the original game's detail options (props, grass, reflections, anisotropic filtering) to their highest setting. Your own settings.ini is backed up once before the first change.\n\nHow much it costs depends on your graphics card, usually not much.");
-        // ---- left column: overall + buttons
-        h_overall = Ctl(L"STATIC", L"", SS_LEFT | SS_NOTIFY, LX, 114, 440, 24, 0); SendMessageW(h_overall, WM_SETFONT, (WPARAM)g_fontT, TRUE);
-        h_total = Ctl(L"STATIC", L"", SS_NOTIFY, LX, 140, 440, 36, 0);
-        AddDesc(h_overall, L"Overall performance impact", L"A quick summary of everything that is switched on: LOW, MEDIUM, HIGH or EXTREME. It is based on measured frame-time costs, so it is a guide: your graphics card and screen resolution decide the real result.\n\nIf the game feels slow, switch off the effects tagged High first."); AddDesc(h_total, L"Overall performance impact", L"A quick summary of everything that is switched on: LOW, MEDIUM, HIGH or EXTREME. It is based on measured frame-time costs, so it is a guide: your graphics card and screen resolution decide the real result.\n\nIf the game feels slow, switch off the effects tagged High first.");
-        c = Ctl(L"BUTTON", L"Play with HD renderer", BS_DEFPUSHBUTTON | WS_TABSTOP, LX, 184, 220, 44, ID_PLAY); SendMessageW(c, WM_SETFONT, (WPARAM)g_fontBig, TRUE);
-        AddDesc(c, L"Play with HD renderer", L"Starts the game with the renderer and your current settings. Keep this window open while you play: every slider changes the picture live.");
-        c = Ctl(L"BUTTON", L"Play original (no mod)", WS_TABSTOP, 244, 184, 212, 44, ID_STOCK); AddDesc(c, L"Play original", L"Starts the untouched original game. Handy for comparing, or for when you just want to feel nostalgic.");
-        c = Ctl(L"BUTTON", L"Steam setup...", WS_TABSTOP, LX, 580, 140, 28, ID_STEAM); AddDesc(c, L"Steam setup", L"Copies a launch option so Steam's own Play button starts the game with the HD renderer. One-time setup.");
-        c = Ctl(L"BUTTON", L"Advanced (ini)...", WS_TABSTOP, 160, 580, 140, 28, ID_ADV); AddDesc(c, L"Advanced settings", L"Opens tyrender.ini in Notepad for the full list of knobs. For tinkerers.");
-        c = Ctl(L"BUTTON", L"Reset sliders", WS_TABSTOP, 304, 580, 152, 28, ID_RESET); AddDesc(c, L"Reset sliders", L"Puts every look slider back to its default position. Your checkboxes and preset stay as they are.");
-        c = Ctl(L"BUTTON", L"More options  >>", WS_TABSTOP, LX, 236, 200, 30, ID_MORE); AddDesc(c, L"More options", L"Shows every effect switch, all the look sliders and this help panel. You do not need any of it: the presets already pick good settings.");
-        h_status = Ctl(L"STATIC", L"", 0, LX, 276, 440, 40, 0);   // 2 lines: the clash warning can be long
-        // ---- middle column: sliders
-        Ctl(L"BUTTON", L"Look && balance  (tag = performance impact; changes apply live)", BS_GROUPBOX, MX - 8, 4, 394, 568, 0);
-        int sy = 26;
-        for (int i = 0; i < NSL; i++) {
-            g_sl[i].lab = Label(g_sl[i].label, MX, sy + 5, 132, 18);
-            g_sl[i].bar = Ctl(TRACKBAR_CLASSW, L"", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, MX + 132, sy, 124, 28, ID_SL0 + i);
-            SendMessageW(g_sl[i].bar, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
-            g_sl[i].val = Label(L"", MX + 258, sy + 5, 38, 18);
-            g_sl[i].tag = Ctl(L"STATIC", L"", SS_CENTER | SS_NOTIFY, MX + 300, sy + 5, 66, 18, 0); SendMessageW(g_sl[i].tag, WM_SETFONT, (WPARAM)g_fontB, TRUE);
-            AddDesc(g_sl[i].lab, g_sl[i].label, g_sl[i].tip); AddDesc(g_sl[i].bar, g_sl[i].label, g_sl[i].tip); AddDesc(g_sl[i].val, g_sl[i].label, g_sl[i].tip); AddDesc(g_sl[i].tag, g_sl[i].label, g_sl[i].tip);
-            sy += 34;
-        }
-        // ---- right column: description panel
-        Ctl(L"BUTTON", L"What does this do?", BS_GROUPBOX, PX - 8, 4, 250, 568, 0);
-        h_dTitle = Ctl(L"STATIC", L"", SS_LEFT, PX, 28, 234, 52, 0); SendMessageW(h_dTitle, WM_SETFONT, (WPARAM)g_fontT, TRUE);
-        h_dText = Ctl(L"STATIC", L"", SS_LEFT, PX, 88, 234, 370, 0);
-        Ctl(L"STATIC", L"Impact tags:  Free = no real cost.  Low = barely noticeable.  Medium = noticeable on weaker cards.  High = the big spenders: switch these off first if the game stutters.", SS_LEFT, PX, 470, 234, 96, 0);
+        h_presetNote = Label(L"", 16, 62, 448, 34);
+        h_overall = Ctl(L"STATIC", L"", SS_LEFT | SS_NOTIFY, 16, 106, 448, 26, 0); SendMessageW(h_overall, WM_SETFONT, (WPARAM)g_fontT, TRUE);
+        AddDesc(h_overall, L"Overall performance impact", L"A quick summary of everything that is switched on: LOW, MEDIUM, HIGH or EXTREME. It is based on measured frame-time costs, so it is a guide: your graphics card and screen resolution decide the real result.\n\nIf the game feels slow, switch off the effects tagged High first.");
+        h_play = Ctl(L"BUTTON", L"Play with HD renderer", BS_DEFPUSHBUTTON | WS_TABSTOP, 16, 144, 226, 46, ID_PLAY); SendMessageW(h_play, WM_SETFONT, (WPARAM)g_fontBig, TRUE);
+        AddDesc(h_play, L"Play with HD renderer", L"Starts the game with the renderer and your current settings. Keep this window open while you play: every slider changes the picture live.");
+        h_stock = Ctl(L"BUTTON", L"Play original (no mod)", WS_TABSTOP, 250, 144, 214, 46, ID_STOCK); AddDesc(h_stock, L"Play original", L"Starts the untouched original game. Handy for comparing, or for when you just want to feel nostalgic.");
+        h_more = Ctl(L"BUTTON", L"Customise settings  >>", WS_TABSTOP, 16, 204, 200, 28, ID_MORE); AddDesc(h_more, L"Customise", L"Opens the effects and look controls in tabs, plus the advanced tools. You do not need any of it: the presets already pick good settings.");
+        h_status = Ctl(L"STATIC", L"", 0, 16, 250, 448, 36, 0);   // 2 lines: the clash warning can be long
+        // ---- expanded view only: impact detail, tabs and the help panel
+        g_pg = PG_EXP;
+        h_total = Ctl(L"STATIC", L"", SS_NOTIFY, 16, 96, 568, 36, 0);
+        AddDesc(h_total, L"Overall performance impact", L"A quick summary of everything that is switched on: LOW, MEDIUM, HIGH or EXTREME. It is based on measured frame-time costs, so it is a guide: your graphics card and screen resolution decide the real result.\n\nIf the game feels slow, switch off the effects tagged High first.");
+        h_tab = CreateWindowW(WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 10, 136, 580, 290, g_hw, (HMENU)(INT_PTR)ID_TAB, NULL, NULL);
+        SendMessageW(h_tab, WM_SETFONT, (WPARAM)g_font, TRUE);
+        static const wchar_t* kTabName[] = { L"Effects", L"Light & shadow", L"Air & fog", L"Picture", L"Advanced" };
+        for (int t = 0; t < 5; t++) { TCITEMW ti = { TCIF_TEXT }; ti.pszText = (LPWSTR)kTabName[t]; SendMessageW(h_tab, TCM_INSERTITEMW, t, (LPARAM)&ti); }
+        h_dTitle = Ctl(L"STATIC", L"", SS_LEFT, 16, 432, 568, 24, 0); SendMessageW(h_dTitle, WM_SETFONT, (WPARAM)g_fontT, TRUE);
+        h_dText = Ctl(L"STATIC", L"", SS_LEFT, 16, 456, 568, 50, 0);
         SetWindowTextW(h_dTitle, L"Welcome, mate!");
-        SetWindowTextW(h_dText, L"Hover over (or click) anything to find out what it does.\n\nPick a preset on the left to start, then fine-tune with the sliders. Every effect has a performance tag: Free, Low, Medium or High. They show roughly how much each one slows the game down, without pretending to know your graphics card.\n\nTip: keep this window open while you play, the sliders work live.");
+        SetWindowTextW(h_dText, L"Hover over (or click) anything to find out what it does. Pick a preset to start, then fine-tune on the tabs. Every effect has a performance tag: Free, Low, Medium or High.");
+        // ---- tab 0: effects (checkbox, impact tag, help text)
+        g_pg = PG_T0; y = 170;
+        h_ao = Ctl(L"BUTTON", L"Ambient occlusion (soft crevice shadows)", BS_AUTOCHECKBOX | WS_TABSTOP, 30, y, 440, 22, ID_AO); c = Tag(TG_AO, 490, y + 2);
+        AddDesc2(h_ao, c, L"Ambient occlusion - crevice shadows", L"Adds the soft darkness where things almost touch: under rocks, between fence boards, beside Ty's feet. Without it the world looks like it is floating a millimetre above itself."); y += 26;
+        h_gi = Ctl(L"BUTTON", L"Global illumination (bounce light, colour bleeding)", BS_AUTOCHECKBOX | WS_TABSTOP, 30, y, 440, 22, ID_GI); c = Tag(TG_GI, 490, y + 2);
+        AddDesc2(h_gi, c, L"Global illumination - colour gossip", L"Light bounces around: a red rock tints the sand next to it, a green bush glows onto Ty. Lovely, but one of the hungriest effects and quite subtle in this game.\n\nThe first thing to switch off if you need frames."); y += 26;
+        h_atmos = Ctl(L"BUTTON", L"Volumetric fog + light shafts", BS_AUTOCHECKBOX | WS_TABSTOP, 30, y, 440, 22, ID_ATMOS); c = Tag(TG_ATM, 490, y + 2);
+        AddDesc2(h_atmos, c, L"Volumetric fog - outback atmosphere", L"Dusty haze that fades far-away rocks into the distance (and the mountains painted on the horizon), plus sun beams through the air. It is what stops everything looking crisp from here to Uluru."); y += 26;
+        h_tess = Ctl(L"BUTTON", L"Surface detail (cracks, grain, rope strands)", BS_AUTOCHECKBOX | WS_TABSTOP, 30, y, 440, 22, ID_TESS); c = Tag(TG_TESS, 490, y + 2);
+        AddDesc2(h_tess, c, L"Surface detail - texture you can almost touch", L"Uses each texture's own paint to carve cracks, wood grain and rope strands into the surface, so the ground has relief instead of being a flat painting. Characters are left alone, so Ty never grows wrinkles."); y += 26;
+        h_tessAll = Ctl(L"BUTTON", L"   ...plus real bumpy geometry on the ground (heavy)", BS_AUTOCHECKBOX | WS_TABSTOP, 30, y, 440, 22, ID_TESSALL); c = Tag(TG_TESSALL, 490, y + 2);
+        AddDesc2(h_tessAll, c, L"Real bumpy geometry - for show-offs", L"Cuts the ground and props into thousands of tiny triangles so the relief is real geometry, not just clever shading. Most visible when the camera skims low over the sand.\n\nMost of the effect is already in Surface detail."); y += 26;
+        h_post = Ctl(L"BUTTON", L"Finishing touches (colour grade, sharpening, smoothing)", BS_AUTOCHECKBOX | WS_TABSTOP, 30, y, 440, 22, ID_POST); c = Tag(TG_POST, 490, y + 2);
+        AddDesc2(h_post, c, L"Finishing touches - the final polish", L"Edge smoothing, a gentle film-like colour curve and sharpening applied to the finished picture. Cheap and makes a surprising difference."); y += 30;
+        l = h_aaLab = Label(L"Edge smoothing:", 30, y + 3, 110, 18);
+        h_aa = Ctl(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_TABSTOP, 144, y, 300, 120, ID_AA);
+        SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"Off (game MSAA only)"); SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"FXAA (fast blur)");
+        SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"TAA (smoothest, recommended)"); SendMessageW(h_aa, CB_ADDSTRING, 0, (LPARAM)L"TAA + FXAA"); c = Tag(TG_AA, 490, y + 3);
+        { const wchar_t* tt = L"Edge smoothing - jaggy remover"; const wchar_t* tx = L"Off = just the game's own smoothing. FXAA = a quick soften of edges. TAA = borrows detail from previous frames for the smoothest edges and calmest shimmer (recommended). TAA + FXAA = belt and braces.\n\nImpact: LOW.";
+          AddDesc(l, tt, tx); AddDesc(h_aa, tt, tx); AddDesc(c, tt, tx); } y += 30;
+        l = h_shLab = Label(L"Shadow sharpness:", 30, y + 3, 110, 18);
+        h_shadow = Ctl(L"COMBOBOX", L"", CBS_DROPDOWNLIST | WS_TABSTOP, 144, y, 300, 120, ID_SHADOW);
+        SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"2048 (original, blocky)"); SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"4096 (crisp)");
+        SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"8192 (razor sharp, big memory)"); c = Tag(TG_SHADOW, 490, y + 3);
+        { const wchar_t* tt = L"Shadow sharpness - how crisp the shade is"; const wchar_t* tx = L"2048 is the original blocky look, 4096 is crisp, 8192 is razor sharp but memory hungry. Takes effect the next time the game starts.";
+          AddDesc(l, tt, tx); AddDesc(h_shadow, tt, tx); AddDesc(c, tt, tx); }
+        Ctl(L"STATIC", L"Tags: Free = no cost, Low = barely noticeable, Medium = noticeable on weaker cards, High = switch off first if it stutters.", SS_LEFT, 30, 388, 540, 34, 0);
+        // ---- tabs 1-3: look sliders. Each slider lands on the tab in kSlTab (1 Light & shadow, 2 Air & fog, 3 Picture).
+        static const int kSlTab[NSL] = { 3, 3, 3, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 3, 3 };
+        int sy[5] = { 172, 172, 172, 172, 172 };
+        for (int i = 0; i < NSL; i++) {
+            int t = kSlTab[i]; g_pg = t; y = sy[t];
+            g_sl[i].lab = Label(g_sl[i].label, 30, y + 5, 150, 18);
+            g_sl[i].bar = Ctl(TRACKBAR_CLASSW, L"", TBS_HORZ | TBS_NOTICKS | WS_TABSTOP, 184, y, 180, 28, ID_SL0 + i);
+            SendMessageW(g_sl[i].bar, TBM_SETRANGE, TRUE, MAKELPARAM(0, 100));
+            g_sl[i].val = Label(L"", 370, y + 5, 44, 18);
+            g_sl[i].tag = Ctl(L"STATIC", L"", SS_CENTER | SS_NOTIFY, 420, y + 5, 70, 18, 0); SendMessageW(g_sl[i].tag, WM_SETFONT, (WPARAM)g_fontB, TRUE);
+            AddDesc(g_sl[i].lab, g_sl[i].label, g_sl[i].tip); AddDesc(g_sl[i].bar, g_sl[i].label, g_sl[i].tip); AddDesc(g_sl[i].val, g_sl[i].label, g_sl[i].tip); AddDesc(g_sl[i].tag, g_sl[i].label, g_sl[i].tip);
+            sy[t] += 36;
+        }
+        // ---- tab 4: advanced
+        g_pg = PG_T4;
+        h_detail = Ctl(L"BUTTON", L"Game detail settings: high (props, grass, reflections)", BS_AUTOCHECKBOX | WS_TABSTOP, 30, 172, 440, 22, ID_DETAIL); c = Tag(TG_DETAIL, 490, 174);
+        AddDesc2(h_detail, c, L"Game detail settings - the game's own dials", L"Flips the original game's detail options (props, grass, reflections, anisotropic filtering) to their highest setting. Your own settings.ini is backed up once before the first change.\n\nHow much it costs depends on your graphics card, usually not much.");
+        c = Ctl(L"BUTTON", L"Steam setup...", WS_TABSTOP, 30, 222, 160, 30, ID_STEAM); AddDesc(c, L"Steam setup", L"Copies a launch option so Steam's own Play button starts the game with the HD renderer. One-time setup.");
+        c = Ctl(L"BUTTON", L"Advanced (ini)...", WS_TABSTOP, 200, 222, 160, 30, ID_ADV); AddDesc(c, L"Advanced settings", L"Opens tyrender.ini in Notepad for the full list of knobs. For tinkerers.");
+        c = Ctl(L"BUTTON", L"Reset sliders", WS_TABSTOP, 370, 222, 170, 30, ID_RESET); AddDesc(c, L"Reset sliders", L"Puts every look slider back to its default position. Your checkboxes and preset stay as they are.");
+        Ctl(L"STATIC", L"Nothing here is needed for a good picture: the presets already pick good settings.", SS_LEFT, 30, 270, 540, 36, 0);
+        g_pg = PG_ANY;
         AssignLv(); LoadSettings(&g_s); ToUI(); SlidersFromIni(); SendMessageW(h_detail, BM_SETCHECK, GameDetailIsHigh(), 0); RefreshCosts();
         UpdateStatus(NULL); SetTimer(h, 1, 2000, NULL); SetTimer(h, 2, 90, NULL);
+        ApplyLayout();
         return 0; }
     case WM_TIMER: if (wp == 2) HoverUpdate(); else UpdateStatus(NULL); return 0;
     case WM_HSCROLL: {
@@ -359,7 +393,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         else if (id == ID_PLAY) { SaveAll(); int ok = EnsurePatched(); (void)ok; StartGame(1); UpdateStatus(L"Started. Keep this window open to fine-tune the sliders live."); }
         else if (id == ID_STOCK) { SaveAll(); StartGame(0); }
         else if (id == ID_ADV) { SaveAll(); ShellExecuteW(h, L"open", L"notepad.exe", g_ini, NULL, SW_SHOWNORMAL); }
-        else if (id == ID_MORE) { g_expanded = !g_expanded; SetWindowTextW((HWND)lp, g_expanded ? L"<<  Fewer options" : L"More options  >>"); RECT r = {0, 0, g_expanded ? 1146 : 480, g_expanded ? 622 : 322}; AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE); SetWindowPos(h, NULL, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER); }
+        else if (id == ID_MORE) { g_expanded = !g_expanded; ApplyLayout(); }
         else if (id == ID_RESET) { for (int i = 0; i < NSL; i++) Wf(g_sl[i].sec, g_sl[i].key, g_sl[i].def); SlidersFromIni(); RefreshCosts(); if (GameRunning()) LiveReload(); }
         else if (id == ID_STEAM) {
             EnsurePatched();
@@ -390,6 +424,9 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (c == h_overall) lv = g_overallLv == 0 ? 1 : g_overallLv == 1 ? 2 : 3;   // LOW green, MEDIUM amber, HIGH/EXTREME red
         if (lv >= 0) { SetBkMode(dc, TRANSPARENT); SetTextColor(dc, IsWindowEnabled(c) ? LvColor(lv) : RGB(170, 170, 170)); return (LRESULT)GetSysColorBrush(COLOR_BTNFACE); }
         SetBkMode(dc, TRANSPARENT); if (!IsWindowEnabled(c)) SetTextColor(dc, RGB(150, 150, 150)); return (LRESULT)GetSysColorBrush(COLOR_BTNFACE); }
+    case WM_NOTIFY:
+        if (((NMHDR*)lp)->idFrom == ID_TAB && ((NMHDR*)lp)->code == TCN_SELCHANGE) { g_tab = (int)SendMessageW(h_tab, TCM_GETCURSEL, 0, 0); ApplyLayout(); }
+        return 0;
     case WM_DESTROY: PostQuitMessage(0); return 0;
     }
     return DefWindowProcW(h, msg, wp, lp);
@@ -410,11 +447,11 @@ int WINAPI wWinMain(HINSTANCE hi, HINSTANCE hp, LPWSTR cmd, int show) {
     }
     if (play) { if (inject) { wchar_t in[MAX_PATH], out[MAX_PATH], err[300]; swprintf(in, MAX_PATH, L"%lsTY.exe", g_dir); swprintf(out, MAX_PATH, L"%lsTY_tyrender.exe", g_dir);
                               if (GetFileAttributesW(out) == INVALID_FILE_ATTRIBUTES) PatchExe(in, out, err, 300); } return StartGame(inject); }
-    INITCOMMONCONTROLSEX icc = { sizeof icc, ICC_STANDARD_CLASSES | ICC_BAR_CLASSES }; InitCommonControlsEx(&icc);
+    INITCOMMONCONTROLSEX icc = { sizeof icc, ICC_STANDARD_CLASSES | ICC_BAR_CLASSES | ICC_TAB_CLASSES }; InitCommonControlsEx(&icc);
     WNDCLASSW wc = {0}; wc.lpfnWndProc = WndProc; wc.hInstance = hi; wc.lpszClassName = L"TYLauncherWnd";
     wc.hCursor = LoadCursor(NULL, IDC_ARROW); wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1); wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
     RegisterClassW(&wc);
-    RECT r = {0, 0, 480, 322}; AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
+    RECT r = {0, 0, 480, 300}; AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
     CreateWindowW(L"TYLauncherWnd", TY_WINDOW_TITLE, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
         CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, hi, NULL);
     MSG m; while (GetMessageW(&m, NULL, 0, 0)) { if (!IsDialogMessageW(g_hw, &m)) { TranslateMessage(&m); DispatchMessageW(&m); } }
