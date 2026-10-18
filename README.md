@@ -30,7 +30,7 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 ## Side by side
 
-Each pair is an F11 capture from build `3ee6ea7` on the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
+Ty's world, before and after. Each pair is an F11 capture from build `3ee6ea7` on the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
 
 The F11 off frame skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is close to the plain game. It is not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game. Each caption names the effect and where to look, and describes only what is visible in the frames.
 
@@ -208,6 +208,8 @@ Ty's still got a few rough edges. Here they are, straight from playtests. Where 
 Hit a glitch? Ta for reporting it. Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
 
 ## Compatibility and credits
+
+Cheers to everyone who sends a log, a screenshot or a "it flickers on my card" message. That is how the mod gets better.
 
 - Works with the base game.
 - Gets more from the ty2k mod, because more texture detail means more precise relief.
