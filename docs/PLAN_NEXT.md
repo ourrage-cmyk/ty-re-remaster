@@ -1,11 +1,14 @@
 # Plan for the next build
 
-Updated 2026-10-17, after the playtest of build cda9364.
+Updated 2026-10-18, after the playtest of build 4a2ef95.
 
 ## Status
 
 - Last full release: v0.3.5 (c255ae8).
-- Merged since v0.3.5: #36, #38, #40, #42, #43, #45, #46, #47, #48, #49, #50, #51, #52, #54, #58, #60, #74, #75, #78.
+- Merged since v0.3.5: #36, #38, #40, #42, #43, #45, #46, #47, #48, #49, #50, #51, #52, #54, #58, #60, #74, #75, #78, #87, #89, #91, #92, #93, #96, #98, #100, #102.
+- Playtest of 4a2ef95 (owner, Ultra):
+  - Good: sky, red rock and horizon fade smoothly; fog looks good; trees fine; no crashes; F11 screenshots work (four on/off pairs written); tessellation floor lift on.
+  - Open: F10 does nothing (default was Key=0, now F10 via #102; verify in a level, #79); slow water brightness ramp on the character (GI off the blue texture, #5); lilies and rocks brighter than the water under them and heavier top-down fog (#4, #82); sharp shadow line at the bridge by the fire (#103); fire not fogged (#4); water outline from above (#104); portal emit fix (#100) untested.
 - Playtest of cda9364:
   - Fog colour looked steady (#3). #3 is closed; the yaw sweep is no longer tracked here.
   - Fog: level-two trees poke through, sky and red rock not fogged, water and lilies wrong (#4).
