@@ -19,6 +19,16 @@ Set-Content -Path $rc -Value @(('1 RCDATA "' + ("$out\tyrender.dll" -replace '\\
 if ($LASTEXITCODE) { throw 'payload resource build failed' }
 & "$bin\i686-w64-mingw32-clang.exe" -O2 -static -municode -mwindows -Wall "-I$out" -o "$out\TYLauncher.exe" "$src\TYLauncher.c" "$out\payload.res.o" -lshell32 -lcomctl32
 if ($LASTEXITCODE) { throw 'TYLauncher.exe build failed' }
+# TY HD Renderer Uninstall.exe (no payload), then TY HD Renderer Setup.exe: one file that embeds TYLauncher.exe, the uninstaller,
+# tyrender.dll and the default ini (resources 1-4, see installer\setup.c). Both are built from installer\ and share installer\common.inc.
+& "$bin\i686-w64-mingw32-clang.exe" -O2 -static -municode -mwindows -Wall "-I$out" -o "$out\TY HD Renderer Uninstall.exe" "$src\installer\uninstall.c" -lole32 -lshell32 -ladvapi32
+if ($LASTEXITCODE) { throw 'uninstaller build failed' }
+$srp = Join-Path $out 'setup_payload.rc'
+Set-Content -Path $srp -Value @(('1 RCDATA "' + ("$out\TYLauncher.exe" -replace '\\', '/') + '"'), ('2 RCDATA "' + ("$out\TY HD Renderer Uninstall.exe" -replace '\\', '/') + '"'), ('3 RCDATA "' + ("$out\tyrender.dll" -replace '\\', '/') + '"'), ('4 RCDATA "' + ("$src\default_tyrender.ini" -replace '\\', '/') + '"')) -Encoding ascii
+& "$bin\i686-w64-mingw32-windres.exe" -O coff -o "$out\setup_payload.res.o" $srp
+if ($LASTEXITCODE) { throw 'setup payload resource build failed' }
+& "$bin\i686-w64-mingw32-clang.exe" -O2 -static -municode -mwindows -Wall "-I$out" -o "$out\TY HD Renderer Setup.exe" "$src\installer\setup.c" "$out\setup_payload.res.o" -lole32 -lshell32 -ladvapi32
+if ($LASTEXITCODE) { throw 'TY HD Renderer Setup.exe build failed' }
 Get-ChildItem $out | Select-Object Name, Length
 if ($Install) {
     $g = 'C:\CLAUDE\TY the Tasmanian Tiger'
