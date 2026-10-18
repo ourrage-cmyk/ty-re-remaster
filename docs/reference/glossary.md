@@ -38,7 +38,7 @@ Terms are listed A to Z. Internal identifiers are in code font and point to the 
 
 ## D
 
-**Decal.** A flat texture drawn on the ground, such as the footprints. Named in `[decal] Names` (`src/tex.inl:74`). Clamp is off by default (`src/default_tyrender.ini:69`).
+**Decal.** A flat texture drawn on the ground, such as the footprints. Named in `[decal] Names` (`src/tex.inl:74`). Clamp is on by default (`src/default_tyrender.ini:69`).
 
 **DDS.** A texture file format. The game loads DDS files from `PC_External` or from `Data_PC.rkv` (`src/tex.inl:2`).
 

@@ -6,6 +6,8 @@ Builds are identified by the git commit in the launcher title bar. "Untested" me
 
 - Launcher: simpler default window (quality presets, one performance readout, Play, and a Customise button). The controls moved into tabs (Effects, Light & shadow, Air & fog, Picture, Advanced); every setting is still there.
 
+- **Footprint glow** (#8): `[decal] Clamp` now defaults to 1, so footprint decals are luminance-capped at `Max` without an ini edit. Only textures in `[decal] Names` are touched. Untested in game.
+
 Added
 - **Defaults agree**: the AO crevice strength (0.60) and sharpening (0.35) defaults in the renderer now match the launcher's sliders. Players who use the launcher already had these values written on Play.
 - **Reference docs**: the reference pages are in `docs/reference/` (start at its README). README defaults now match the code.

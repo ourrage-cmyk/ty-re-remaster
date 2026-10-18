@@ -16,7 +16,7 @@ static GLint g_progTyTexLoc[kTexProgs]; static float g_progTyTexLast[kTexProgs];
 static GLint g_progTyWaterLoc[kTexProgs]; static float g_progTyWaterLast[kTexProgs]; static int g_texWaterNoFresnel; static int g_dbgWater = 0;   // [pbr] DebugWater bitmask (issue #5 bisect), see LoadPbrConfig   // ini [pbr] SkyFresnelSkipWater (default 0 = off): per-draw tyWater uniform, 1 = water-tagged draw
 static std::unordered_map<std::string, uint8_t> g_tagByName;      // lowercase file name -> flags
 static int g_spillLog = 0; static std::unordered_map<GLuint, unsigned> g_spillCnt; static std::unordered_map<GLuint, std::string> g_texNameById;   // #9 step 1 (SpillLogDraw)
-// ini [decal] (#8 footprint glow): Clamp=0 (default off) caps the luminance of decal draws at Max; Names = file names that count as decals.
+// ini [decal] (#8 footprint glow): Clamp=1 (default on) caps the luminance of decal draws at Max; Names = file names that count as decals.
 // Per program: tyDecal uniform (1 = decal draw), set per draw from the bound albedo flags (TexDrawPrep).
 static int g_decalClamp = 0; static float g_decalMax = 0.9f; static std::vector<std::string> g_decalNames;
 static std::vector<std::string> g_waterNames;   // [fog] WaterNames: lowercase substrings that also count as water (TF_WATER)
@@ -69,7 +69,7 @@ static void LoadTexTags() {
     g_spillLog = g_texEnable && GetPrivateProfileIntA("spill", "LogEmitters", 0, ini);   // #9 step 1: log additive draws per texture (every 600 frames)
     g_texSkinTags = g_texEnable && GetPrivateProfileIntA("tex", "SkinnedByTag", 1, ini);   // skinned shaders get the detail code too; tags switch it per draw
     for (unsigned i = 0; i < kTexProgs; i++) g_progTyTexLoc[i] = g_progTyWaterLoc[i] = g_progTyDecalLoc[i] = -1;
-    g_decalClamp = GetPrivateProfileIntA("decal", "Clamp", 0, ini);
+    g_decalClamp = GetPrivateProfileIntA("decal", "Clamp", 1, ini);
     char dv[32]; GetPrivateProfileStringA("decal", "Max", "0.9", dv, sizeof dv, ini); g_decalMax = (float)atof(dv);
     char dn[512]; GetPrivateProfileStringA("decal", "Names", "ty_footprint.dds,ty_footprint2.dds", dn, sizeof dn, ini);
     g_decalNames.clear(); for (char* t = strtok(dn, ","); t; t = strtok(nullptr, ",")) { std::string x = TexBase(t); while (!x.empty() && x.back() == ' ') x.pop_back(); if (!x.empty()) g_decalNames.push_back(x); }
