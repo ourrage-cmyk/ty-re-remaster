@@ -12,6 +12,7 @@ Added
 - **tyrender.log paths**: paths are relative to the game folder and the Windows user name is replaced by `<user>`.
 - **Session report for bug reports**: each start writes `tyrender\logs\TYHD_report_<time>_<build>.txt` (hardware and OS basics, settings, frame times for the first 5 minutes, events). Local only, nothing is sent. Launcher Advanced tab has a Report a problem / open logs folder button. `[report]` in tyrender.ini.
 - **F10 settings overlay** (#12): in game, F10 opens a small panel with live brightness, saturation, sharpen, vignette, fog intensity, AO on/off, tess level and shadow taps. `[overlay] Key=F10`, `0` = off. Untested.
+- **F10 overlay default**: the code default for `[overlay] Key` is now F10, matching the shipped ini (it was `0`, so F10 did nothing in a fresh setup). Untested.
 - **Water flicker fix** (#5): `[pbr] WaterStable=1` (default on) drops bump, relief, specular and sky Fresnel from water-tagged draws, aimed at the blue flicker on Ty. Untested.
 - **Distance LOD** (#10): `[lod] Enable/GI/AO/Fog`, `Start=1500`, `End=6000`, `MinScale=0.35`. Off by default. Untested.
 - **Tessellation distance LOD** (#10, #60): `[lod] TessEnable`, default off. Untested.
