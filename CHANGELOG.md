@@ -16,10 +16,12 @@ Added
 - **Material classes** (#44, #48): one class lookup replaces the separate texture-flag tests. No intended visual change. Untested.
 - **Settings clash guard** (#13): warns in the log when the game's own SSAO/MSAA is on (`[clash] Check=1`).
 - **Water debug** (#5): `[pbr] DebugWater` bitmask to bisect the blue flicker on Ty (#62). **Emitter blur** `[emit]` wider portal blur, default off (#61).
-- **Overlay fixes** (#12): F10 overlay now defaults off (`Key=0`); explicit draw state and focus-free toggle (#54, #59, #63). Untested in level.
+- **Overlay fixes** (#12): the overlay toggle is focus-free and uses explicit draw state; the key default changed to F10 in #102 (existing inis keep `Key=0` and need `Key=F10`); explicit draw state and focus-free toggle (#54, #59, #63). Untested in level.
 - **Automated playtest** (`tools/playtest`, #64, #65): boots variants, takes screenshots, checks flicker and overlay. Runs only in phase TEST and takes `C:\CLAUDE\LOCK\game.lock` (#66).
 - **Water fog mask** (#5, #92): `[fog] WaterMaskSoft` softens the water-fog mask edge. Off by default. Untested.
 - **GI far ring** (#7, #93): `[gi] AtrousFar` uses a 3x3 ring beyond `[lod] Start`. Off by default. Untested.
+- **Water names** (#4, #106): `[fog] WaterNames` lists extra texture names (lily pads) that WaterBoost also fogs. Default empty. Untested.
+- **README** (#107, #108, #109): old A/B pairs removed, three build `4a2ef95` pairs with technical captions.
 - **Playtest harness** (#91): progress log, status.json, plan files, request queue, focus fix, visual review step.
 
 Fixed

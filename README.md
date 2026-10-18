@@ -1,10 +1,10 @@
 # TY HD Renderer
 
-**Same game, same art, better light.**
+A lighting and shading mod for the PC version of TY the Tasmanian Tiger.
 
 TY HD Renderer is a rendering mod for **TY the Tasmanian Tiger** on PC. It changes how the outback is lit and shaded, and it leaves the game itself alone. Pick a preset, press Play, and the bush gets a little more depth.
 
-**Status:** community beta. The latest release is v0.3.5. Changes on `main` since then are listed in [CHANGELOG.md](CHANGELOG.md). They are not playtested yet.
+**Status:** community beta. The latest release is v0.3.5. Changes on `main` since then are listed in [CHANGELOG.md](CHANGELOG.md). Build `4a2ef95` was partly playtested on Ultra on 2026-10-18; later changes are not.
 
 Tested on one graphics card: AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet, and reports from those are very welcome.
 
@@ -42,7 +42,7 @@ All images are in [`docs/ab/`](docs/ab/).
 <td><img src="docs/ab/09_launch_pad_fence_on.jpg" alt="Ty on a red launch pad with a fence and rope bridge, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>09 Launch pad: froxel fog.</b> Fog. Look through the fence rails (2x crop below). Frame A: the rock behind the rails keeps full saturation and a hard edge to the far horizon. Frame B: the froxel volumetric fog is accumulated along the view ray, so the same rock and the far trees blend towards a pale pink fog colour that gets denser with depth, and the far ridge line loses contrast. Foreground wood and the sign are barely touched, which is how you tell depth-based fog from a colour grade. The cast shadow of the sign on the ground is present in both frames, so the shadow map is not what changed here. The sky is identical in the wide frame, so sky fog is not visible in this pair.</sub></td>
+<td colspan="2"><sub><b>09 Launch pad: froxel fog.</b> Fog. Look through the fence rails (2x crop below). Frame A: the rock behind the rails keeps full saturation and a hard edge to the far horizon. Frame B: the froxel volumetric fog is accumulated along the view ray, so the same rock and the far trees blend towards a warm orange-pink fog colour that gets denser with depth, and the far ridge line loses contrast. Foreground wood and the sign are barely touched, which is how you tell depth-based fog from a colour grade. The cast shadow of the sign on the ground is present in both frames, so the shadow map is not what changed here. The sky is identical in the wide frame, so sky fog is not visible in this pair.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/09_launch_pad_fence_crop_off.jpg" alt="Fence and cockatoo sign, 2x crop, F11 off" width="100%"></td>
@@ -64,7 +64,7 @@ All images are in [`docs/ab/`](docs/ab/).
 <td><img src="docs/ab/12_canyon_path_on.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>12 Canyon path: AO, shading and fog.</b> Occlusion and fog in a dark scene. Look at the base of the grass and the tree trunk (2x crop below). Frame A: the blades are lit evenly down to the soil. Frame B: the grass roots and the foot of the trunk are occluded (AO), and the back wall behind them has a layer of fog over it. On the path, frame B has deeper grooves in the cracked ground, larger shaded areas under the canopy and a lower overall ambient level, so the lit grass at the right stands out more. At the far end of the path the volumetric fog turns the distance a warm red, which frame A does not have. Ty is not changed, since characters are excluded from relief.</sub></td>
+<td colspan="2"><sub><b>12 Canyon path: AO, shading and fog.</b> Occlusion and fog in a dark scene. Look at the base of the grass and the tree trunk (2x crop below). Frame A: the blades are lit evenly down to the soil. Frame B: the grass roots and the foot of the trunk are occluded (AO), and the back wall behind them has a layer of fog over it. On the path, frame B has deeper grooves in the cracked ground, larger shaded areas under the canopy and a lower overall ambient level, so the lit grass at the right stands out more. At the far end of the path the volumetric fog turns the distance a warm orange-red, which frame A does not have. Ty is not changed, since characters are excluded from relief.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/12_canyon_path_crop_off.jpg" alt="Grass and trunk base, 2x crop, F11 off" width="100%"></td>
@@ -86,7 +86,7 @@ Frame times are GPU milliseconds per frame, measured by the author at 2560x1440 
 | High | about 18 ms | 55 | Medium plus bounce light (1 ray) and contact shadows |
 | Ultra | about 31 ms | 32 | More AO samples, bounce light (2 rays), higher-quality haze, environment relief, 8192 shadow maps |
 
-Medium is the stable preset in playtests. High and Ultra flickered in playtest 4, so use Medium if you see flicker.
+Medium is the stable preset in playtests. High and Ultra flickered in playtest 4 (v0.3.2, see `docs/FINDINGS_ROUND4.md`). The AO flicker has since been fixed and Ultra on build `4a2ef95` played without it, but use Medium if you see flicker.
 
 ### What each option costs
 
@@ -126,19 +126,19 @@ Delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.ini`, `tyr
 
 These are open from playtests. Where a fix is on `main`, it is marked untested.
 
-- **Water:** Ty flickers blue in water (#5). A fix is on `main` but has not been confirmed in a playtest.
-- **Fog on distant scenery:** far trees and the sky on the second level are not fully fogged (#4).
-- **Portal light:** the rainbow portal does not light the ground, and fire is not yet hazed by the fog (#9).
+- **Water:** in build `4a2ef95`, the light on Ty ramps up and down slowly in water instead of flickering (#5). Lily pads and rocks look brighter than the water under them, and fog is heavier looking down than across (#4). A water outline shows when viewed from above (#104).
+- **Fog:** sky and red rock now fade smoothly, and fog on trees is slight. Fire is not fogged (#4).
+- **Shadows:** a sharp shadow line crosses the bridge near the fire (#103).
+- **Portal light:** the rainbow portal does not light the ground (#9). `[emit] Enable` is off by default because it draws a white band when on.
 - **Character shadows:** a thin bright line can run through the shadow edge on characters (face, bag), and the shadow looks slightly grid-like.
 - **Dark halo:** a dark halo can appear behind a character, on the side away from the camera.
 - **White rim:** fern shadows on the ground have a white rim.
-- **High and Ultra flicker:** use Medium if you see it.
 - **Ultra is slow:** about 31 ms per frame on the test card.
 - **Thin objects:** rope and grass get little benefit from relief, because their source textures are flat.
 - **Trails:** TAA can leave a faint trail on fast animation.
 - **Low-resolution textures:** relief comes from the texture's own colour, so it is weaker on low-resolution textures.
 - **Shimmer:** shimmer during fast camera moves has not been measured formally.
-- **F10 overlay:** the in-game settings overlay broke geometry in playtest, so it is off by default. It is not a supported feature yet.
+- **F10 overlay:** the in-game settings overlay broke geometry in an earlier playtest. `main` now defaults to `[overlay] Key=F10`, but in build `4a2ef95` F10 did nothing, because an existing `tyrender.ini` keeps its old `Key=0`. Set `Key=F10` yourself. It is still untested in a level (#79).
 - **Game version:** built against the 2020-04-04 `TY.exe`. Other builds are untested.
 
 ## Reporting problems
@@ -150,7 +150,7 @@ Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), 
 - Works with the base game.
 - Gets more from the ty2k mod, because more texture detail means more precise relief.
 - The HD texture pack is separate from this project.
-- A hobby project, made with Claude for the community. Thank you to everyone who tested and sent reports.
+- A hobby project, made with Claude. Test reports are welcome.
 
 ## For modders
 
