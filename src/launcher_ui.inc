@@ -18,16 +18,16 @@ static Slider g_sl[] = {
     { L"post",    L"Brightness",    L"Brightness",          0.70f, 1.50f, 0.94f, L"Turn the sun up or down. Sunglasses for the whole outback." },
     { L"post",    L"Contrast",      L"Contrast",            0.80f, 1.30f, 1.00f, L"Darks get darker, lights get lighter. Too much and even the kangaroos look dramatic." },
     { L"post",    L"Saturation",    L"Colour intensity",    0.60f, 1.60f, 1.18f, L"Colour volume. Low = faded old photograph, high = candy shop." },
-    { L"ao",      L"Strength",      L"Crevice shadows",     0.00f, 1.50f, 0.60f, L"How dark the nooks and crannies get (needs Ambient occlusion on). Changing it costs nothing; the switch on the left pays the bill." },
-    { L"ao",      L"WideStrength",  L"Corner darkness",     0.00f, 2.00f, 1.00f, L"Big-picture darkening where walls meet the floor, under rocks and in hollows, so corners finally look like corners (needs Ambient occlusion on)." },
+    { L"ao",      L"Strength",      L"Crevice shadows",     0.00f, 1.50f, 0.60f, L"How dark the nooks and crannies get (needs Ambient occlusion on)." },
+    { L"ao",      L"WideStrength",  L"Corner darkness",     0.00f, 2.00f, 1.00f, L"Darkening where walls meet the floor and under rocks (needs Ambient occlusion on)." },
     { L"shadows", L"Strength",      L"Shadow darkness",     0.00f, 1.00f, 0.50f, L"How dark shadows are. Zero = ghost shadows, one = film noir." },
     { L"shadows", L"GrassStrength", L"Shadows on grass",    0.00f, 1.00f, 0.35f, L"Shadow strength on grass blades. Keep it low or the lawn gets patchy." },
     { L"gi",      L"Strength",      L"Bounce light",        0.00f, 3.00f, 0.70f, L"How loudly light gossips between surfaces (needs Global illumination on)." },
     { L"fog",     L"Amount",        L"Fog amount",          0.00f, 3.00f, 1.00f, L"How much of the game's own fog you get. More fog = more mystery and less visibility." },
     { L"fog",     L"Distance",      L"Fog distance",        0.30f, 4.00f, 1.00f, L"How far you can see before the world dissolves into haze." },
-    { L"atmos",   L"Intensity",     L"Distance haze",       0.00f, 4.00f, 1.20f, L"Dusty air that washes out far-away rocks and the painted mountains on the horizon. Lower = crisp postcard, higher = hot dusty afternoon (needs Volumetric fog on)." },
+    { L"atmos",   L"Intensity",     L"Distance haze",       0.00f, 4.00f, 1.20f, L"Dusty haze over far-away rocks and mountains. Lower = crisp, higher = dusty (needs Volumetric fog on)." },
     { L"atmos",   L"SunIntensity",  L"Light shafts",        0.00f, 8.00f, 2.00f, L"Brightness of the sun beams cutting through the haze (needs Volumetric fog on)." },
-    { L"atmos",   L"ContactShadows",L"Contact shadows",     0.00f, 1.00f, 0.00f, L"Tiny sharp shadows where things touch the ground (Ty's feet, fence posts). It is the one slider here that costs performance: zero is free, anything above that is not." },
+    { L"atmos",   L"ContactShadows",L"Contact shadows",     0.00f, 1.00f, 0.00f, L"Tiny sharp shadows where things touch the ground. The one slider here that costs performance: zero is free." },
     { L"tess",    L"ReliefDepth",   L"Surface relief",      0.00f, 10.00f, 3.00f, L"How deep cracks, grain and rope strands are carved. High values look rugged, very high values look like cardboard." },
     { L"post",    L"Sharpen",       L"Sharpening",          0.00f, 1.00f, 0.35f, L"Edge crispness. Too much and you can count the pixels, too little and it looks like a watercolour." },
 };
@@ -125,7 +125,7 @@ static void GameClashText(wchar_t* out, int n) {
     int msaa = GameDisplayValue("MSAA", v, sizeof v) && atoi(v) >= 2;   // "off", "2x", "4x", "8x"
     int aa = R(L"post", L"AA", 2);                                      // tyrender Edge smoothing: 0 off, 1 FXAA, 2 TAA, 3 TAA + FXAA
     if (!ssao && !(msaa && aa != 0)) return;
-    swprintf(out, n, L"Settings clash with the game's settings.ini: %ls%ls%ls. Set them there (Display section).",
+    swprintf(out, n, L"Clash with the game's settings.ini: %ls%ls%ls. Turn them off there (Display section).",
         ssao ? L"SSAO is on (AO runs twice)" : L"", (ssao && msaa && aa) ? L" and " : L"", (msaa && aa) ? L"MSAA is on (edges smoothed twice)" : L"");
 }
 
@@ -235,7 +235,7 @@ static void RefreshCosts(void) {
       int on[6] = { 1, g_s.ao, g_s.gi, g_s.atmos, g_s.tess, g_s.post };
       for (int i = 0; i < NSL; i++) { BOOL en = on[kDep[i]] ? TRUE : FALSE; EnableWindow(g_sl[i].bar, en); EnableWindow(g_sl[i].lab, en); EnableWindow(g_sl[i].val, en); EnableWindow(g_sl[i].tag, en); } }
     wchar_t m[200]; swprintf(m, 200, L"Overall performance impact:  %ls", kTotName[g_overallLv]); SetWindowTextW(h_overall, m); InvalidateRect(h_overall, NULL, TRUE);
-    swprintf(m, 200, L"How much this slows the game compared with the original. A faster graphics card or a lower screen resolution (now %dx%d) makes it lighter.", g_resW, g_resH);
+    swprintf(m, 200, L"Slowdown compared with the original game. A faster card or a lower resolution (now %dx%d) makes it lighter.", g_resW, g_resH);
     SetWindowTextW(h_total, m);
     int mp = MatchPreset();
     g_presetSel = mp; for (int i = 0; i < NPRESET; i++) InvalidateRect(h_preset[i], NULL, TRUE);
@@ -268,10 +268,10 @@ static void AssignLv(void) {   // the description panel shows the live impact le
 }
 static const wchar_t* kPresetTitle[NPRESET] = { L"Low - potato mode", L"Medium - the sweet spot", L"High - look at me", L"Ultra - because we can" };
 static const wchar_t* kPresetText[NPRESET] = {
-    L"The original game with a light polish: gentle edge smoothing and cleaner shadows. No fancy lighting, so it runs happily on old laptops and integrated graphics.\n\nPerformance impact: LOW.",
-    L"The outback as it was meant to be seen: crevice shadows, dusty volumetric haze with sun beams, carved cracks and grain on the ground, soft sharp shadows and smooth edges.\n\nThe one we recommend. Performance impact: MEDIUM.",
-    L"Everything in Medium plus bounce light (red rocks tint the sand beside them) and tiny contact shadows under Ty's feet. Pretty, hungry and not for shy graphics cards.\n\nPerformance impact: HIGH.",
-    L"Maximum everything: razor-sharp shadows, thick haze, extra occlusion and bounce rays, real bumpy geometry on the ground. Bring a strong graphics card and a fan that believes in you.\n\nPerformance impact: EXTREME." };
+    L"The original game with a light polish: smoother edges and cleaner shadows. No fancy lighting, so it runs on old laptops.\n\nPerformance impact: LOW.",
+    L"The outback as it was meant to be seen: crevice shadows, dusty haze with sun beams, carved ground detail and smooth edges.\n\nWe recommend this one. Performance impact: MEDIUM.",
+    L"Medium plus bounce light (red rocks tint the sand beside them) and contact shadows under Ty's feet. Needs a decent graphics card.\n\nPerformance impact: HIGH.",
+    L"Everything turned up: razor-sharp shadows, thick haze, extra occlusion and bounce, real bumpy ground. Needs a strong graphics card.\n\nPerformance impact: EXTREME." };
 static void AddDesc2(HWND a, HWND b, const wchar_t* title, const wchar_t* text) { AddDesc(a, title, text); AddDesc(b, title, text); }
 // Simple view: presets, impact, Play and the Customise button. Expanded view: compact presets, tabs and the help panel.
 static void ApplyLayout(void) {
@@ -411,7 +411,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         }
         h_presetNote = Label(L"", 16, 62, 448, 34);
         h_overall = Ctl(L"STATIC", L"", SS_LEFT | SS_NOTIFY, 16, 106, 448, 26, 0); SendMessageW(h_overall, WM_SETFONT, (WPARAM)g_fontT, TRUE);
-        AddDesc(h_overall, L"Overall performance impact", L"A quick summary of everything that is switched on: LOW, MEDIUM, HIGH or EXTREME. It is based on measured frame-time costs, so it is a guide: your graphics card and screen resolution decide the real result.\n\nIf the game feels slow, switch off the effects tagged High first.");
+        AddDesc(h_overall, L"Overall performance impact", L"Everything switched on, added up: LOW, MEDIUM, HIGH or EXTREME. It is a guide based on measured costs; your graphics card and resolution decide the real result.");
         h_play = Ctl(L"BUTTON", L"Play with HD renderer", BS_DEFPUSHBUTTON | WS_TABSTOP, 16, 144, 226, 46, ID_PLAY); SendMessageW(h_play, WM_SETFONT, (WPARAM)g_fontBig, TRUE);
         AddDesc(h_play, L"Play with HD renderer", L"Starts the game with the renderer and your current settings. Keep this window open while you play: every slider changes the picture live.");
         h_stock = Ctl(L"BUTTON", L"Play original (no mod)", WS_TABSTOP, 250, 144, 214, 46, ID_STOCK); AddDesc(h_stock, L"Play original", L"Starts the untouched original game. Handy for comparing, or for when you just want to feel nostalgic.");
@@ -420,15 +420,15 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         // ---- expanded view only: impact detail, tabs and the help panel
         g_pg = PG_EXP;
         h_total = Ctl(L"STATIC", L"", SS_NOTIFY, 16, 96, 568, 36, 0);
-        AddDesc(h_total, L"Overall performance impact", L"A quick summary of everything that is switched on: LOW, MEDIUM, HIGH or EXTREME. It is based on measured frame-time costs, so it is a guide: your graphics card and screen resolution decide the real result.\n\nIf the game feels slow, switch off the effects tagged High first.");
+        AddDesc(h_total, L"Overall performance impact", L"Everything switched on, added up: LOW, MEDIUM, HIGH or EXTREME. It is a guide based on measured costs; your graphics card and resolution decide the real result.");
         h_tab = CreateWindowW(WC_TABCONTROLW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP, 10, 136, 580, 290, g_hw, (HMENU)(INT_PTR)ID_TAB, NULL, NULL);
         SendMessageW(h_tab, WM_SETFONT, (WPARAM)g_font, TRUE);
-        static const wchar_t* kTabName[] = { L"Effects", L"Light & shadow", L"Air & fog", L"Picture", L"Advanced" };
+        static const wchar_t* kTabName[] = { L"Effects", L"Light and shadow", L"Air and fog", L"Picture", L"Advanced" };
         for (int t = 0; t < 5; t++) { TCITEMW ti = { TCIF_TEXT }; ti.pszText = (LPWSTR)kTabName[t]; SendMessageW(h_tab, TCM_INSERTITEMW, t, (LPARAM)&ti); }
         h_dTitle = Ctl(L"STATIC", L"", SS_LEFT, 16, 432, 568, 24, 0); SendMessageW(h_dTitle, WM_SETFONT, (WPARAM)g_fontT, TRUE);
         h_dText = Ctl(L"STATIC", L"", SS_LEFT, 16, 456, 568, 50, 0);
         SetWindowTextW(h_dTitle, L"Welcome, mate!");
-        SetWindowTextW(h_dText, L"Hover over (or click) anything to find out what it does. Pick a preset to start, then fine-tune on the tabs. Every effect has a performance tag: Free, Low, Medium or High.");
+        SetWindowTextW(h_dText, L"Hover over anything to see what it does. Pick a preset to start, then fine-tune on the tabs.");
         // ---- tab 0: effects (checkbox, impact tag, help text)
         g_pg = PG_T0; y = 170;
         h_ao = Ctl(L"BUTTON", L"Ambient occlusion (soft crevice shadows)", BS_AUTOCHECKBOX | WS_TABSTOP, 30, y, 440, 22, ID_AO); c = Tag(TG_AO, 490, y + 2);
@@ -455,7 +455,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         SendMessageW(h_shadow, CB_ADDSTRING, 0, (LPARAM)L"8192 (razor sharp, big memory)"); c = Tag(TG_SHADOW, 490, y + 3);
         { const wchar_t* tt = L"Shadow sharpness - how crisp the shade is"; const wchar_t* tx = L"2048 is the original blocky look, 4096 is crisp, 8192 is razor sharp but memory hungry. Takes effect the next time the game starts.";
           AddDesc(l, tt, tx); AddDesc(h_shadow, tt, tx); AddDesc(c, tt, tx); }
-        Ctl(L"STATIC", L"Tags: Free = no cost, Low = barely noticeable, Medium = noticeable on weaker cards, High = switch off first if it stutters.", SS_LEFT, 30, 388, 540, 34, 0);
+        Ctl(L"STATIC", L"Each effect shows its cost: Free, Low, Medium or High. Switch High off first if the game stutters.", SS_LEFT, 30, 388, 540, 34, 0);
         // ---- tabs 1-3: look sliders. Each slider lands on the tab in kSlTab (1 Light & shadow, 2 Air & fog, 3 Picture).
         static const int kSlTab[NSL] = { 3, 3, 3, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 3, 3 };
         int sy[5] = { 172, 172, 172, 172, 172 };
@@ -477,7 +477,6 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         c = Ctl(L"BUTTON", L"Advanced (ini)...", WS_TABSTOP, 200, 222, 160, 30, ID_ADV); AddDesc(c, L"Advanced settings", L"Opens tyrender.ini in Notepad for the full list of knobs. For tinkerers.");
         c = Ctl(L"BUTTON", L"Reset sliders", WS_TABSTOP, 370, 222, 170, 30, ID_RESET); AddDesc(c, L"Reset sliders", L"Puts every look slider back to its default position. Your checkboxes and preset stay as they are.");
         c = Ctl(L"BUTTON", L"Report a problem / open logs folder", WS_TABSTOP, 30, 262, 340, 30, ID_REPORT); AddDesc(c, L"Report a problem", L"Opens the folder with the session report the mod writes each time you play. It holds hardware basics and frame times, no names or personal paths. Send that file to the author, with a screenshot and your GPU name.");
-        Ctl(L"STATIC", L"Nothing here is needed for a good picture: the presets already pick good settings.", SS_LEFT, 30, 306, 540, 36, 0);
         g_pg = PG_ANY;
         AssignLv(); LoadSettings(&g_s); ToUI(); SlidersFromIni(); SendMessageW(h_detail, BM_SETCHECK, GameDetailIsHigh(), 0); RefreshCosts();
         UpdateStatus(NULL); SetTimer(h, 1, 2000, NULL); SetTimer(h, 2, 90, NULL); SetTimer(h, 3, 30, NULL);
