@@ -19,6 +19,7 @@ static int g_spillLog = 0; static std::unordered_map<GLuint, unsigned> g_spillCn
 // ini [decal] (#8 footprint glow): Clamp=0 (default off) caps the luminance of decal draws at Max; Names = file names that count as decals.
 // Per program: tyDecal uniform (1 = decal draw), set per draw from the bound albedo flags (TexDrawPrep).
 static int g_decalClamp = 0; static float g_decalMax = 0.9f; static std::vector<std::string> g_decalNames;
+static std::vector<std::string> g_waterNames;   // [fog] WaterNames: lowercase substrings that also count as water (TF_WATER)
 static GLint g_progTyDecalLoc[kTexProgs]; static float g_progTyDecalLast[kTexProgs];
 static std::mutex g_texMu; static std::unordered_map<GLuint, std::string> g_texInfo;   // debug: id -> "name WxH"
 static unsigned g_texUploads, g_texNamed, g_texTagged, g_texReads;
@@ -72,6 +73,9 @@ static void LoadTexTags() {
     char dv[32]; GetPrivateProfileStringA("decal", "Max", "0.9", dv, sizeof dv, ini); g_decalMax = (float)atof(dv);
     char dn[512]; GetPrivateProfileStringA("decal", "Names", "ty_footprint.dds,ty_footprint2.dds", dn, sizeof dn, ini);
     g_decalNames.clear(); for (char* t = strtok(dn, ","); t; t = strtok(nullptr, ",")) { std::string x = TexBase(t); while (!x.empty() && x.back() == ' ') x.pop_back(); if (!x.empty()) g_decalNames.push_back(x); }
+    // [fog] WaterNames (default empty): extra file-name substrings that get TF_WATER, so WaterBoost also fogs them (e.g. lily pads). Empty = only names containing "water".
+    g_waterNames.clear(); { char wn[512]; GetPrivateProfileStringA("fog", "WaterNames", "", wn, sizeof wn, ini);
+      for (char* t = strtok(wn, ","); t; t = strtok(nullptr, ",")) { std::string x = t; while (!x.empty() && x.front() == ' ') x.erase(0, 1); while (!x.empty() && x.back() == ' ') x.pop_back(); for (auto& c : x) c = (char)tolower((unsigned char)c); if (!x.empty()) g_waterNames.push_back(x); } }
     if (!g_texFlagArr) g_texFlagArr = (uint8_t*)calloc(kTexArr, 1);
     if (!g_texClassArr) g_texClassArr = (uint8_t*)calloc(kTexArr, 1);
     g_tagByName.clear();
@@ -183,7 +187,8 @@ static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const voi
     if (nm) { g_texNamed++; auto it = g_tagByName.find(nm); if (it != g_tagByName.end()) { fl = it->second; if (fl & TF_KNOWN) g_texTagged++; }
         if (g_decalClamp && std::find(g_decalNames.begin(), g_decalNames.end(), std::string(nm)) != g_decalNames.end()) fl |= TF_DECAL;
         std::string low = nm; for (auto& c : low) c = (char)tolower((unsigned char)c);
-        if (low.find("water") != std::string::npos) fl |= TF_WATER; }
+        if (low.find("water") != std::string::npos) fl |= TF_WATER;
+        for (const std::string& wn : g_waterNames) if (low.find(wn) != std::string::npos) { fl |= TF_WATER; break; } }
     g_texFlagArr[id] = fl; g_texClassArr[id] = MatClassOfFlags(fl);
     if ((g_spillLog || g_texLogUnknown) && nm) g_texNameById[id] = nm;
     if (g_texDebug) { char b[160]; snprintf(b, sizeof b, "%s %dx%d ifmt=%#x", nm ? nm : "?", w, h, ifmt); g_texInfo[id] = b; }
