@@ -128,10 +128,22 @@ function Exit-GameLock([string]$Token) {
 # Every line is also printed to the console.
 $ProgressDir = 'C:\CLAUDE\RESEARCH\autoplaytest'
 
+# progress.log has two writers (this function and the heartbeat job). Both open it with shared write access and retry, so neither blocks the other.
+function Add-LogLine([string]$Path, [string]$Line) {
+    for ($t = 0; $t -lt 10; $t++) {
+        try {
+            $fs = [IO.File]::Open($Path, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]'ReadWrite,Delete')
+            $sw = New-Object IO.StreamWriter($fs, (New-Object Text.UTF8Encoding($false)))
+            $sw.WriteLine($Line); $sw.Dispose(); return
+        } catch [IO.IOException] { Start-Sleep -Milliseconds (100 * ($t + 1)) }
+    }
+    throw "could not write $Path after retries"
+}
+
 function Write-RunLog([string]$Msg) {
     New-Item -ItemType Directory -Force $ProgressDir | Out-Null
     $line = '{0} {1}' -f (Get-Date -Format 'HH:mm:ss'), $Msg
-    Add-Content -Path (Join-Path $ProgressDir 'progress.log') -Value $line -Encoding utf8
+    Add-LogLine (Join-Path $ProgressDir 'progress.log') $line
     Write-Host $line
 }
 
@@ -154,7 +166,14 @@ $HeartbeatScript = {
         $logFile = Join-Path $Game 'tyrender.log'
         $logTxt = if (Test-Path $logFile) { (Get-Item $logFile).LastWriteTime.ToString('HH:mm:ss') } else { 'none' }
         $line = '{0} heartbeat game=[{1}] newest_shot={2} tyrender.log={3}' -f (Get-Date -Format 'HH:mm:ss'), $alive, $shotTxt, $logTxt
-        Add-Content -Path (Join-Path $Dir 'progress.log') -Value $line -Encoding utf8
+        # Same shared-append retry as Add-LogLine in common.ps1 (a job runs in its own process, so it cannot call that function).
+        for ($t = 0; $t -lt 10; $t++) {
+            try {
+                $fs = [IO.File]::Open((Join-Path $Dir 'progress.log'), [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]'ReadWrite,Delete')
+                $sw = New-Object IO.StreamWriter($fs, (New-Object Text.UTF8Encoding($false)))
+                $sw.WriteLine($line); $sw.Dispose(); break
+            } catch [IO.IOException] { Start-Sleep -Milliseconds (100 * ($t + 1)) }
+        }
         Start-Sleep -Seconds $Interval
     }
 }
@@ -218,7 +237,7 @@ function Send-GameKey([string]$Game, [string]$Proc, [string]$Key, [int]$DelayMs 
 # Press the A/B screenshot key once (F11 by default, which writes 2 PNGs into <game>\Screenshots) and copy the new pair to $Dest as <Prefix>_a.png / <Prefix>_b.png.
 # Returns the copied paths (empty when the game wrote nothing).
 function Take-Pair([string]$Game, [string]$Proc, [string]$Dest, [string]$Prefix, [string]$ShotKey = 'F11') {
-    if (-not (Ensure-GameFg $Game $Proc)) { $script:FgMiss++; Write-RunLog "shot $Prefix: game NOT foreground, shot marked invalid" }
+    if (-not (Ensure-GameFg $Game $Proc)) { $script:FgMiss++; Write-RunLog "shot ${Prefix}: game NOT foreground, shot marked invalid" }
     $before = @(Get-GameShots $Game)
     Send-GameKey $Game $Proc $ShotKey 300
     $new = @()
