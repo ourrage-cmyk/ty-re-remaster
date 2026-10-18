@@ -1,4 +1,4 @@
-# Shared helpers for tools/playtest. Dot-source from the scripts in this folder:  . "$PSScriptRoot\common.ps1"
+﻿# Shared helpers for tools/playtest. Dot-source from the scripts in this folder:  . "$PSScriptRoot\common.ps1"
 # Everything here is read-and-screenshot: nothing writes into the game install except tyrender.ini, which the caller backs up and restores.
 Add-Type -AssemblyName System.Drawing
 $ToolsDir = Split-Path $PSScriptRoot -Parent          # tools\ (holds key.ps1 and ty_play.ps1)
@@ -234,6 +234,20 @@ function Send-GameKey([string]$Game, [string]$Proc, [string]$Key, [int]$DelayMs 
     $null = & powershell -NoProfile -File (Join-Path $ToolsDir 'key.ps1') -Keys $Key -TargetPid $p.Id -DelayMs $DelayMs 2>&1
 }
 
+# A shot is usable when the game has finished writing it (size non-zero and unchanged over two polls) and System.Drawing can open it.
+function Test-ShotReady([string]$File) {
+    $last = -1
+    for ($t = 0; $t -lt 20; $t++) {
+        if (Test-Path $File) {
+            $len = (Get-Item $File).Length
+            if ($len -gt 0 -and $len -eq $last) { break }
+            $last = $len
+        }
+        Start-Sleep -Milliseconds 300
+    }
+    try { $img = [System.Drawing.Image]::FromFile($File); $img.Dispose(); return $true } catch { return $false }
+}
+
 # Press the A/B screenshot key once (F11 by default, which writes 2 PNGs into <game>\Screenshots) and copy the new pair to $Dest as <Prefix>_a.png / <Prefix>_b.png.
 # Returns the copied paths (empty when the game wrote nothing).
 function Take-Pair([string]$Game, [string]$Proc, [string]$Dest, [string]$Prefix, [string]$ShotKey = 'F11') {
@@ -248,6 +262,7 @@ function Take-Pair([string]$Game, [string]$Proc, [string]$Dest, [string]$Prefix,
     $out = @()
     $i = 0
     foreach ($f in ($new | Select-Object -First 2)) {
+        if (-not (Test-ShotReady $f)) { Write-RunLog "shot ${Prefix}: $(Split-Path $f -Leaf) not readable after the wait, dropped"; continue }
         $to = Join-Path $Dest ("{0}_{1}.png" -f $Prefix, [char](97 + $i))
         Copy-Item $f $to -Force
         $out += $to; $i++
