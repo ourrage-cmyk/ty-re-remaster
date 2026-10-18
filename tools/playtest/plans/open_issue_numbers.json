@@ -1,0 +1,123 @@
+{
+  "name": "open_issue_numbers",
+  "purpose": "Collect the numbers the open issues are waiting on, without the owner at the keyboard: GI and LOD cost per option (#7, #83, #10), WaterMaskSoft 0 vs 1 from above (#104), the DebugWater bit bisect (#5, #80), the emit pass cost and portal view (#9, #84), and the F10 overlay not breaking geometry (#79). Output decides which defaults the numbers support flipping. Fire, lily and cliff views are added once their fixes are on main.",
+  "checks": [
+    {
+      "id": "boot-mod",
+      "kind": "boot",
+      "variants": [
+        "mod"
+      ],
+      "issue": 0,
+      "decides": "the newest main boots to gameplay",
+      "next": "read the log copy and the build id",
+      "pass": "boots and stays alive"
+    },
+    {
+      "id": "baselines-boot",
+      "kind": "boot",
+      "variants": [
+        "wms_0",
+        "dbg_water_0"
+      ],
+      "issue": 0,
+      "decides": "the water baselines booted (they are the reference for the ratio checks)",
+      "pass": "boots and stays alive",
+      "next": "read the log copy"
+    },
+    {
+      "id": "overlay-slot1",
+      "kind": "overlay",
+      "variants": [
+        "overlay"
+      ],
+      "issue": 79,
+      "decides": "F10 open/close does not break geometry (slot 1)",
+      "next": "report the diff and look at ov_closed",
+      "pass": "closed frame matches the baseline"
+    },
+    {
+      "id": "overlay-billabong",
+      "kind": "overlay",
+      "variants": [
+        "overlay_billabong"
+      ],
+      "issue": 79,
+      "decides": "F10 open/close does not break geometry (level 2)",
+      "next": "report the diff and look at ov_closed",
+      "pass": "closed frame matches the baseline"
+    },
+    {
+      "id": "gi-cost-log",
+      "kind": "log",
+      "variants": [
+        "cost_base",
+        "cost_checker",
+        "cost_atrous",
+        "cost_lod_gi",
+        "cost_lod_all"
+      ],
+      "issue": 83,
+      "decides": "GPU timings were logged for every cost option",
+      "next": "GpuProf off? set [debug] GpuProf=1",
+      "pass": "[gpusub] lines present",
+      "pattern": "\\[gpusub\\]",
+      "mustMatch": true
+    },
+    {
+      "id": "water-soft-flicker",
+      "kind": "tyflicker",
+      "variants": [
+        "wms_1"
+      ],
+      "issue": 104,
+      "decides": "WaterMaskSoft=1 vs 0 from above",
+      "next": "keep default 0 and look at the frames",
+      "pass": "Ty blue std ratio vs wms_0 <= 1.0",
+      "baseline": "wms_0",
+      "limit": 1.0
+    },
+    {
+      "id": "water-bisect-0",
+      "kind": "tyflicker",
+      "variants": [
+        "dbg_water_1",
+        "dbg_water_2",
+        "dbg_water_4",
+        "dbg_water_8",
+        "dbg_water_5"
+      ],
+      "issue": 5,
+      "decides": "which DebugWater bit removes the Ty blue flicker",
+      "next": "combine bits; the ratio is the number to report",
+      "pass": "a bit with ratio <= 1.0 vs dbg_water_0 is the cause",
+      "baseline": "dbg_water_0",
+      "limit": 1.0
+    },
+    {
+      "id": "portal-emit-log",
+      "kind": "log",
+      "variants": [
+        "emit1"
+      ],
+      "issue": 9,
+      "decides": "emitter pass runs with [emit] Enable=1 and its cost is logged",
+      "next": "check [emit] Enable took effect",
+      "pass": "[gpusub] ... | emit line present",
+      "pattern": "\\| emit",
+      "mustMatch": true
+    },
+    {
+      "id": "portal-emit-look",
+      "kind": "manual",
+      "variants": [
+        "emit1",
+        "mod"
+      ],
+      "issue": 9,
+      "decides": "portal light with emit on vs off",
+      "next": "wire the portal camera first",
+      "pass": "a person compares the contact sheet; portal spot is not wired, so this is the Rainbow spot only"
+    }
+  ]
+}

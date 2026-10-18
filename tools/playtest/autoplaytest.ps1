@@ -70,6 +70,15 @@ $defs = @{
     gi_checker1  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'gi.Checker' = '1' };     Flicker = $false; Overlay = $false }
     lod_enable1  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'lod.Enable' = '1' };      Flicker = $false; Overlay = $false }
     portal_comp1 = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'emit.Enable' = '1'; 'emit.Compensate' = '1' }; Flicker = $false; Overlay = $false }
+    # Cost and A/B numbers run (open-issue numbers plan). GI is off in the default ini, so every GI/LOD cost variant switches it on explicitly. Compare the [gpu]/[gpusub] means with tools\playtest\gpu_summary.ps1.
+    cost_base    = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'gi.Enable' = '1' };                                   Flicker = $false; Overlay = $false }
+    cost_checker = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'gi.Enable' = '1'; 'gi.Checker' = '1' };               Flicker = $false; Overlay = $false }
+    cost_atrous  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'gi.Enable' = '1'; 'gi.AtrousFar' = '1' };             Flicker = $false; Overlay = $false }
+    cost_lod_gi  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'gi.Enable' = '1'; 'lod.Enable' = '1'; 'lod.GI' = '1' }; Flicker = $false; Overlay = $false }
+    cost_lod_all = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'gi.Enable' = '1'; 'lod.Enable' = '1'; 'lod.GI' = '1'; 'lod.AO' = '1'; 'lod.Fog' = '1'; 'lod.Shadow' = '1'; 'lod.TessEnable' = '1' }; Flicker = $false; Overlay = $false }
+    # WaterMaskSoft 0 vs 1 from above the water (Billabong; camera 500 up, looking down 60 degrees). Placeholder camera: look at the frames before trusting the number.
+    wms_0        = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.WaterMaskSoft' = '0' }; Flicker = $true; Overlay = $false; Spot = 'billabong'; Cam = '0 500 0 0 -60' }
+    wms_1        = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'fog.WaterMaskSoft' = '1' }; Flicker = $true; Overlay = $false; Spot = 'billabong'; Cam = '0 500 0 0 -60' }
     sky_yaw000  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 0 0' }
     sky_yaw090  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 90 0' }
     sky_yaw180  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 180 0' }
