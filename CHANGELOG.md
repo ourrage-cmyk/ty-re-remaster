@@ -7,6 +7,7 @@ Builds are identified by the git commit in the launcher title bar. "Untested" me
 - Launcher: simpler default window (quality presets, one performance readout, Play, and a Customise button). The controls moved into tabs (Effects, Light & shadow, Air & fog, Picture, Advanced); every setting is still there.
 
 Added
+- **Session report for bug reports**: each start writes `tyrender\logs\TYHD_report_<time>_<build>.txt` (hardware and OS basics, settings, frame times for the first 5 minutes, events). Local only, nothing is sent. Launcher Advanced tab has a Report a problem / open logs folder button. `[report]` in tyrender.ini.
 - **F10 settings overlay** (#12): in game, F10 opens a small panel with live brightness, saturation, sharpen, vignette, fog intensity, AO on/off, tess level and shadow taps. `[overlay] Key=F10`, `0` = off. Untested.
 - **Water flicker fix** (#5): `[pbr] WaterStable=1` (default on) drops bump, relief, specular and sky Fresnel from water-tagged draws, aimed at the blue flicker on Ty. Untested.
 - **Distance LOD** (#10): `[lod] Enable/GI/AO/Fog`, `Start=1500`, `End=6000`, `MinScale=0.35`. Off by default. Untested.

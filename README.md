@@ -229,6 +229,24 @@ Ty's still got a few rough edges. Here they are, straight from playtests. Where 
 
 Hit a glitch? Ta for reporting it. Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
 
+## Reporting a bug
+
+Every time you press Play with the HD renderer, the mod writes a short report file next to the game: `tyrender\logs\TYHD_report_<time>_<build>.txt`. Press **Report a problem / open logs folder** in the launcher's Advanced tab to open that folder.
+
+To report a problem, send:
+
+1. The newest `TYHD_report_` file from that folder.
+2. A screenshot of the problem.
+3. Your GPU model (the file has it too).
+
+**What the file contains:** the build and preset, Windows version and build, OS architecture, CPU model and core count, RAM size, display resolution and refresh rate, GPU vendor and model, driver version (inside the OpenGL version line), a few OpenGL limits, the game's `settings.ini` and the mod's `tyrender.ini`, frame times for the first 5 minutes of play, and events such as GL errors, shader failures, settings changes, screenshots and window changes.
+
+**What it does not contain:** usernames, the computer name, serial numbers, IP or MAC addresses, installed programs, running processes, file listings or personal folder paths. Paths are relative to the game folder.
+
+**Privacy:** the file is only written to your disk. Nothing is sent anywhere. You decide whether to send it.
+
+**Settings:** `[report]` in `tyrender.ini`. `Enable=0` turns it off. `CaptureSeconds` sets how long the frame-time part runs (default 300), `MaxBytes` caps the file size (default 1 MB), and `KeepFiles` keeps only the newest reports (default 10).
+
 ## Compatibility and credits
 
 Cheers to everyone who sends a log, a screenshot or a "it flickers on my card" message. That is how the mod gets better.
