@@ -27,7 +27,7 @@ Read order for a fresh session: `START_HERE.md` -> `RESUME.md` -> `PLAN_NEXT.md`
 | `FINDINGS_ROUND2.md` | Round 2 (v0.3.1 Ultra): G1-G10 and plan T60-T65 |
 | `FINDINGS_ROUND3.md` | Round 3 (v0.3.2): W1, S1, A1, E1, requests, plan T70-T77, the Ultra flicker update (T78) |
 | `FINDINGS_ROUND4.md` | Round 4 (playtest 4, v0.3.2 High/Ultra): High and Ultra flicker, water blue flicker, shadow bright lines, fire haze, bag tessellation, portal light, footprints, AO fade; plan T78, T80-T82 |
-| `mp3.txt`, `mp3_2.txt`, `voice3.txt`, `voice4.txt`, `transcript.txt`, `voiceover.txt` | Transcripts of the user's voice-overs |
+| `voice3.txt`, `voice4.txt`, `voiceover.txt` | Transcripts of the user's voice-overs |
 | `texture_tags.csv` | User-filled flags (emissive / transparent / character) for 1933 textures; input for the tag system (T80) and `gen_tex_tags.ps1` |
 | `key\`, `key2\`, `key3\`, `frames\`, `sheet*.jpg` | Key frames from the recordings |
 
