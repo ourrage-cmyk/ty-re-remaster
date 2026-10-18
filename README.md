@@ -28,7 +28,7 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 Each pair is an F11 capture from build `4a2ef95` on the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
 
-The F11 off frame skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is close to the plain game. It is not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game. Captions describe what is visible in the two images, and the sky is unchanged in all of them.
+The F11 off frame skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is close to the plain game. It is not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game. Captions name the effect and say where to look, and only describe what is visible in the two frames.
 
 All images are in [`docs/ab/`](docs/ab/).
 
@@ -42,21 +42,33 @@ All images are in [`docs/ab/`](docs/ab/).
 <td><img src="docs/ab/09_launch_pad_fence_on.jpg" alt="Ty on a red launch pad with a fence and rope bridge, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>09 Launch pad.</b> Left: crisp and saturated all the way to the back. Right: the canyon behind the fence sits in a pale haze, the far rock loses colour and the wooden posts and ground pick up softer shading. The sky and Ty are unchanged.</sub></td>
+<td colspan="2"><sub><b>09 Launch pad: froxel fog.</b> Fog. Look through the fence rails (2x crop below). Frame A: the rock behind the rails keeps full saturation and a hard edge to the far horizon. Frame B: the froxel volumetric fog is accumulated along the view ray, so the same rock and the far trees blend towards a pale pink fog colour that gets denser with depth, and the far ridge line loses contrast. Foreground wood and the sign are barely touched, which is how you tell depth-based fog from a colour grade. The cast shadow of the sign on the ground is present in both frames, so the shadow map is not what changed here. The sky is identical in the wide frame, so sky fog is not visible in this pair.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/09_launch_pad_fence_crop_off.jpg" alt="Fence and cockatoo sign, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/09_launch_pad_fence_crop_on.jpg" alt="Fence and cockatoo sign, 2x crop, shaders on" width="100%"></td>
 </tr>
 <tr>
 <td><img src="docs/ab/11_bli_bli_gate_off.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, F11 off" width="100%"></td>
 <td><img src="docs/ab/11_bli_bli_gate_on.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>11 Bli Bli Station gate.</b> Left: flat, even light. Right: the red rock walls are darker with deeper shadow in the creases, the gum trunk has more grain and contrast, and the trees seen through the arch fade into a cooler haze. The sign and the characters look the same.</sub></td>
+<td colspan="2"><sub><b>11 Bli Bli Station gate: AO and surface relief.</b> Contact shading and relief. Look at the fork of the gum tree (2x crop below). Frame A: the bark is flat and the rock behind the fork is evenly lit. Frame B: ambient occlusion darkens the rock where the branches meet it and the crevice between the two limbs, and the bark ridges have more tonal separation (normals derived from the albedo). On the ground at the feet of Ty, the cracks in frame B are shaded on one side like real grooves (relief and tessellation), where in A they are flat painted lines. Through the arch, the distant trees sit in a faint haze in B.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/11_bli_bli_gate_crop_off.jpg" alt="Gum tree fork and rock wall, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/11_bli_bli_gate_crop_on.jpg" alt="Gum tree fork and rock wall, 2x crop, shaders on" width="100%"></td>
 </tr>
 <tr>
 <td><img src="docs/ab/12_canyon_path_off.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, F11 off" width="100%"></td>
 <td><img src="docs/ab/12_canyon_path_on.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>12 Canyon path.</b> The biggest difference. Left: bright, sunlit grass and path. Right: the whole scene is darker and moodier, the trunks, grass and path sit in shade under the canopy, and the far end of the path glows through a warm red haze. Ty stays readable.</sub></td>
+<td colspan="2"><sub><b>12 Canyon path: AO, shading and fog.</b> Occlusion and fog in a dark scene. Look at the base of the grass and the tree trunk (2x crop below). Frame A: the blades are lit evenly down to the soil. Frame B: the grass roots and the foot of the trunk are occluded (AO), and the back wall behind them has a layer of fog over it. On the path, frame B has deeper grooves in the cracked ground, larger shaded areas under the canopy and a lower overall ambient level, so the lit grass at the right stands out more. At the far end of the path the volumetric fog turns the distance a warm red, which frame A does not have. Ty is not changed, since characters are excluded from relief.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/12_canyon_path_crop_off.jpg" alt="Grass and trunk base, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/12_canyon_path_crop_on.jpg" alt="Grass and trunk base, 2x crop, shaders on" width="100%"></td>
 </tr>
 </table>
 
