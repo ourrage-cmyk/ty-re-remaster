@@ -291,6 +291,109 @@ static void ApplyLayout(void) {
     AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
     SetWindowPos(g_hw, NULL, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER);
 }
+// ------------------------------------------------------------ gamepad (XInput)
+// A controller drives the same controls as the mouse and keyboard, so Steam Big Picture and Steam Deck work without either.
+// D-pad or left stick: move the focus to the nearest control in that direction (Left/Right change a slider or combo box instead).
+// A: press the focused control. B: close a dropdown, or go back to the simple view. LB/RB: switch tabs in the expanded view.
+// Mouse and keyboard handling is untouched. Focus cues appear only after the first pad press. XInput is loaded at run time,
+// so the build needs no extra library. Steam Input presents its pads as XInput, so this covers Steam's controller setup too.
+typedef struct { WORD wButtons; BYTE bLeftTrigger, bRightTrigger; SHORT sThumbLX, sThumbLY, sThumbRX, sThumbRY; } GpPad;
+typedef struct { DWORD dwPacketNumber; GpPad Gamepad; } GpState;
+typedef DWORD (WINAPI* GpGetStateFn)(DWORD, GpState*);
+enum { GP_UP, GP_DOWN, GP_LEFT, GP_RIGHT, GP_N };
+#define GP_BTN_A 0x1000
+#define GP_BTN_B 0x2000
+#define GP_BTN_LB 0x0100
+#define GP_BTN_RB 0x0200
+static GpGetStateFn g_gpGet; static int g_gpTried, g_gpSeen, g_gpDirOn[GP_N], g_gpRep[GP_N]; static WORD g_gpLast;
+static HWND g_gpFrom, g_gpBest; static int g_gpDir, g_gpFx, g_gpFy; static long g_gpScore;
+static void GpCentre(HWND c, int* x, int* y) {   // screen coordinates; the tab strip stands for the whole tab control
+    RECT r; GetWindowRect(c, &r); *x = (r.left + r.right) / 2; *y = c == h_tab ? r.top + 10 : (r.top + r.bottom) / 2;
+}
+static BOOL CALLBACK GpCand(HWND c, LPARAM lp) {
+    (void)lp;
+    if (c == g_gpFrom || !IsWindowVisible(c) || !IsWindowEnabled(c) || !(GetWindowLongW(c, GWL_STYLE) & WS_TABSTOP)) return TRUE;
+    int x, y; GpCentre(c, &x, &y);
+    int dx = x - g_gpFx, dy = y - g_gpFy, p, s;   // p = distance in the wanted direction, s = sideways offset
+    switch (g_gpDir) {
+    case GP_UP:   p = -dy; s = abs(dx); break;
+    case GP_DOWN: p = dy;  s = abs(dx); break;
+    case GP_LEFT: p = -dx; s = abs(dy); break;
+    default:      p = dx;  s = abs(dy); break;
+    }
+    if (p <= 0) return TRUE;
+    long score = p + 2L * s;
+    if (score < g_gpScore) { g_gpScore = score; g_gpBest = c; }
+    return TRUE;
+}
+static HWND GpNext(HWND from, int dir) {
+    g_gpFrom = from; g_gpDir = dir; g_gpBest = NULL; g_gpScore = 0x7fffffffL;
+    GpCentre(from, &g_gpFx, &g_gpFy); EnumChildWindows(g_hw, GpCand, 0); return g_gpBest;
+}
+static void GpFocusTo(HWND c) {
+    SetFocus(c); ShowDesc(c);
+    for (int i = 0; i < NSL; i++) InvalidateRect(g_sl[i].lab, NULL, TRUE);   // the focused slider's name is drawn in the accent colour
+}
+static HWND GpCurrent(void) {   // the focused control; with nothing focused yet, the first press only picks a starting point
+    HWND f = GetFocus();
+    if (f && IsChild(g_hw, f) && IsWindowVisible(f)) return f;
+    GpFocusTo(g_expanded ? h_tab : h_preset[0]); return NULL;
+}
+static void GpTab(int delta) {
+    if (!g_expanded) return;
+    int n = (int)SendMessageW(h_tab, TCM_GETITEMCOUNT, 0, 0);
+    g_tab = (g_tab + delta + n) % n; SendMessageW(h_tab, TCM_SETCURSEL, g_tab, 0); ApplyLayout();
+    HWND f = GetFocus(); if (!f || !IsWindowVisible(f)) GpFocusTo(h_tab);
+}
+static void GpMove(int dir) {
+    HWND f = GpCurrent(); if (!f) return;
+    wchar_t cls[32] = L""; GetClassNameW(f, cls, 32);
+    if (!wcscmp(cls, TRACKBAR_CLASSW) && (dir == GP_LEFT || dir == GP_RIGHT)) { SendMessageW(f, WM_KEYDOWN, dir == GP_LEFT ? VK_LEFT : VK_RIGHT, 0); return; }
+    if (!wcscmp(cls, L"ComboBox") && (dir == GP_LEFT || dir == GP_RIGHT || SendMessageW(f, CB_GETDROPPEDSTATE, 0, 0))) {
+        int n = (int)SendMessageW(f, CB_GETCOUNT, 0, 0), cur = (int)SendMessageW(f, CB_GETCURSEL, 0, 0);
+        int nx = cur + (dir == GP_RIGHT || dir == GP_DOWN ? 1 : -1);
+        if (nx >= 0 && nx < n) { SendMessageW(f, CB_SETCURSEL, nx, 0); SendMessageW(g_hw, WM_COMMAND, MAKEWPARAM(GetDlgCtrlID(f), CBN_SELCHANGE), (LPARAM)f); }
+        return;
+    }
+    if (f == h_tab && (dir == GP_LEFT || dir == GP_RIGHT)) { GpTab(dir == GP_RIGHT ? 1 : -1); return; }
+    HWND n = GpNext(f, dir); if (n) GpFocusTo(n);
+}
+static void GpActivate(void) {
+    HWND f = GpCurrent(); if (!f) return;
+    wchar_t cls[32] = L""; GetClassNameW(f, cls, 32);
+    if (!wcscmp(cls, L"Button")) SendMessageW(f, BM_CLICK, 0, 0);
+    else if (!wcscmp(cls, L"ComboBox")) SendMessageW(f, CB_SHOWDROPDOWN, !SendMessageW(f, CB_GETDROPPEDSTATE, 0, 0), 0);
+    else if (f == h_tab) GpMove(GP_DOWN);
+}
+static void GpBack(void) {
+    HWND f = GetFocus(); wchar_t cls[32] = L""; if (f) GetClassNameW(f, cls, 32);
+    if (!wcscmp(cls, L"ComboBox") && SendMessageW(f, CB_GETDROPPEDSTATE, 0, 0)) { SendMessageW(f, CB_SHOWDROPDOWN, FALSE, 0); return; }
+    if (g_expanded) { SendMessageW(h_more, BM_CLICK, 0, 0); GpFocusTo(h_more); }
+}
+// Called every 30 ms by the timer. Pad input is ignored while another window (the game) is in front.
+static void GamepadTick(void) {
+    if (!g_gpTried) { HMODULE x; g_gpTried = 1; x = LoadLibraryW(L"xinput1_4.dll"); if (!x) x = LoadLibraryW(L"xinput1_3.dll");
+        if (x) g_gpGet = (GpGetStateFn)GetProcAddress(x, "XInputGetState"); }
+    GpState st;
+    if (!g_gpGet || g_gpGet(0, &st) != ERROR_SUCCESS || GetForegroundWindow() != g_hw) { g_gpLast = 0; memset(g_gpDirOn, 0, sizeof g_gpDirOn); return; }
+    WORD b = st.Gamepad.wButtons, fresh = b & ~g_gpLast; g_gpLast = b;
+    int on[GP_N];
+    on[GP_UP] = (b & 0x0001) || st.Gamepad.sThumbLY > 12000;
+    on[GP_DOWN] = (b & 0x0002) || st.Gamepad.sThumbLY < -12000;
+    on[GP_LEFT] = (b & 0x0004) || st.Gamepad.sThumbLX < -12000;
+    on[GP_RIGHT] = (b & 0x0008) || st.Gamepad.sThumbLX > 12000;
+    int any = fresh != 0; for (int d = 0; d < GP_N; d++) any |= on[d];
+    if (any && !g_gpSeen) { g_gpSeen = 1; SendMessageW(g_hw, WM_UPDATEUISTATE, MAKEWPARAM(UIS_CLEAR, UISF_HIDEFOCUS), 0); }   // show focus cues from now on
+    for (int d = 0; d < GP_N; d++) {   // a held direction repeats: first after about 0.4 s, then about 8 times a second
+        if (!on[d]) { g_gpDirOn[d] = 0; continue; }
+        if (!g_gpDirOn[d]) { g_gpDirOn[d] = 1; g_gpRep[d] = 14; GpMove(d); }
+        else if (--g_gpRep[d] <= 0) { g_gpRep[d] = 4; GpMove(d); }
+    }
+    if (fresh & GP_BTN_A) GpActivate();
+    if (fresh & GP_BTN_B) GpBack();
+    if (fresh & GP_BTN_LB) GpTab(-1);
+    if (fresh & GP_BTN_RB) GpTab(1);
+}
 static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE: {
@@ -376,10 +479,10 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         Ctl(L"STATIC", L"Nothing here is needed for a good picture: the presets already pick good settings.", SS_LEFT, 30, 270, 540, 36, 0);
         g_pg = PG_ANY;
         AssignLv(); LoadSettings(&g_s); ToUI(); SlidersFromIni(); SendMessageW(h_detail, BM_SETCHECK, GameDetailIsHigh(), 0); RefreshCosts();
-        UpdateStatus(NULL); SetTimer(h, 1, 2000, NULL); SetTimer(h, 2, 90, NULL);
+        UpdateStatus(NULL); SetTimer(h, 1, 2000, NULL); SetTimer(h, 2, 90, NULL); SetTimer(h, 3, 30, NULL);
         ApplyLayout();
         return 0; }
-    case WM_TIMER: if (wp == 2) HoverUpdate(); else UpdateStatus(NULL); return 0;
+    case WM_TIMER: if (wp == 3) GamepadTick(); else if (wp == 2) HoverUpdate(); else UpdateStatus(NULL); return 0;
     case WM_HSCROLL: {
         for (int i = 0; i < NSL; i++) if ((HWND)lp == g_sl[i].bar) { SliderText(i); SliderToIni(i); RefreshCosts(); if (GameRunning()) LiveReload(); ShowDesc(g_sl[i].bar); }
         return 0; }
@@ -422,6 +525,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         for (int i = 0; i < TG_N; i++) if (c == g_tagH[i]) lv = g_tagLv[i];
         for (int i = 0; i < NSL; i++) if (c == g_sl[i].tag) lv = g_slLv[i];
         if (c == h_overall) lv = g_overallLv == 0 ? 1 : g_overallLv == 1 ? 2 : 3;   // LOW green, MEDIUM amber, HIGH/EXTREME red
+        if (g_gpSeen) for (int i = 0; i < NSL; i++) if (c == g_sl[i].lab && GetFocus() == g_sl[i].bar) {   // gamepad focus cue for a slider
+            SetBkMode(dc, TRANSPARENT); SetTextColor(dc, RGB(0, 84, 153)); return (LRESULT)GetSysColorBrush(COLOR_BTNFACE); }
         if (lv >= 0) { SetBkMode(dc, TRANSPARENT); SetTextColor(dc, IsWindowEnabled(c) ? LvColor(lv) : RGB(170, 170, 170)); return (LRESULT)GetSysColorBrush(COLOR_BTNFACE); }
         SetBkMode(dc, TRANSPARENT); if (!IsWindowEnabled(c)) SetTextColor(dc, RGB(150, 150, 150)); return (LRESULT)GetSysColorBrush(COLOR_BTNFACE); }
     case WM_NOTIFY:
