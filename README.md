@@ -93,7 +93,7 @@ A common comment is that the mod only adds fog. These four pairs were taken with
 
 ### With fog on
 
-Fog is separate. These two pairs show the volumetric fog in the default setup.
+Fog is separate. These pairs show the volumetric fog in the default setup, plus what else changes with it.
 
 <table>
 <tr>
@@ -121,6 +121,28 @@ Fog is separate. These two pairs show the volumetric fog in the default setup.
 <tr>
 <td><img src="docs/ab/fog_3_waterfall_reeds_crop_off.jpg" alt="Waterfall, palms and reeds across the water, 2x crop, F11 off" width="100%"></td>
 <td><img src="docs/ab/fog_3_waterfall_reeds_crop_on.jpg" alt="Waterfall, palms and reeds across the water, 2x crop, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_2_lily_pond_off.jpg" alt="Pond with reeds, a cliff wall and the sun flare, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_2_lily_pond_on.jpg" alt="Pond with reeds, a cliff wall and the sun flare, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>7 Lily pond (fog on).</b> Height and distance fog on a large flat surface. Look at the cliff face behind the pond (2x crop). Frame A: the rock columns keep full contrast and saturation to the top. Frame B: the froxel fog lays a warm red veil over the whole face and lowers its contrast, and the foreground reeds are darker (AO and shadow). The sun flare is the same in both frames. Known issue: the lily pads and rocks in the water still look pale against the water and the fog looks heavy from above (#4); this pair is about the cliff, not the water.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_2_lily_pond_crop_off.jpg" alt="Pond with reeds, a cliff wall and the sun flare, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_2_lily_pond_crop_on.jpg" alt="Pond with reeds, a cliff wall and the sun flare, 2x crop, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_4_koala_lvl2_off.jpg" alt="Level 2 grass and ground with the koala, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_4_koala_lvl2_on.jpg" alt="Level 2 grass and ground with the koala, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>8 Level 2 (fog on).</b> Little fog is visible here, because the scene is close and the air is clear, so this pair shows what else changes with the default setup. Look at the ground shadows and the far wall (2x crop). Frame A: shadows are neutral grey and the far wall is crisp. Frame B: shadows take a cooler sky-blue shade colour, the far wall and grass sit in a light haze, and the grass blades show surface relief. The koala is a character and is not changed by relief.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_4_koala_lvl2_crop_off.jpg" alt="Level 2 grass and ground with the koala, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_4_koala_lvl2_crop_on.jpg" alt="Level 2 grass and ground with the koala, 2x crop, shaders on" width="100%"></td>
 </tr>
 </table>
 
