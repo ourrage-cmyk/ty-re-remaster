@@ -105,6 +105,11 @@ These are approximate, because effects interact. They come from the v0.3 measure
 
 ## Install
 
+**Easiest:** download `TY HD Renderer Setup.exe` from the release and run it. It finds the game (Steam libraries first, otherwise you pick the folder with `TY.exe`), installs the renderer, and adds "TY HD Renderer (mod)" to Apps and Features.
+Files it replaces are backed up in `tyrender\backup`. Your existing `tyrender.ini` is kept, and only missing settings are added. The overlay key is F10.
+
+**By hand:**
+
 1. Download `TYLauncher.exe` from the release.
 2. Put it in the game folder, next to `TY.exe`.
 3. Run `TYLauncher.exe`, pick a preset (Medium is the recommended one) and press **Play with HD renderer**.
@@ -120,7 +125,10 @@ The launcher is a single file. The renderer DLL and default settings are built i
 
 ## Uninstall
 
-Delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.ini`, `tyrender.log`, and the `tyrender` folder if it exists. If you added the Steam launch option, remove it in Steam. The original game keeps working without these files.
+Run **`TY HD Renderer Uninstall.exe`** in the game folder, or use Apps and Features > **TY HD Renderer (mod)**. It is separate from the game's own uninstall.
+It deletes only the files the install added and puts back the originals it saved. It asks whether to keep your `tyrender.ini` settings. The game folder's own files are not touched.
+
+By hand: delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.ini`, `tyrender.log`, and the `tyrender` folder if it exists. If you added the Steam launch option, remove it in Steam. The original game keeps working without these files.
 
 ## Known issues
 
