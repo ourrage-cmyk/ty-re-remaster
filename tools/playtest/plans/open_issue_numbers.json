@@ -1,6 +1,6 @@
 {
   "name": "open_issue_numbers",
-  "purpose": "Collect the numbers the open issues are waiting on, without the owner at the keyboard: GI and LOD cost per option (#7, #83, #10), WaterMaskSoft 0 vs 1 from above (#104), the DebugWater bit bisect (#5, #80), the emit pass cost and portal view (#9, #84), and the F10 overlay not breaking geometry (#79). Output decides which defaults the numbers support flipping. Fire, lily and cliff views are added once their fixes are on main.",
+  "purpose": "Collect the numbers the open issues are waiting on, without the owner at the keyboard: GI and LOD cost per option (#7, #83, #10), WaterMaskSoft 0 vs 1 from above (#104), the DebugWater bit bisect (#5, #80), the emit pass cost and portal view (#9, #84), and the F10 overlay not breaking geometry (#79). Output decides which defaults the numbers support flipping. Fire, lily and cliff views are added once their fixes are on main. Also bisects the broken-character report against the three changed defaults (mod vs mod_noclamp, mod_oldpost, mod_oldao, mod_oldall).",
   "checks": [
     {
       "id": "boot-mod",
@@ -12,6 +12,20 @@
       "decides": "the newest main boots to gameplay",
       "next": "read the log copy and the build id",
       "pass": "boots and stays alive"
+    },
+    {
+      "id": "characters-bisect",
+      "kind": "manual",
+      "variants": [
+        "mod_noclamp",
+        "mod_oldpost",
+        "mod_oldao",
+        "mod_oldall"
+      ],
+      "issue": 0,
+      "decides": "which changed default ([decal] Clamp, [post] Sharpen, [ao] Strength) broke the skinned characters in the 2026-10-18 playtest",
+      "pass": "look at the base01 frames of mod and each variant: the first variant whose characters are intact names the cause",
+      "next": "revert that default; if only mod_oldall is intact, bisect pairs"
     },
     {
       "id": "baselines-boot",
