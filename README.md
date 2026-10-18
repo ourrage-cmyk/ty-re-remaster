@@ -26,11 +26,15 @@ Nothing in the game files is changed. The original `TY.exe` is never modified, s
 
 ## Side by side
 
-Each pair is an F11 capture from build `4a2ef95` on the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
+Each pair is an F11 capture from build `3ee6ea7` on the **Ultra** preset, taken on 2026-10-18. Left is F11 off, right is shaders on. Ultra is the slowest preset, so Medium will show less difference.
 
-The F11 off frame skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is close to the plain game. It is not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game. Captions name the effect and say where to look, and only describe what is visible in the two frames.
+The F11 off frame skips AO, bounce light, atmosphere, anti-aliasing, shadow strength and light extras, so it is close to the plain game. It is not proven to be fully vanilla (the shadow filter and the tessellated draw path still run), so read "off" as F11 off, not as the stock game. Each caption names the effect and where to look, and describes only what is visible in the frames.
 
 All images are in [`docs/ab/`](docs/ab/).
+
+### Fog disabled
+
+A common comment is that the mod only adds fog. These four pairs were taken with **fog disabled**, so no haze is involved. What changes is ambient occlusion, shadow strength and softness, relief and tessellation, and the material lighting.
 
 <table>
 <tr>
@@ -38,41 +42,85 @@ All images are in [`docs/ab/`](docs/ab/).
 <th align="left">Shaders on</th>
 </tr>
 <tr>
-<td><img src="docs/ab/09_launch_pad_fence_off.jpg" alt="Ty on a red launch pad with a fence and rope bridge, F11 off" width="100%"></td>
-<td><img src="docs/ab/09_launch_pad_fence_on.jpg" alt="Ty on a red launch pad with a fence and rope bridge, shaders on" width="100%"></td>
+<td><img src="docs/ab/nofog_1_house_gate_off.jpg" alt="Ty on the launch pad with fence and rope bridge, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_1_house_gate_on.jpg" alt="Ty on the launch pad with fence and rope bridge, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>09 Launch pad: froxel fog.</b> Fog. Look through the fence rails (2x crop below). Frame A: the rock behind the rails keeps full saturation and a hard edge to the far horizon. Frame B: the froxel volumetric fog is accumulated along the view ray, so the same rock and the far trees blend towards a warm orange-pink fog colour that gets denser with depth, and the far ridge line loses contrast. Foreground wood and the sign are barely touched, which is how you tell depth-based fog from a colour grade. The cast shadow of the sign on the ground is present in both frames, so the shadow map is not what changed here. The sky is identical in the wide frame, so sky fog is not visible in this pair.</sub></td>
+<td colspan="2"><sub><b>1 Launch pad (fog disabled).</b> Fog is off in both frames, so everything that differs here is something else. Look at the red rug around Ty's feet (2x crop). Frame A: the rug is a flat painted texture. Frame B: relief (normals derived from the albedo, plus tessellation) gives the rug a bumpy surface with shaded pits, and the AO/shadow term puts a dark contact patch under and between the feet, which frame A does not have. The rock wall behind has deeper shading in its creases.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/ab/09_launch_pad_fence_crop_off.jpg" alt="Fence and cockatoo sign, 2x crop, F11 off" width="100%"></td>
-<td><img src="docs/ab/09_launch_pad_fence_crop_on.jpg" alt="Fence and cockatoo sign, 2x crop, shaders on" width="100%"></td>
+<td><img src="docs/ab/nofog_1_house_gate_crop_off.jpg" alt="Ty on the launch pad with fence and rope bridge, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_1_house_gate_crop_on.jpg" alt="Ty on the launch pad with fence and rope bridge, 2x crop, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td><img src="docs/ab/11_bli_bli_gate_off.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, F11 off" width="100%"></td>
-<td><img src="docs/ab/11_bli_bli_gate_on.jpg" alt="Ty at the Bli Bli Station wooden arch with a gum tree and two kangaroos, shaders on" width="100%"></td>
+<td><img src="docs/ab/nofog_2_house_waterfall_off.jpg" alt="Ty at the cliff overlook above the waterfall pond, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_2_house_waterfall_on.jpg" alt="Ty at the cliff overlook above the waterfall pond, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>11 Bli Bli Station gate: AO and surface relief.</b> Contact shading and relief. Look at the fork of the gum tree (2x crop below). Frame A: the bark is flat and the rock behind the fork is evenly lit. Frame B: ambient occlusion darkens the rock where the branches meet it and the crevice between the two limbs, and the bark ridges have more tonal separation (normals derived from the albedo). On the ground at the feet of Ty, the cracks in frame B are shaded on one side like real grooves (relief and tessellation), where in A they are flat painted lines. Through the arch, the distant trees sit in a faint haze in B.</sub></td>
+<td colspan="2"><sub><b>2 Waterfall overlook (fog disabled).</b> Look at the cliff face behind Ty (2x crop). Frame A: the red rock columns are evenly lit with little separation. Frame B: the creases between the columns are occluded (AO) and the faces carry stronger relief shading, so the columns read as rounded forms. Ty's face and neck are shaded on the underside in B (shadow strength and AO on the character), where A is flat. The leaf shadows on the ground at the bottom are present in both frames, so the shadow map itself is the same; B changes how dark and how soft it is.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/ab/11_bli_bli_gate_crop_off.jpg" alt="Gum tree fork and rock wall, 2x crop, F11 off" width="100%"></td>
-<td><img src="docs/ab/11_bli_bli_gate_crop_on.jpg" alt="Gum tree fork and rock wall, 2x crop, shaders on" width="100%"></td>
+<td><img src="docs/ab/nofog_2_house_waterfall_crop_off.jpg" alt="Ty at the cliff overlook above the waterfall pond, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_2_house_waterfall_crop_on.jpg" alt="Ty at the cliff overlook above the waterfall pond, 2x crop, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td><img src="docs/ab/12_canyon_path_off.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, F11 off" width="100%"></td>
-<td><img src="docs/ab/12_canyon_path_on.jpg" alt="Ty on a dirt path under gum trees between red canyon walls, shaders on" width="100%"></td>
+<td><img src="docs/ab/nofog_3_station_sign_off.jpg" alt="Ty under the Bli Bli Station sign, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_3_station_sign_on.jpg" alt="Ty under the Bli Bli Station sign, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>12 Canyon path: AO, shading and fog.</b> Occlusion and fog in a dark scene. Look at the base of the grass and the tree trunk (2x crop below). Frame A: the blades are lit evenly down to the soil. Frame B: the grass roots and the foot of the trunk are occluded (AO), and the back wall behind them has a layer of fog over it. On the path, frame B has deeper grooves in the cracked ground, larger shaded areas under the canopy and a lower overall ambient level, so the lit grass at the right stands out more. At the far end of the path the volumetric fog turns the distance a warm orange-red, which frame A does not have. Ty is not changed, since characters are excluded from relief.</sub></td>
+<td colspan="2"><sub><b>3 Bli Bli Station (fog disabled).</b> Look at where the large rock meets the ground and grass on the left (2x crop). Frame A: the rock, the wall behind it and the grass are all lit evenly, and the grass is uniformly bright yellow. Frame B: the wall behind the rock is darker where the rock shields it (AO), the grass is darker at the roots and brighter at the tips, and the cracked ground in front of Ty shows grooves shaded on one side (relief and tessellation) instead of flat painted lines.</sub></td>
 </tr>
 <tr>
-<td><img src="docs/ab/12_canyon_path_crop_off.jpg" alt="Grass and trunk base, 2x crop, F11 off" width="100%"></td>
-<td><img src="docs/ab/12_canyon_path_crop_on.jpg" alt="Grass and trunk base, 2x crop, shaders on" width="100%"></td>
+<td><img src="docs/ab/nofog_3_station_sign_crop_off.jpg" alt="Ty under the Bli Bli Station sign, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_3_station_sign_crop_on.jpg" alt="Ty under the Bli Bli Station sign, 2x crop, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td><img src="docs/ab/nofog_4_shade_ao_off.jpg" alt="Ty standing in the shade of a gum grove, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_4_shade_ao_on.jpg" alt="Ty standing in the shade of a gum grove, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>4 Shade under the trees (fog disabled).</b> The ambient occlusion case. Look at the tree trunks and grass at the left and the back of Ty (2x crop). Frame A: bright, flat light, the trunk in the top left is pale and the grass is evenly lit down to the ground. Frame B: the shaded area is clearly darker, the grass roots and the trunk bases are occluded, and the foliage in the distance separates into lit and shaded clumps. This is the AO and shadow term only, with no fog involved.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/nofog_4_shade_ao_crop_off.jpg" alt="Ty standing in the shade of a gum grove, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/nofog_4_shade_ao_crop_on.jpg" alt="Ty standing in the shade of a gum grove, 2x crop, shaders on" width="100%"></td>
 </tr>
 </table>
 
-Water and the portal are not shown here. The blue flicker on Ty in water and the portal light are known issues. See [Known issues](#known-issues).
+### With fog on
+
+Fog is separate. These two pairs show the volumetric fog in the default setup.
+
+<table>
+<tr>
+<th align="left">F11 off</th>
+<th align="left">Shaders on</th>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_1_canyon_gate_off.jpg" alt="Launch pad with fence, rope bridge and canyon behind, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_1_canyon_gate_on.jpg" alt="Launch pad with fence, rope bridge and canyon behind, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>5 Launch pad (fog on).</b> Fog, same spot as pair 1. Look at the canyon behind the right-hand fence (2x crop). Frame A: the rock keeps full saturation and a hard edge to the sky. Frame B: the froxel volumetric fog is integrated along the view ray, so the distant rock and ground dissolve into a warm pink haze that is denser the further away it is, while the foreground fence and rug are barely touched.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_1_canyon_gate_crop_off.jpg" alt="Launch pad with fence, rope bridge and canyon behind, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_1_canyon_gate_crop_on.jpg" alt="Launch pad with fence, rope bridge and canyon behind, 2x crop, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_3_waterfall_reeds_off.jpg" alt="Waterfall, palms and reeds across the water, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_3_waterfall_reeds_on.jpg" alt="Waterfall, palms and reeds across the water, shaders on" width="100%"></td>
+</tr>
+<tr>
+<td colspan="2"><sub><b>6 Waterfall and reeds (fog on).</b> Fog and shading together. Look at the palms and the cliff beside the waterfall (2x crop). Frame B adds a haze that grows with depth: the far palms, the cliff and the waterfall mist lose contrast and take the fog colour. The reeds in front are also darker in B because of AO and shadow, which is separate from the fog.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/ab/fog_3_waterfall_reeds_crop_off.jpg" alt="Waterfall, palms and reeds across the water, 2x crop, F11 off" width="100%"></td>
+<td><img src="docs/ab/fog_3_waterfall_reeds_crop_on.jpg" alt="Waterfall, palms and reeds across the water, 2x crop, shaders on" width="100%"></td>
+</tr>
+</table>
+
+Water and the portal are not shown here. The blue flicker on Ty in water, the lily pads against the water and the portal light are known issues. See [Known issues](#known-issues).
 
 ## Presets
 
