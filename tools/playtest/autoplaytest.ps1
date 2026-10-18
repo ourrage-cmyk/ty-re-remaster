@@ -1,4 +1,4 @@
-# Automated playtest for the TY renderer: boots each variant to a fixed spot, takes A/B screenshots, measures flicker,
+﻿# Automated playtest for the TY renderer: boots each variant to a fixed spot, takes A/B screenshots, measures flicker,
 # checks the F10 overlay open/close, collects tyrender.log, and writes report.md and contact_sheet.png.
 # Read-and-screenshot only. It backs up tyrender.ini and restores it, never writes into the install, and leaves the game closed.
 # Usage: powershell -NoProfile -File tools\playtest\autoplaytest.ps1 [-Game 'C:\CLAUDE\TY the Tasmanian Tiger'] [-Variants stock,mod] [-Spot rainbow] [-Out <dir>]
@@ -84,6 +84,11 @@ $defs = @{
     sky_yaw180  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 180 0' }
     sky_yaw270  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $false; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 270 0' }
     # Static water camera: slot 1 (no cutscene), fixed yaw and pitch from the spawn. PLACEHOLDER yaw/pitch: set them from the sky_yaw sweep before the owner relies on this view.
+    # Character-vertex report (2026-10-18): mod broke skinned characters. Revert one default at a time against mod; the first that restores them names the cause.
+    mod_noclamp  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'decal.Clamp' = '0' };                                   Flicker = $false; Overlay = $false }
+    mod_oldpost  = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'post.Sharpen' = '0.25' };                               Flicker = $false; Overlay = $false }
+    mod_oldao    = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'ao.Strength' = '0.85' };                                 Flicker = $false; Overlay = $false }
+    mod_oldall   = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{ 'decal.Clamp' = '0'; 'post.Sharpen' = '0.25'; 'ao.Strength' = '0.85' }; Flicker = $false; Overlay = $false }
     water_static = @{ Exe = 'TY_tyrender.exe'; Args = '-skipvideo'; Ini = @{}; Flicker = $true; Overlay = $false; Spot = 'rainbow'; Cam = '0 0 0 270 -20' }
 }
 
@@ -153,11 +158,20 @@ function Run-Variant([string]$Name, [hashtable]$Def) {
             $alive = [bool](Get-GameProcs $Game -Names @($proc))
             if ($open.Count -lt 1 -or $closed.Count -lt 1) { $r.Overlay = 'FAIL no frame captured'; $r.OverlayPass = $false }
             else {
-                $dOpen = [PlaytestImg]::MeanAbsDiff($r.Base[0], $open[0], $TyX0, $TyY0, $TyX1, $TyY1)
-                $dClosed = [PlaytestImg]::MeanAbsDiff($r.Base[0], $closed[0], $TyX0, $TyY0, $TyX1, $TyY1)
-                $r.OverlayPass = ($alive -and $dClosed -ge 0 -and $dClosed -le $OverlayClosedMax)
-                $r.Overlay = 'open diff {0:N2}, closed diff {1:N2}, alive {2}' -f $dOpen, $dClosed, $alive
-                if ($dOpen -lt 1) { $r.Overlay += ' (CHECK: overlay did not visibly open)' }
+                $dOpen = -1; $dClosed = -1; $cmpErr = ''
+                try {
+                    $dOpen = [PlaytestImg]::MeanAbsDiff($r.Base[0], $open[0], $TyX0, $TyY0, $TyX1, $TyY1)
+                    $dClosed = [PlaytestImg]::MeanAbsDiff($r.Base[0], $closed[0], $TyX0, $TyY0, $TyX1, $TyY1)
+                } catch { $cmpErr = $_.Exception.Message }
+                if ($cmpErr -or $dOpen -lt 0 -or $dClosed -lt 0) {
+                    # Unreadable or size-mismatched shot: report it as a failed check and keep the run going.
+                    $r.OverlayPass = $false
+                    $r.Overlay = "FAIL shot compare (open $($open[0]), closed $($closed[0]), base $($r.Base[0])): $(if ($cmpErr) { $cmpErr } else { 'size mismatch or empty frame' })"
+                } else {
+                    $r.OverlayPass = ($alive -and $dClosed -le $OverlayClosedMax)
+                    $r.Overlay = 'open diff {0:N2}, closed diff {1:N2}, alive {2}' -f $dOpen, $dClosed, $alive
+                    if ($dOpen -lt 1) { $r.Overlay += ' (CHECK: overlay did not visibly open)' }
+                }
                 $r.OverlayRows = @(@{ Label = 'overlay open / closed'; Files = @($open[0], $closed[0]) })
             }
         }
@@ -177,7 +191,13 @@ try {
     foreach ($name in $Variants) {
         if (-not $defs.ContainsKey($name)) { throw "unknown variant $name" }
         Write-RunStatus @{ state = 'running'; current = $name; done = $n; total = $Variants.Count }
-        $results += Run-Variant $name $defs[$name]
+        try { $results += Run-Variant $name $defs[$name] }
+        catch {
+            # Harness error inside one variant: record it as a failed boot for that variant and continue with the next.
+            Write-RunLog "variant $name ERROR (run continues): $($_.Exception.Message)"
+            try { Stop-Game } catch {}
+            $results += @{ Name = $name; Dir = (Join-Path $Out $name); Boot = "FAIL harness error: $($_.Exception.Message)"; Alive = 'n/a'; Base = @(); ShotCount = 0; Flicker = 'n/a'; FlickerLower = -1; Overlay = 'n/a'; OverlayPass = $null; OverlayRows = @(); LogHits = 'n/a'; OverlayLog = @(); TyBlue = -1; FgMiss = 0 }
+        }
         $n++
     }
     Write-RunStatus @{ state = 'finished'; current = ''; done = $n; total = $Variants.Count }
