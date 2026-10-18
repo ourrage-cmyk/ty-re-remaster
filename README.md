@@ -1,18 +1,22 @@
 # TY HD Renderer
 
-A lighting and shading mod for the PC version of TY the Tasmanian Tiger.
+*Better light for the outback, a fan mod for TY the Tasmanian Tiger on PC.*
 
-TY HD Renderer is a rendering mod for **TY the Tasmanian Tiger** on PC. It changes how the outback is lit and shaded, and it leaves the game itself alone. Pick a preset, press Play, and the bush gets a little more depth.
+G'day! TY HD Renderer gives the bush a bit more depth: shadows that look like shade, distant rocks that fade back, and light that bounces off things. Pick a preset, hit Play, and Ty's world looks a little more lived in. The game itself is left alone.
+
+> **Fan project.** This is an unofficial, community-made mod. It is not made by or connected to the game's developers or publishers. It includes no game files, so you need your own copy of TY the Tasmanian Tiger for PC.
 
 **Status:** community beta. The latest release is v0.3.5. Changes on `main` since then are listed in [CHANGELOG.md](CHANGELOG.md). Build `4a2ef95` was partly playtested on Ultra on 2026-10-18; later changes are not.
 
-Tested on one graphics card: AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet, and reports from those are very welcome.
+**Tested on:** one graphics card, AMD Radeon RX 7600 XT on Windows 11. NVIDIA, Intel and Linux/Proton are not tested yet, so reports from those are very welcome.
+
+**Jump to:** [Side by side](#side-by-side) · [Presets](#presets) · [Install](#install) · [Known issues](#known-issues)
 
 ## What it changes
 
 TY's art is bold and flat, and the lighting underneath it is old. Shadows are hard and capped at 50%. Distant rocks fade into a flat colour. Surfaces have no depth beyond their paint. Light never bounces off anything.
 
-The mod fixes those four things and keeps the look:
+The mod fixes those four things and keeps the paint job:
 
 - **Shadows.** Softer edges, a larger shadow map, and a cooler shade colour, so shade reads as shade.
 - **Surface relief.** Cracks, grain, wood and rope get bumps and roughness from their own colour. Feet stay on the ground, and characters are not changed.
@@ -86,7 +90,7 @@ Frame times are GPU milliseconds per frame, measured by the author at 2560x1440 
 | High | about 18 ms | 55 | Medium plus bounce light (1 ray) and contact shadows |
 | Ultra | about 31 ms | 32 | More AO samples, bounce light (2 rays), higher-quality haze, environment relief, 8192 shadow maps |
 
-Medium is the stable preset in playtests. High and Ultra flickered in playtest 4 (v0.3.2, see `docs/FINDINGS_ROUND4.md`). The AO flicker has since been fixed and Ultra on build `4a2ef95` played without it, but use Medium if you see flicker.
+Start with Medium. It is the preset that has held up best in playtests, and it is the default. High and Ultra flickered in playtest 4 (v0.3.2, see `docs/FINDINGS_ROUND4.md`). The AO flicker has since been fixed and Ultra on build `4a2ef95` played without it, but use Medium if you see flicker.
 
 ### What each option costs
 
@@ -125,14 +129,14 @@ The launcher is a single file. The renderer DLL and default settings are built i
 
 ## Uninstall
 
-Run **`TY HD Renderer Uninstall.exe`** in the game folder, or use Apps and Features > **TY HD Renderer (mod)**. It is separate from the game's own uninstall.
+No worries if you want out. Run **`TY HD Renderer Uninstall.exe`** in the game folder, or use Apps and Features > **TY HD Renderer (mod)**. It is separate from the game's own uninstall.
 It deletes only the files the install added and puts back the originals it saved. It asks whether to keep your `tyrender.ini` settings. The game folder's own files are not touched.
 
 By hand: delete `tyrender.dll`, `TYLauncher.exe`, `TY_tyrender.exe`, `tyrender.ini`, `tyrender.log`, and the `tyrender` folder if it exists. If you added the Steam launch option, remove it in Steam. The original game keeps working without these files.
 
 ## Known issues
 
-These are open from playtests. Where a fix is on `main`, it is marked untested.
+Still rough around the edges, from playtests. Where a fix is on `main`, it is marked untested.
 
 - **Water:** in build `4a2ef95`, the light on Ty ramps up and down slowly in water instead of flickering (#5). Lily pads and rocks look brighter than the water under them, and fog is heavier looking down than across (#4). A water outline shows when viewed from above (#104).
 - **Fog:** sky and red rock now fade smoothly, and fog on trees is slight. Fire is not fogged (#4).
@@ -151,18 +155,20 @@ These are open from playtests. Where a fix is on `main`, it is marked untested.
 
 ## Reporting problems
 
-Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
+Found a glitch? Send your `tyrender.log`, a screenshot (the F11 hotkey takes comparison shots), your GPU model and your driver version. NVIDIA and Intel owners: a `tyrender.log` from one run is especially welcome, since those GPUs are untested.
 
 ## Compatibility and credits
 
 - Works with the base game.
 - Gets more from the ty2k mod, because more texture detail means more precise relief.
 - The HD texture pack is separate from this project.
+- The cast you will meet: Ty, Shazza the dingo, Sly the tiger rival, Julius the koala scientist, Maurie the cockatoo and Boss Cass the cassowary. Characters are left out of surface relief.
+- Ty and the cast belong to their own rights holders. This mod is a fan project and ships none of their work.
 - A hobby project, made with Claude. Test reports are welcome.
 
 ## For modders
 
-Presets cover most needs, and the launcher writes the values it needs. To tune by hand, edit `tyrender.ini` in the game folder, or open it from **Advanced (ini)...** in the launcher. Per-option costs are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
+Presets cover most needs, and the launcher writes the values it needs. This part is for tinkerers. To tune by hand, edit `tyrender.ini` in the game folder, or open it from **Advanced (ini)...** in the launcher. Per-option costs are in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md).
 
 If a graphics card or driver cannot run an effect (for example no GL 4.3 compute for the fog, or a shader that does not compile), **that effect switches itself off** and the frame is drawn without it. The renderer does not fall back to a slower path. Check `tyrender.log` for the reason.
 
@@ -226,4 +232,4 @@ The shipped `tyrender.ini` is the Medium preset. The launcher writes the values 
 
 ## Changes and history
 
-Release notes are in [CHANGELOG.md](CHANGELOG.md). Builds are identified by the git commit in the launcher title bar.
+The good oil is in [CHANGELOG.md](CHANGELOG.md). Builds are identified by the git commit in the launcher title bar.
