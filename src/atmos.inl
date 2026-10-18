@@ -264,10 +264,10 @@ static bool InitVolume() {
     if (!vol.Dispatch || !vol.BindImage || !vol.Barrier || !vol.TexImage3D || !vol.DelTex || !vol.GetErr) { logf("[atmos] froxel: missing entry points"); vol.failed = true; return false; }
     GLuint s = o_glCreateShader(0x91B9); o_glShaderSource(s, 1, &kAtmosCS, nullptr); gx.CompileShader(s);
     GLint ok = 0; gx.GetShaderiv(s, 0x8B81, &ok);
-    if (!ok) { char buf[4096]; gx.GetShaderInfoLog(s, sizeof buf, nullptr, buf); logf("[atmos] froxel compute compile FAILED:\n%s", buf); vol.failed = true; return false; }
+    if (!ok) { char buf[4096]; gx.GetShaderInfoLog(s, sizeof buf, nullptr, buf); logf("[atmos] froxel compute compile FAILED:\n%s", buf); SessFailure("atmos compile", buf); vol.failed = true; return false; }
     vol.prog = gx.CreateProgram(); o_glAttachShader(vol.prog, s); o_glLinkProgram(vol.prog);
     gx.GetProgramiv(vol.prog, 0x8B82, &ok);
-    if (!ok) { char buf[4096]; gx.GetProgramInfoLog(vol.prog, sizeof buf, nullptr, buf); logf("[atmos] froxel compute link FAILED:\n%s", buf); vol.failed = true; return false; }
+    if (!ok) { char buf[4096]; gx.GetProgramInfoLog(vol.prog, sizeof buf, nullptr, buf); logf("[atmos] froxel compute link FAILED:\n%s", buf); SessFailure("atmos link", buf); vol.failed = true; return false; }
     vol.ok = true; logf("[atmos] froxel compute path ready"); return true;
 }
 static bool EnsureVolTex(int w, int h) {
@@ -368,7 +368,7 @@ static void RunAtmos(GLuint depthTex, int w, int h) {
         if (!ao.fbo) gx.GenFramebuffers(1, &ao.fbo);
         atm.init = true;
     }
-    if (g_atEnable && g_atFroxel && g_atContact <= 0 && !InitVolume()) { static int once; if (!once++) logf("[fallback] froxel unavailable -> atmosphere OFF (no heavy ray-march fallback)"); atm.failed = true; return; }   // fallback policy: failure -> OFF, never a slower path
+    if (g_atEnable && g_atFroxel && g_atContact <= 0 && !InitVolume()) { static int once; if (!once++) logf("[fallback] froxel unavailable -> atmosphere OFF (no heavy ray-march fallback)"); SessEvent("atmosphere turned off: froxel unavailable"); atm.failed = true; return; }   // fallback policy: failure -> OFF, never a slower path
     typedef void(WINAPI* glCopyTexSubImage2D_t)(GLenum, GLint, GLint, GLint, GLint, GLint, GLsizei, GLsizei);
     static glCopyTexSubImage2D_t copySub = (glCopyTexSubImage2D_t)GLProc("glCopyTexSubImage2D");
     typedef void(WINAPI* glUniform3f_t)(GLint, GLfloat, GLfloat, GLfloat);

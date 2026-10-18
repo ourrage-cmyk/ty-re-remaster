@@ -447,12 +447,12 @@ static GLuint CompileProg(const char* name, const char* vs, const char* fs1, con
         if (k == 0) o_glShaderSource(s, 1, &vs, nullptr); else o_glShaderSource(s, nfs, fsParts, nullptr);
         gx.CompileShader(s);
         GLint ok = 0; gx.GetShaderiv(s, 0x8B81 /*COMPILE_STATUS*/, &ok);
-        if (!ok) { char buf[4096]; gx.GetShaderInfoLog(s, sizeof buf, nullptr, buf); logf("[ao] %s %s compile FAILED:\n%s", name, k ? "fs" : "vs", buf); return 0; }
+        if (!ok) { char buf[4096]; gx.GetShaderInfoLog(s, sizeof buf, nullptr, buf); logf("[ao] %s %s compile FAILED:\n%s", name, k ? "fs" : "vs", buf); SessFailure("ao compile", buf); return 0; }
         o_glAttachShader(p, s);
     }
     o_glLinkProgram(p);
     GLint ok = 0; gx.GetProgramiv(p, 0x8B82 /*LINK_STATUS*/, &ok);
-    if (!ok) { char buf[4096]; gx.GetProgramInfoLog(p, sizeof buf, nullptr, buf); logf("[ao] %s link FAILED:\n%s", name, buf); return 0; }
+    if (!ok) { char buf[4096]; gx.GetProgramInfoLog(p, sizeof buf, nullptr, buf); logf("[ao] %s link FAILED:\n%s", name, buf); SessFailure("ao link", buf); return 0; }
     return p;
 }
 
@@ -543,7 +543,7 @@ static bool InitAO(int w, int h) {
         ao.progPre0 = CompileProg("pre0", kVS, kPre0, nullptr, nullptr); ao.progPreN = CompileProg("preN", kVS, kPreN, nullptr, nullptr);
         ao.progAO2 = CompileProg("gtao2", kVS, kGTAO2, nullptr, nullptr);
         ao.v2ok = ao.progPre0 && ao.progPreN && ao.progAO2;
-        if (!ao.v2ok && !g_aoLegacy) { logf("[fallback] AO v2 unavailable -> AO OFF (no legacy fallback)"); ao.failed = true; return false; }   // fallback policy: failure -> OFF
+        if (!ao.v2ok && !g_aoLegacy) { logf("[fallback] AO v2 unavailable -> AO OFF (no legacy fallback)"); SessEvent("AO turned off: v2 shader unavailable"); ao.failed = true; return false; }   // fallback policy: failure -> OFF
         if (!ao.v2ok) logf("[ao] v2 (depth-mip GTAO) unavailable, using legacy GTAO (Legacy=1)");
         gx.GenVertexArrays(1, &ao.vao); gx.GenFramebuffers(1, &ao.fbo);
     }

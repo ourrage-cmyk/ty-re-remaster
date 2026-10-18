@@ -48,6 +48,10 @@ static void logf(const char* fmt, ...) {
     if (!g_cap) fflush(g_log);
 }
 #define CAP(...) do { if (g_cap) logf(__VA_ARGS__); } while (0)
+// session report (sesslog.inl): declared here because the shader and crash code above uses them
+static void SessEvent(const char* fmt, ...); static void SessEventForce(const char* fmt, ...); static void SessFailure(const char* kind, const char* log);
+static void SessIniCheck(const char* why); static void SessInit(); static void SessShutdown(const char* how); static void SessCrash(DWORD code, const char* mod, unsigned long off);
+static void SessFrame(HDC dc); static void SessGpuSample(double frame, double ao, double gi, double atm, double post);
 
 static void LoadConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
@@ -472,7 +476,7 @@ static bool TestCompile(GLenum type, const std::string& src) {
     GLuint t = o_glCreateShader(type); const GLchar* p = src.c_str();
     o_glShaderSource(t, 1, &p, nullptr); compile(t);
     GLint ok = 0; getiv(t, 0x8B81, &ok);
-    if (!ok && getlog) { char buf[2048]; getlog(t, sizeof buf, nullptr, buf); logf("[compile test] FAILED:\n%s", buf); }
+    if (!ok && getlog) { char buf[2048]; getlog(t, sizeof buf, nullptr, buf); logf("[compile test] FAILED:\n%s", buf); SessFailure("compile test", buf); }
     if (del) del(t);
     return ok != 0;
 }
@@ -542,6 +546,7 @@ static void Snapshot(HDC dc) {
 #include "pbr.inl"
 #include "light.inl"
 #include "debugcam.inl"
+#include "sesslog.inl"
 #include "gpuprof.inl"
 #include "abshot.inl"
 #include "overlay.inl"
@@ -595,13 +600,14 @@ static BOOL WINAPI h_SwapBuffers(HDC dc) {
             { char ini[MAX_PATH], b[32]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
               GetPrivateProfileStringA("fog", "Distance", "1.0", b, sizeof b, ini); g_fogDistance = (float)atof(b);
               GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "1.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
-            logf("[cfg] reloaded all"); }
+            logf("[cfg] reloaded all"); SessIniCheck("reload"); }
     }   // poll the trigger file every 8 frames
     TexReport();
     GProf(9);                                      // GPU timestamp: end of this frame's commands (before present, so vsync waits are not counted)
     ABShotFrame(dc);                               // A/B hotkey (abshot.inl): reads the frame just drawn, F11 by default
     OverlayFrame(dc);                              // settings overlay (overlay.inl): drawn after the A/B read so screenshots stay clean
     BOOL r = o_SwapBuffers(dc);
+    SessFrame(dc);
     GProfNextFrame();
     g_frame++;
     UpdateJitter();
@@ -687,11 +693,13 @@ static LONG WINAPI CrashVEH(EXCEPTION_POINTERS* e) {
     if (code == EXCEPTION_ACCESS_VIOLATION) logf("    access %s address %p", e->ExceptionRecord->ExceptionInformation[0] ? "write" : "read", (void*)e->ExceptionRecord->ExceptionInformation[1]);
     void* bt[24]; USHORT n = RtlCaptureStackBackTrace(0, 24, bt, nullptr);
     for (USHORT i = 0; i < n; i++) { HMODULE bm = nullptr; char bmod[MAX_PATH] = "?"; if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)bt[i], &bm)) GetModuleFileNameA(bm, bmod, MAX_PATH); logf("    #%u %p %s +0x%lx", i, bt[i], strrchr(bmod, '\\') ? strrchr(bmod, '\\') + 1 : bmod, (unsigned long)((BYTE*)bt[i] - (BYTE*)bm)); }
+    SessCrash(code, mod, (unsigned long)((BYTE*)addr - (BYTE*)m));
     if (g_log) fflush(g_log);
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
+    if (reason == DLL_PROCESS_DETACH) { SessShutdown("clean exit"); return TRUE; }
     if (reason != DLL_PROCESS_ATTACH) return TRUE;
     DisableThreadLibraryCalls(inst);
     GetModuleFileNameA(nullptr, g_dir, MAX_PATH);
@@ -720,6 +728,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
     CheckOrig("SwapBuffers", (void*)o_SwapBuffers);
     CheckOrig("wglGetProcAddress", (void*)o_wglGetProcAddress);
     CheckOrig("glDrawElements", (void*)o_glDrawElements);
+    SessInit();
     logf("hooks installed");
     return TRUE;
 }

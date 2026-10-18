@@ -130,7 +130,7 @@ static void GameClashText(wchar_t* out, int n) {
 }
 
 // ------------------------------------------------------------ window
-enum { ID_P0 = 100, ID_AO = 110, ID_ATMOS, ID_TESS, ID_TESSALL, ID_POST, ID_GI, ID_AA, ID_SHADOW, ID_DETAIL, ID_PLAY = 130, ID_STOCK, ID_STEAM, ID_ADV, ID_RESET, ID_MORE, ID_TAB = 136, ID_SL0 = 300 };
+enum { ID_P0 = 100, ID_AO = 110, ID_ATMOS, ID_TESS, ID_TESSALL, ID_POST, ID_GI, ID_AA, ID_SHADOW, ID_DETAIL, ID_PLAY = 130, ID_STOCK, ID_STEAM, ID_ADV, ID_RESET, ID_MORE, ID_TAB = 136, ID_REPORT = 137, ID_SL0 = 300 };
 enum { TG_AO, TG_GI, TG_ATM, TG_TESS, TG_TESSALL, TG_POST, TG_AA, TG_SHADOW, TG_DETAIL, TG_N };
 static HWND g_hw, h_preset[NPRESET], h_presetNote, h_ao, h_atmos, h_tess, h_tessAll, h_post, h_gi, h_aa, h_shadow, h_detail, h_status, h_total, h_overall, h_dTitle, h_dText;
 static Settings g_s; static int g_updating, g_presetSel = -1, g_expanded;
@@ -476,7 +476,8 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         c = Ctl(L"BUTTON", L"Steam setup...", WS_TABSTOP, 30, 222, 160, 30, ID_STEAM); AddDesc(c, L"Steam setup", L"Copies a launch option so Steam's own Play button starts the game with the HD renderer. One-time setup.");
         c = Ctl(L"BUTTON", L"Advanced (ini)...", WS_TABSTOP, 200, 222, 160, 30, ID_ADV); AddDesc(c, L"Advanced settings", L"Opens tyrender.ini in Notepad for the full list of knobs. For tinkerers.");
         c = Ctl(L"BUTTON", L"Reset sliders", WS_TABSTOP, 370, 222, 170, 30, ID_RESET); AddDesc(c, L"Reset sliders", L"Puts every look slider back to its default position. Your checkboxes and preset stay as they are.");
-        Ctl(L"STATIC", L"Nothing here is needed for a good picture: the presets already pick good settings.", SS_LEFT, 30, 270, 540, 36, 0);
+        c = Ctl(L"BUTTON", L"Report a problem / open logs folder", WS_TABSTOP, 30, 262, 340, 30, ID_REPORT); AddDesc(c, L"Report a problem", L"Opens the folder with the session report the mod writes each time you play. It holds hardware basics and frame times, no names or personal paths. Send that file to the author, with a screenshot and your GPU name.");
+        Ctl(L"STATIC", L"Nothing here is needed for a good picture: the presets already pick good settings.", SS_LEFT, 30, 306, 540, 36, 0);
         g_pg = PG_ANY;
         AssignLv(); LoadSettings(&g_s); ToUI(); SlidersFromIni(); SendMessageW(h_detail, BM_SETCHECK, GameDetailIsHigh(), 0); RefreshCosts();
         UpdateStatus(NULL); SetTimer(h, 1, 2000, NULL); SetTimer(h, 2, 90, NULL); SetTimer(h, 3, 30, NULL);
@@ -496,6 +497,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         else if (id == ID_PLAY) { SaveAll(); int ok = EnsurePatched(); (void)ok; StartGame(1); UpdateStatus(L"Started. Keep this window open to fine-tune the sliders live."); }
         else if (id == ID_STOCK) { SaveAll(); StartGame(0); }
         else if (id == ID_ADV) { SaveAll(); ShellExecuteW(h, L"open", L"notepad.exe", g_ini, NULL, SW_SHOWNORMAL); }
+        else if (id == ID_REPORT) { wchar_t d[MAX_PATH]; swprintf(d, MAX_PATH, L"%lstyrender\\logs", g_dir); CreateDirectoryW(d, NULL); ShellExecuteW(h, L"open", d, NULL, NULL, SW_SHOWNORMAL); UpdateStatus(L"Logs folder opened. Send the newest TYHD_report file, plus a screenshot and your GPU name. See README: Reporting a bug."); }
         else if (id == ID_MORE) { g_expanded = !g_expanded; ApplyLayout(); }
         else if (id == ID_RESET) { for (int i = 0; i < NSL; i++) Wf(g_sl[i].sec, g_sl[i].key, g_sl[i].def); SlidersFromIni(); RefreshCosts(); if (GameRunning()) LiveReload(); }
         else if (id == ID_STEAM) {

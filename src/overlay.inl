@@ -59,6 +59,7 @@ static void OvReload(const OvItem& it) {
 static void OvWriteIni(const OvItem& it, const char* text) {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);
     WritePrivateProfileStringA(it.sec, it.key, text, ini);
+    SessIniCheck("F10 overlay");
 }
 static void OvSetVal(int i, float v) {
     const OvItem& it = g_ovItems[i];
@@ -79,7 +80,7 @@ static void OvOpen() {
         g_ovVal[i] = v;
     }
     g_ovSel = 0; g_ovOpen = true;
-    logf("[overlay] opened (build %s)", TY_BUILD_ID_A);
+    logf("[overlay] opened (build %s)", TY_BUILD_ID_A); SessEvent("F10 overlay opened");
 }
 static void OvRevertAndClose() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir);

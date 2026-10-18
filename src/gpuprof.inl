@@ -31,6 +31,7 @@ static void GProfNextFrame() {
             for (int m = 0; m < 22; m++) if (mk & (1u << m)) gp_get64(gp.q[gp.cur][m], 0x8866, &t[m]);
             auto d = [&](int a, int b) { return ((mk & (1u << a)) && (mk & (1u << b)) && t[b] >= t[a]) ? (t[b] - t[a]) / 1e6 : 0.0; };
             gp.acc[0] += d(0, 9); gp.acc[1] += d(1, 2); gp.acc[2] += d(3, 4); gp.acc[3] += d(5, 6); gp.acc[4] += d(7, 8); gp.acc[5] += d(10, 11); gp.acc[6] += d(12, 13); gp.acc[7] += d(14, 15); gp.acc[8] += d(16, 17); gp.acc[9] += d(18, 19); gp.acc[10] += d(20, 21); gp.n++;
+                SessGpuSample(d(0, 9), d(1, 2), d(3, 4), d(5, 6), d(7, 8));
             if (gp.n >= 300) {
                 double f = gp.acc[0] / gp.n, o = f - (gp.acc[1] + gp.acc[2] + gp.acc[3] + gp.acc[4]) / gp.n;
                 logf("[gpu] frame %.2f ms | ao %.2f gi %.2f atmos %.2f post %.2f | engine+rest %.2f ms (%u draws)", f, gp.acc[1] / gp.n, gp.acc[2] / gp.n, gp.acc[3] / gp.n, gp.acc[4] / gp.n, o, g_draws);
