@@ -1,5 +1,8 @@
 # RESUME - current state only (rewritten 2026-10-13 19:23, docs pass 2)
 
+> Historical handoff snapshot (2026-10-13 era). For the current state see [docs/reference/](reference/README.md) and [CHANGELOG.md](../CHANGELOG.md).
+
+
 Entry point and how-to: `START_HERE.md`. Numbers: `STATUS_2026-10-13.md`. Problem ids from playtests: `recording\INDEX.md`. Plan order: `PLAN_NEXT.md`. Older running notes (appended log) are in `archive\20261013\RESUME_appended_log_20261013_1923.md`; the earlier consolidated versions are in `archive\20261013\`.
 
 ## State right now (evening 2026-10-13)

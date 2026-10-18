@@ -1,5 +1,8 @@
 # START HERE - TY HD renderer (single entry point)
 
+> Pointer: the current reference (settings, shaders, pass order, troubleshooting) is in [docs/reference/](reference/README.md). Paths and env-var notes below are a historical snapshot; where they disagree with the reference, the code wins.
+
+
 Updated 2026-10-13 19:23 (docs pass 2, after playtest 4 and the v0.3.3 test build). Read this file, then `RESUME.md` (current state, open items), then `PLAN_NEXT.md` (order of work), and `DOC_MAP.md` if you need to find a document. Everything older is in `archive\20261013\` (index: `archive\20261013\MOVED.md`).
 
 ## 1. What the project is
