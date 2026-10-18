@@ -242,7 +242,7 @@ static void SessGraphics() {
     const char* ren = (const char*)o_glGetString(GL_RENDERER);
     const char* ver = (const char*)o_glGetString(GL_VERSION);
     const char* glsl = (const char*)o_glGetString(GL_SHADING_LANGUAGE_VERSION);
-    SessText(false, "GPU vendor: %s\nGPU model: %s\nOpenGL version (includes the driver version): %s\nGLSL: %s\n", ven ? ven : "?", ren ? ren : "?", ver ? ver : "?", glsl ? glsl : "?");
+    SessText(false, "GPU vendor: %s\nGPU model (OpenGL renderer string, so the driver's own name; can be generic): %s\nOpenGL version (includes the driver version): %s\nGLSL: %s\n", ven ? ven : "?", ren ? ren : "?", ver ? ver : "?", glsl ? glsl : "?");
     SessGetIntegerv_t giv = (SessGetIntegerv_t)SessGL("glGetIntegerv");
     auto lim = [&](GLenum e) { GLint v = -1; if (giv) giv(e, &v); return (int)v; };
     SessText(false, "limits: max texture size %d, texture units %d, draw buffers %d, max samples %d\n", lim(0x0D33), lim(0x8872), lim(0x8824), lim(0x8D57));
