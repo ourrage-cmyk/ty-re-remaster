@@ -19,6 +19,10 @@ Updated 2026-10-18, after the playtest of build 4a2ef95.
   - F10 overlay regression: opening it breaks all geometry until restart and cannot be closed (#12). Default is now F10 (#102); older inis need Key=F10.
   - Launcher guard (#13) untested; GPU portability (#15, #16) awaits other GPUs.
 
+- Playtest of 3ee6ea7 (owner, Ultra, 2026-10-18):
+  - Good: launcher, no crashes, sky and red rock fog, trees no longer obscured, second level fine, F11 pairs (four with fog disabled).
+  - Open: fire not fogged (#4, LateEmitBoost in #115, default off, untested); lilies and rocks against the water still look off (#4, needs the lily texture names for `[fog] WaterNames`); bridge shadow line (#103) and water outline (#104) not yet fixed.
+
 ## Open work by owner thread (priority order)
 
 1. Unblock desktop permissions and install the newest main.
