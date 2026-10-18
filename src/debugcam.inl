@@ -71,6 +71,6 @@ static void MotionFrame(HDC dc) {
     if (g_mt.i >= g_mt.n) {
         char dir[MAX_PATH], out[MAX_PATH]; snprintf(dir, sizeof dir, "%styrender\\snaps", g_dir); CreateDirectoryA(dir, nullptr); snprintf(out, sizeof out, "%s\\motion_%s.raw", dir, g_mt.name);
         if (FILE* f = fopen(out, "wb")) { int hdr[3] = {g_mt.W, g_mt.H, g_mt.n}; fwrite(hdr, 4, 3, f); fwrite(g_mt.buf.data(), 1, g_mt.buf.size(), f); fclose(f); }
-        g_dcamOn = g_mt.savedOn; memcpy(g_dcam, g_mt.savedCam, sizeof g_dcam); g_mt.on = false; logf("[motion] done %s -> %s", g_mt.name, out);
+        g_dcamOn = g_mt.savedOn; memcpy(g_dcam, g_mt.savedCam, sizeof g_dcam); g_mt.on = false; logf("[motion] done %s -> %s", g_mt.name, LogPath(out).c_str());
     }
 }

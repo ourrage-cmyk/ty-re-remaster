@@ -141,7 +141,7 @@ void main() {
 
 static struct { bool init, failed; int w, h; GLuint progFXAA, progGrade, progTAA, texScene, texTmp, texHist[2], fbo; int histIdx; bool histValid; unsigned lastFrame; float prevVP[16]; } fx;
 static int g_fxEnable = 1, g_fxFXAA = 1, g_fxAA = 2; static float g_taaBlend = 0.85f, g_taaReject = 1.0f;
-static float g_fxSharpen = 0.25f, g_fxContrast = 1.0f, g_fxSat = 1.0f, g_fxVib = 0.04f, g_fxShoulder = 0.12f, g_fxVignette = 0.0f, g_fxGamma = 1.0f, g_fxBrightness = 1.0f, g_fxKnee = 0.72f, g_fxRoll = 0.15f, g_fxSplit = 0.12f; static int g_fxTonemap = 1; static float g_fxHalo = 1.0f;
+static float g_fxSharpen = 0.35f, g_fxContrast = 1.0f, g_fxSat = 1.0f, g_fxVib = 0.04f, g_fxShoulder = 0.12f, g_fxVignette = 0.0f, g_fxGamma = 1.0f, g_fxBrightness = 1.0f, g_fxKnee = 0.72f, g_fxRoll = 0.15f, g_fxSplit = 0.12f; static int g_fxTonemap = 1; static float g_fxHalo = 1.0f;
 
 static void LoadFXConfig() {
     char ini[MAX_PATH]; snprintf(ini, sizeof ini, "%styrender.ini", g_dir); char b[32];
@@ -150,7 +150,7 @@ static void LoadFXConfig() {
     GetPrivateProfileStringA("post", "TAABlend", "0.85", b, sizeof b, ini); g_taaBlend = (float)atof(b);
     GetPrivateProfileStringA("post", "TAAReject", "1.0", b, sizeof b, ini); g_taaReject = (float)atof(b);   // 0 = old behaviour; 1 = history far outside the neighbourhood (moving grass) blends at most 0.35
 #define F(key, def, var) GetPrivateProfileStringA("post", key, def, b, sizeof b, ini); var = (float)atof(b);
-    F("Sharpen", "0.25", g_fxSharpen) F("SharpenHaloClamp", "1.0", g_fxHalo) F("Contrast", "1.0", g_fxContrast) F("Saturation", "1.0", g_fxSat) F("Vibrance", "0.04", g_fxVib)
+    F("Sharpen", "0.35", g_fxSharpen) F("SharpenHaloClamp", "1.0", g_fxHalo) F("Contrast", "1.0", g_fxContrast) F("Saturation", "1.0", g_fxSat) F("Vibrance", "0.04", g_fxVib)
     F("Shoulder", "0.12", g_fxShoulder) F("Vignette", "0.0", g_fxVignette) F("Gamma", "1.0", g_fxGamma) F("Brightness", "1.0", g_fxBrightness) F("TonemapKnee", "0.72", g_fxKnee) F("TonemapRoll", "0.15", g_fxRoll) F("SplitTone", "0.12", g_fxSplit)
     g_fxTonemap = GetPrivateProfileIntA("post", "Tonemap", 1, ini);
 #undef F

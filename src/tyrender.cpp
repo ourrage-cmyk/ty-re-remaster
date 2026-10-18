@@ -48,6 +48,15 @@ static void logf(const char* fmt, ...) {
     if (!g_cap) fflush(g_log);
 }
 #define CAP(...) do { if (g_cap) logf(__VA_ARGS__); } while (0)
+// Paths written to tyrender.log: relative to the game folder when inside it, and the Windows user name in C:\Users\<name> replaced by <user>.
+static std::string LogPath(const char* p) {
+    std::string s = p ? p : "", gd = g_dir;
+    if (!gd.empty() && s.size() >= gd.size() && _strnicmp(s.c_str(), gd.c_str(), gd.size()) == 0) return s.substr(gd.size());
+    std::string low = s; for (auto& c : low) c = (char)tolower((unsigned char)c);
+    size_t u = low.find("\\users\\");
+    if (u != std::string::npos) { size_t a = u + 7, b = s.find('\\', a); if (b != std::string::npos) return s.substr(0, a) + "<user>" + s.substr(b); }
+    return s;
+}
 // session report (sesslog.inl): declared here because the shader and crash code above uses them
 static void SessEvent(const char* fmt, ...); static void SessEventForce(const char* fmt, ...); static void SessFailure(const char* kind, const char* log);
 static void SessIniCheck(const char* why); static void SessInit(); static void SessShutdown(const char* how); static void SessCrash(DWORD code, const char* mod, unsigned long off);
@@ -534,7 +543,7 @@ static void Snapshot(HDC dc) {
         fclose(f);
     }
     DeleteFileA(req);
-    logf("[snap] %s %dx%d frame=%u", out, w, h, g_frame);
+    logf("[snap] %s %dx%d frame=%u", LogPath(out).c_str(), w, h, g_frame);
 }
 
 #include "ao.inl"
@@ -640,7 +649,7 @@ static void CheckGameSettingsClash() {
     char docs[MAX_PATH] = "";
     if (FAILED(SHGetFolderPathA(nullptr, CSIDL_PERSONAL, nullptr, 0, docs))) return;
     char path[MAX_PATH]; snprintf(path, sizeof path, "%s\\TY the Tasmanian Tiger\\settings.ini", docs);
-    FILE* f = fopen(path, "rb"); if (!f) { logf("[clash] no game settings.ini at %s", path); return; }
+    FILE* f = fopen(path, "rb"); if (!f) { logf("[clash] no game settings.ini at %s", LogPath(path).c_str()); return; }
     static char buf[16384]; size_t n = fread(buf, 1, sizeof buf - 1, f); fclose(f); buf[n] = 0;
     bool ssao = false, msaa = false, inDisplay = false;
     char val[64] = "";
@@ -677,7 +686,7 @@ extern "C" __declspec(dllexport) void tyrender_init() {}
 static void CheckOrig(const char* n, void* p) {
     HMODULE m = nullptr; char path[MAX_PATH] = "?";
     if (p && GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)p, &m)) GetModuleFileNameA(m, path, MAX_PATH);
-    logf("[iat] %s orig=%p module=%s", n, p, path);
+    logf("[iat] %s orig=%p module=%s", n, p, LogPath(path).c_str());
 }
 
 // crash diagnostics: log the first fatal exception (code, address, module+offset, last GL activity) and flush
@@ -689,7 +698,7 @@ static LONG WINAPI CrashVEH(EXCEPTION_POINTERS* e) {
     static LONG once; if (InterlockedExchange(&once, 1)) return EXCEPTION_CONTINUE_SEARCH;
     void* addr = e->ExceptionRecord->ExceptionAddress; HMODULE m = nullptr; char mod[MAX_PATH] = "?";
     if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)addr, &m)) GetModuleFileNameA(m, mod, MAX_PATH);
-    logf("!!! EXCEPTION %08lx at %p (%s +0x%lx) frame=%u stage=%s prog=%u tessProg=%d fbo=%u", code, addr, mod, (unsigned long)((BYTE*)addr - (BYTE*)m), g_frame, (const char*)g_lastStage, g_curProg, (int)g_curProgTess, g_curFBO);
+    logf("!!! EXCEPTION %08lx at %p (%s +0x%lx) frame=%u stage=%s prog=%u tessProg=%d fbo=%u", code, addr, LogPath(mod).c_str(), (unsigned long)((BYTE*)addr - (BYTE*)m), g_frame, (const char*)g_lastStage, g_curProg, (int)g_curProgTess, g_curFBO);
     if (code == EXCEPTION_ACCESS_VIOLATION) logf("    access %s address %p", e->ExceptionRecord->ExceptionInformation[0] ? "write" : "read", (void*)e->ExceptionRecord->ExceptionInformation[1]);
     void* bt[24]; USHORT n = RtlCaptureStackBackTrace(0, 24, bt, nullptr);
     for (USHORT i = 0; i < n; i++) { HMODULE bm = nullptr; char bmod[MAX_PATH] = "?"; if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)bt[i], &bm)) GetModuleFileNameA(bm, bmod, MAX_PATH); logf("    #%u %p %s +0x%lx", i, bt[i], strrchr(bmod, '\\') ? strrchr(bmod, '\\') + 1 : bmod, (unsigned long)((BYTE*)bt[i] - (BYTE*)bm)); }
@@ -723,7 +732,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID) {
       GetPrivateProfileStringA("fog", "Amount", "1.0", b, sizeof b, ini); g_fogAmount = (float)atof(b); GetPrivateProfileStringA("fog", "LateBoost", "1.0", b, sizeof b, ini); g_lateFog = (float)atof(b); }
     LoadTessConfig();
     LoadPbrConfig(); LoadLightConfig(); LoadShotConfig(); LoadOverlayConfig(); LoadTexTags(); LoadEmitConfig();
-    logf("tyrender stage1 loaded. game dir %s  capture=%d,%d dump=%d override=%d", g_dir, g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
+    logf("tyrender stage1 loaded. paths in this log are relative to the game folder. capture=%d,%d dump=%d override=%d", g_capFrame1, g_capFrame2, g_dumpShaders, g_overrideShaders);
     Install();
     CheckOrig("SwapBuffers", (void*)o_SwapBuffers);
     CheckOrig("wglGetProcAddress", (void*)o_wglGetProcAddress);
