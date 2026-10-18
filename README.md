@@ -46,7 +46,7 @@ A common comment is that the mod only adds fog. These four pairs were taken with
 <td><img src="docs/ab/nofog_1_house_gate_on.jpg" alt="Ty on the launch pad with fence and rope bridge, shaders on" width="100%"></td>
 </tr>
 <tr>
-<td colspan="2"><sub><b>1 Launch pad (fog disabled).</b> Frame B has no fog (`[fog]` off in both frames), so everything that differs here is something else. Look at the red rug around Ty's feet (2x crop). Frame A: the rug is a flat painted texture. Frame B: relief (normals derived from the albedo, plus tessellation) gives the rug a bumpy surface with shaded pits, and the AO/shadow term puts a dark contact patch under and between the feet, which frame A does not have. The rock wall behind has deeper shading in its creases.</sub></td>
+<td colspan="2"><sub><b>1 Launch pad (fog disabled).</b> Fog is off in both frames, so everything that differs here is something else. Look at the red rug around Ty's feet (2x crop). Frame A: the rug is a flat painted texture. Frame B: relief (normals derived from the albedo, plus tessellation) gives the rug a bumpy surface with shaded pits, and the AO/shadow term puts a dark contact patch under and between the feet, which frame A does not have. The rock wall behind has deeper shading in its creases.</sub></td>
 </tr>
 <tr>
 <td><img src="docs/ab/nofog_1_house_gate_crop_off.jpg" alt="Ty on the launch pad with fence and rope bridge, 2x crop, F11 off" width="100%"></td>
