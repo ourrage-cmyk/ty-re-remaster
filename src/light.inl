@@ -22,10 +22,10 @@ static void LoadLightConfig() {
     LF("HemisphereAmount", "0.10", g_ltHemiAmt) LF("HemisphereStatic", "0.5", g_ltHemiStatic) LF("FoliageAmount", "0.10", g_ltFoliageAmt) LF("ShadowFill", "0.015", g_ltFill)
 #undef LF
     g_ltView = GetPrivateProfileIntA("debug", "ShadowView", 0, ini);   // restart-only: 1 = show the shadow term alone (white = lit, black = shadow)
-    g_shPlane = GetPrivateProfileIntA("shadows", "PlaneBias", 0, ini);
+    g_shPlane = GetPrivateProfileIntA("shadows", "PlaneBias", 1, ini);   // #103: receiver-plane bias on by default (set 0 to revert)
     GetPrivateProfileStringA("shadows", "PlaneClamp", "0.004", b, sizeof b, ini); g_shPlaneClamp = (float)atof(b);
     logf("[light] config (%s): view=%d plane=%d clamp=%.4f slices=%d mapscale=%d", ini, g_ltView, g_shPlane, g_shPlaneClamp, GetPrivateProfileIntA("ao", "Slices", -1, ini), GetPrivateProfileIntA("shadows", "MapScale", -1, ini));
-    GetPrivateProfileStringA("shadows", "SlopeBias", "0", b, sizeof b, ini); g_shZOff = (float)atof(b);
+    GetPrivateProfileStringA("shadows", "SlopeBias", "1.0", b, sizeof b, ini); g_shZOff = (float)atof(b);
     GetPrivateProfileStringA("shadows", "SkinBias", "0", b, sizeof b, ini); g_shSkinBias = (float)atof(b);
     GetPrivateProfileStringA("shadows", "CloseCracks", "0", b, sizeof b, ini); g_shClose = (float)atof(b);   // live, optional: 1 = fill 1-3 texel light gaps between casters (grid filter only); not needed for S1
     g_ltStamp.clear();

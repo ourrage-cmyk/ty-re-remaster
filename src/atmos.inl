@@ -331,12 +331,14 @@ static bool LateFogBegin() {
     GLuint tex = g_bound2D[g_progDiffUnit[g_curProg] & 31];
     const MatRow& row = MatPolicy(tex);
     bool emitBoost = g_fogEmitBoost > 1.0f && row.emissive;
-    if (!row.seeThru && !((g_fogLateEmit || emitBoost) && row.emissive)) return false;
+    // [fog] WaterBoost on opaque water-named draws (lily pads, #82): they are not see-through, so they used to return here and never got the boost
+    bool waterOpaque = g_fogWaterBoost > 1.0f && (TexFlags(tex) & TF_WATER);
+    if (!row.seeThru && !waterOpaque && !((g_fogLateEmit || emitBoost) && row.emissive)) return false;
     // [fog] WaterBoost (issue #3/#4 water): water-named see-through draws use their own multiplier; their vertex fog is already at the water's own distance
     // [fog] FoliageBoost (issue #4, default 1 = off): see-through non-water draws after the fog pass (tree cards) get their own multiplier instead of LateBoost
     float mult = g_lateFog;
     if (emitBoost) mult = g_fogEmitBoost;   // fire and emissive particles: their own multiplier, also when see-through
-    else if (row.seeThru) { if (TexFlags(tex) & TF_WATER) { if (g_fogWaterBoost > 1.0f) mult = g_fogWaterBoost; } else if (g_fogFoliageBoost > 1.0f) mult = g_fogFoliageBoost; }
+    else if (row.seeThru || waterOpaque) { if (TexFlags(tex) & TF_WATER) { if (g_fogWaterBoost > 1.0f) mult = g_fogWaterBoost; } else if (g_fogFoliageBoost > 1.0f) mult = g_fogFoliageBoost; }
     if (mult <= 1.0f) return false;
     memcpy(g_lateSaved, g_progFog[g_curProg], sizeof g_lateSaved); g_lateProg = g_curProg;
     GLfloat b[4] = {g_lateSaved[0], g_lateSaved[1], g_lateSaved[2], g_lateSaved[3]}; b[1] = fminf(b[1] * mult, 1.0f - b[0]);
