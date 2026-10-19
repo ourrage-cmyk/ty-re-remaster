@@ -15,7 +15,7 @@ static const GLuint kTexProgs = 8192;
 static GLint g_progTyTexLoc[kTexProgs]; static float g_progTyTexLast[kTexProgs];   // per program: tyTex uniform location, last value (g_progDiffUnit = albedo sampler unit, in tyrender.cpp)
 static GLint g_progTyWaterLoc[kTexProgs]; static float g_progTyWaterLast[kTexProgs]; static int g_texWaterNoFresnel; static int g_dbgWater = 0;   // [pbr] DebugWater bitmask (issue #5 bisect), see LoadPbrConfig   // ini [pbr] SkyFresnelSkipWater (default 0 = off): per-draw tyWater uniform, 1 = water-tagged draw
 static std::unordered_map<std::string, uint8_t> g_tagByName;      // lowercase file name -> flags
-static int g_spillLog = 0; static std::unordered_map<GLuint, unsigned> g_spillCnt; static std::unordered_map<GLuint, std::string> g_texNameById;   // #9 step 1 (SpillLogDraw)
+static int g_fogDiag = 0; static int g_spillLog = 0; static std::unordered_map<GLuint, unsigned> g_spillCnt; static std::unordered_map<GLuint, std::string> g_texNameById;   // #9 step 1 (SpillLogDraw)
 // ini [decal] (#8 footprint glow): Clamp=0 (default off) caps the luminance of decal draws at Max; Names = file names that count as decals.
 // Per program: tyDecal uniform (1 = decal draw), set per draw from the bound albedo flags (TexDrawPrep).
 static int g_decalClamp = 0; static float g_decalMax = 0.9f; static std::vector<std::string> g_decalNames;
@@ -74,6 +74,7 @@ static void LoadTexTags() {
     char dn[512]; GetPrivateProfileStringA("decal", "Names", "ty_footprint.dds,ty_footprint2.dds", dn, sizeof dn, ini);
     g_decalNames.clear(); for (char* t = strtok(dn, ","); t; t = strtok(nullptr, ",")) { std::string x = TexBase(t); while (!x.empty() && x.back() == ' ') x.pop_back(); if (!x.empty()) g_decalNames.push_back(x); }
     // [fog] WaterNames (default empty): extra file-name substrings that get TF_WATER, so WaterBoost also fogs them (e.g. lily pads). Empty = only names containing "water".
+    g_fogDiag = GetPrivateProfileIntA("fog", "Diag", 0, ini);   // debug: 1 = [fogdiag2] and [shadows] patch lines in tyrender.log
     g_waterNames.clear(); { char wn[512]; GetPrivateProfileStringA("fog", "WaterNames", "", wn, sizeof wn, ini);
       for (char* t = strtok(wn, ","); t; t = strtok(nullptr, ",")) { std::string x = t; while (!x.empty() && x.front() == ' ') x.erase(0, 1); while (!x.empty() && x.back() == ' ') x.pop_back(); for (auto& c : x) c = (char)tolower((unsigned char)c); if (!x.empty()) g_waterNames.push_back(x); } }
     if (!g_texFlagArr) g_texFlagArr = (uint8_t*)calloc(kTexArr, 1);
@@ -190,7 +191,7 @@ static void TexOnUpload(GLuint id, int lvl, GLenum ifmt, int w, int h, const voi
         if (low.find("water") != std::string::npos) fl |= TF_WATER;
         for (const std::string& wn : g_waterNames) if (low.find(wn) != std::string::npos) { fl |= TF_WATER; break; } }
     g_texFlagArr[id] = fl; g_texClassArr[id] = MatClassOfFlags(fl);
-    if ((g_spillLog || g_texLogUnknown) && nm) g_texNameById[id] = nm;
+    if ((g_spillLog || g_texLogUnknown || g_fogDiag) && nm) g_texNameById[id] = nm;
     if (g_texDebug) { char b[160]; snprintf(b, sizeof b, "%s %dx%d ifmt=%#x", nm ? nm : "?", w, h, ifmt); g_texInfo[id] = b; }
     if (g_texDebug && g_texUploads < 500) logf("[tex] upload id=%u %dx%d ifmt=%#x bytes=%d px=%p name=%s flags=%u", id, w, h, ifmt, bytes, px, nm ? nm : "?", fl);
 }

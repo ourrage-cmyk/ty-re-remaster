@@ -198,6 +198,7 @@ static bool PatchShadowShader(std::string& s) {
     n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture2, v_shadowCoord2)", "TyPCFL(shadowTexture2, v_shadowCoord2, tyShLod)");
     n += ReplaceAll(s, "SHADOWTEXTURE(shadowTexture3, v_shadowCoord3)", "TyPCFL(shadowTexture3, v_shadowCoord3, tyShLod)");
     n += ReplaceAll(s, "shadowAmount * 0.5", "shadowAmount * tyShadowStrength");   // set per program after link (grass gets its own value)
+    if (g_fogDiag) { static int diagN = 0; if (diagN++ < 8) logf("[shadows] stock shadow patch replacements=%d", n); }
     if (!n) return false;
     // Filter: 4-tap probe (rotated cross, bilinear compare = 16 depth fetches). Fully lit / fully shadowed neighbourhoods (the vast majority of pixels) stop there.
     // Edge pixels take Vogel-spiral taps with a per-pixel interleaved-gradient rotation that changes every frame (TAA integrates it -> no stipple).
@@ -277,7 +278,7 @@ HOOK(void, glDrawElements, (GLenum m, GLsizei n, GLenum t, const GLvoid* idx)) {
     if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; }   // tessellated programs only accept GL_PATCHES
     for (int k = 0; k < 2; k++) if (g_pendingShadowUnit[k] >= 0) { if (g_pendingShadowUnit[k] < 32) g_shadowTex[k] = g_bound2D[g_pendingShadowUnit[k]]; g_pendingShadowUnit[k] = -1; } bool zFix = SeeThruDepthBegin(); CAP("glDrawElements %#x n=%d", m, n); EmitQBegin(); o_glDrawElements(m, n, t, idx); EmitQEnd(); if (zFix) SeeThruDepthEnd(); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawElements(m, n, t, idx); GIMaskEnd(); } if (EmitBegin()) { o_glDrawElements(m, n, t, idx); EmitEnd(); } }
 HOOK(void, glDrawArrays, (GLenum m, GLint f, GLsizei n)) { g_draws++; TexDrawPrep();
-    if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; } CAP("glDrawArrays %#x first=%d n=%d", m, f, n); EmitQBegin(); o_glDrawArrays(m, f, n); EmitQEnd(); if (GIMaskBegin()) { o_glDrawArrays(m, f, n); GIMaskEnd(); } if (EmitBegin()) { o_glDrawArrays(m, f, n); EmitEnd(); } }
+    if (g_curProgTess) { if (m != 4) { g_tessBadDrawsExt++; return; } TessPatchMode(); m = 0x000E; } CAP("glDrawArrays %#x first=%d n=%d", m, f, n); bool lateFog = LateFogBegin("arrays"); EmitQBegin(); o_glDrawArrays(m, f, n); EmitQEnd(); if (lateFog) LateFogEnd(); if (GIMaskBegin()) { o_glDrawArrays(m, f, n); GIMaskEnd(); } if (EmitBegin()) { o_glDrawArrays(m, f, n); EmitEnd(); } }
 HOOK(void, glTexImage2D, (GLenum t, GLint lvl, GLint ifmt, GLsizei w, GLsizei h, GLint b, GLenum fmt, GLenum ty, const GLvoid* px)) {
     // enlarge the 2048^2 cascade shadow maps (texel size is read from textureSize() in patched shaders)
     if (g_shPatch && g_shMapScale > 1 && !px && ifmt == 0x81A7 && w == 2048 && h == 2048) { w *= g_shMapScale; h *= g_shMapScale; logf("[shadows] shadow map enlarged to %dx%d", w, h); }
