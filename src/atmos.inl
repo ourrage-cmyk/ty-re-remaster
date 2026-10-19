@@ -326,7 +326,19 @@ static void FogDiagDraw() {
 // volumetric fog, only the engine's own per-vertex fog. [fog] LateBoost (default 1 = off; 2.0 was tried and fogged everything) multiplies that engine fog strength for just those draws.
 static GLfloat g_lateSaved[4]; static GLuint g_lateProg;
 // [fog] LateEmitters (issue #4, default 0): the same late boost also covers emissive draws after the fog pass (cave fire, particles), which were never hazed.
-static bool LateFogBegin() {
+// [fog] Diag=1 (debug): once per texture, log the late-fog inputs of emissive and water draws, so a playtest log shows whether they reach this code
+static void FogDiagLate(const char* via) {
+    static uint8_t seen[kTexArr];
+    if (!g_fogDiag || !g_curProg || g_curProg >= 8192 || !g_texFlagArr) return;
+    GLuint tex = g_bound2D[g_progDiffUnit[g_curProg] & 31];
+    if (tex >= kTexArr || seen[tex]) return;
+    const MatRow& row = MatPolicy(tex); bool water = (TexFlags(tex) & TF_WATER) != 0;
+    if (!row.emissive && !water) return;
+    seen[tex] = 1; auto it = g_texNameById.find(tex);
+    logf("[fogdiag2] tex=%u name=%s emissive=%d seeThru=%d water=%d via=%s afterFog=%d fbo=%u fogLoc=%d", tex, it != g_texNameById.end() ? it->second.c_str() : "?", row.emissive ? 1 : 0, row.seeThru ? 1 : 0, water ? 1 : 0, via, g_atRanFrame == g_frame ? 1 : 0, (unsigned)g_curFBO, g_progFogLoc1[g_curProg] ? 1 : 0);
+}
+static bool LateFogBegin(const char* via = "elements") {
+    FogDiagLate(via);
     if ((g_lateFog <= 1.0f && g_fogWaterBoost <= 1.0f && g_fogFoliageBoost <= 1.0f && g_fogEmitBoost <= 1.0f) || g_atRanFrame != g_frame || g_curFBO != 0 || !g_curProg || g_curProg >= 8192 || !g_progFogLoc1[g_curProg] || !g_texFlagArr) return false;
     GLuint tex = g_bound2D[g_progDiffUnit[g_curProg] & 31];
     const MatRow& row = MatPolicy(tex);
